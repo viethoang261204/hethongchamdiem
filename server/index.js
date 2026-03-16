@@ -542,5 +542,17 @@ app.delete('/api/scores/:id', async (req, res) => {
   }
 });
 
+// Serve static files from client build (for production)
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// SPA fallback - must be last route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Server chạy tại http://localhost:${PORT}`));
