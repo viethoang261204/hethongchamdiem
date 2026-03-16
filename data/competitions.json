@@ -1,0 +1,14 @@
+{
+  "competitions": [
+    {
+      "id": "comp-mmsz5ad3",
+      "name": "ENJOY AI 2025",
+      "description": "",
+      "location": "Hà Nội",
+      "startDate": "2026-05-10",
+      "endDate": "2026-05-30",
+      "isActive": true,
+      "createdAt": "2026-03-16T09:21:47.703Z"
+    }
+  ]
+}

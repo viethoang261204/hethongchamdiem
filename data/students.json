@@ -1,0 +1,22 @@
+{
+  "students": [
+    {
+      "id": "student-mmt36kdi",
+      "fullName": "Nguyễn Minh Việt Hoàng",
+      "class": "12A2",
+      "school": "THPT Chuyên Lê Hồng Phong",
+      "grade": "12",
+      "dateOfBirth": "2004-12-26",
+      "createdAt": "2026-03-16T11:14:45.798Z"
+    },
+    {
+      "id": "student-mmt37yve",
+      "fullName": "Quốc Bảo",
+      "class": "Okela",
+      "school": "Vinschool",
+      "grade": "123",
+      "dateOfBirth": "2004-12-26",
+      "createdAt": "2026-03-16T11:15:51.242Z"
+    }
+  ]
+}

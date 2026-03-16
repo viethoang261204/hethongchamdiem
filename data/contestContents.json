@@ -1,0 +1,108 @@
+{
+  "contestContents": [
+    {
+      "id": "content-1",
+      "competitionId": "comp-1",
+      "name": "Đua xe tự hành",
+      "description": "Nội dung thi đua xe robot tự hành",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "thoi_gian",
+            "label": "Thời gian",
+            "type": "time",
+            "required": true
+          },
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          },
+          {
+            "id": "ghi_chu",
+            "label": "Ghi chú",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "content-2",
+      "competitionId": "comp-1",
+      "name": "Robot cứu hộ",
+      "description": "Nội dung thi robot cứu hộ",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "thoi_gian",
+            "label": "Thời gian",
+            "type": "time",
+            "required": true
+          },
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          },
+          {
+            "id": "hoan_thanh",
+            "label": "Hoàn thành nhiệm vụ",
+            "type": "boolean",
+            "required": false
+          }
+        ]
+      },
+      "order": 2
+    },
+    {
+      "id": "content-mmszqzdc",
+      "competitionId": "comp-mmsz5ad3",
+      "name": "Drone",
+      "description": "",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "thoi_gian",
+            "label": "Thời gian",
+            "type": "time",
+            "required": true
+          },
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          }
+        ]
+      },
+      "order": 1
+    },
+    {
+      "id": "content-mmszr7h5",
+      "competitionId": "comp-mmsz5ad3",
+      "name": "Flycam",
+      "description": "",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "thoi_gian",
+            "label": "Thời gian",
+            "type": "time",
+            "required": true
+          },
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          }
+        ]
+      },
+      "order": 2
+    }
+  ]
+}

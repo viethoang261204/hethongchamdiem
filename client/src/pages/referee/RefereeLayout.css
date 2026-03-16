@@ -1,0 +1,401 @@
+.referee-panel {
+  min-height: 100vh;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 25%, #bae6fd 50%, #e0f2fe 100%);
+  background-attachment: fixed;
+}
+
+.referee-panel .sidebar {
+  left: 0;
+  top: 0;
+  width: 280px;
+  min-width: 280px;
+  background: linear-gradient(180deg, #0077b6 0%, #005a8d 100%);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  z-index: 100;
+}
+
+.referee-panel .sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 24px;
+}
+
+.referee-panel .sidebar-logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.referee-panel .sidebar-logo-fallback {
+  display: none;
+}
+
+.referee-panel .sidebar-logo-fallback.show {
+  display: flex;
+}
+
+.referee-panel .logo-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.referee-panel .logo-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: #fff;
+  fill: none;
+  stroke-width: 2;
+}
+
+.referee-panel .logo-text {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.referee-panel .nav-menu {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.referee-panel .nav-section-title {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+
+.referee-panel .nav-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.75);
+  text-decoration: none;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.referee-panel .nav-item:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  text-decoration: none;
+}
+
+.referee-panel .nav-item.active {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-weight: 600;
+}
+
+.referee-panel .sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 16px;
+}
+
+.referee-panel .user-info {
+  padding: 12px;
+}
+
+.referee-panel .user-name {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.referee-panel .user-email {
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+}
+
+.referee-panel .logout-btn {
+  margin-top: 8px;
+  color: rgba(255,255,255,0.8);
+}
+
+.referee-panel .main-content {
+  flex: 1;
+  margin-left: 280px;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+.referee-panel .card,
+.referee-panel .btn {
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+.referee-panel .breadcrumb {
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.referee-panel .breadcrumb a {
+  color: #0077b6;
+  text-decoration: none;
+}
+
+.referee-panel .referee-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.referee-panel .referee-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: all 0.2s;
+  border: 1px solid #e5e7eb;
+}
+
+.referee-panel .referee-card:hover {
+  border-color: #0077b6;
+  box-shadow: 0 4px 16px rgba(0,119,182,0.15);
+  transform: translateY(-2px);
+  text-decoration: none;
+  color: inherit;
+}
+
+.referee-panel .referee-card h3 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  color: #1a1a1a;
+}
+
+.referee-panel .referee-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.referee-panel .referee-steps {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.referee-panel .referee-steps .step {
+  padding: 8px 16px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.referee-panel .referee-steps .step.active {
+  background: #0077b6;
+  color: #fff;
+}
+
+.referee-panel .page-title,
+.referee-panel .referee-page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 16px 0;
+}
+
+.referee-panel .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0077b6;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  margin-bottom: 16px;
+}
+
+.referee-panel .btn-ghost:hover {
+  background: #f1f5f9;
+  border-color: #0077b6;
+}
+
+.referee-panel .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  text-decoration: none;
+}
+
+.referee-panel .btn-secondary {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #e5e7eb;
+}
+
+.referee-panel .btn-primary {
+  background: linear-gradient(135deg, #0096c7 0%, #0077b6 100%);
+  color: #fff;
+}
+
+.referee-panel .card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.referee-panel .form-group {
+  margin-bottom: 16px;
+}
+
+.referee-panel .form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.referee-panel .form-group input[type="text"],
+.referee-panel .form-group input[type="number"],
+.referee-panel .form-group input[type="time"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.referee-panel .form-group input:focus {
+  outline: none;
+  border-color: #0077b6;
+  box-shadow: 0 0 0 3px rgba(0, 119, 182, 0.15);
+}
+
+.referee-panel .form-group input.form-input-error {
+  border-color: #dc2626;
+}
+
+.referee-panel .form-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.referee-panel .form-label .required {
+  color: #dc2626;
+}
+
+.referee-panel .form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Phiếu chấm điểm - card giống form thêm mới */
+.referee-panel .score-form-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  max-width: 520px;
+  overflow: hidden;
+}
+
+.referee-panel .score-form-card .score-form-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+}
+
+.referee-panel .score-form-card .score-form-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.referee-panel .score-form-card .score-form-body {
+  padding: 24px;
+}
+
+.referee-panel .score-form-card .score-form-section {
+  margin-bottom: 24px;
+}
+
+.referee-panel .score-form-card .score-form-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.referee-panel .score-form-card .score-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+}
+
+.referee-panel .score-form-card .form-note {
+  font-size: 13px;
+  color: #64748b;
+  margin: -4px 0 16px 0;
+}
+
+.referee-panel .score-form-card .form-actions {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+@media (max-width: 899px) {
+  .referee-panel .main-content {
+    margin-left: 0;
+    padding: 24px 16px;
+  }
+}

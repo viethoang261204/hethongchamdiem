@@ -1,0 +1,17 @@
+{
+  "teams": [
+    {
+      "id": "team-mmt4vr6t",
+      "contestContentId": "content-mmszr7h5",
+      "name": "DragonFly1",
+      "competitionId": "comp-mmsz5ad3",
+      "studentIds": [
+        "student-mmt37yve",
+        "student-mmt36kdi"
+      ],
+      "region": "bac",
+      "order": 1,
+      "createdAt": "2026-03-16T12:02:20.645Z"
+    }
+  ]
+}

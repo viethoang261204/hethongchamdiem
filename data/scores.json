@@ -1,0 +1,43 @@
+{
+  "scores": [
+    {
+      "id": "score-mmt5127k",
+      "teamId": "team-mmt4vr6t",
+      "contestContentId": "content-mmszr7h5",
+      "refereeId": "user-2",
+      "time": "12:02",
+      "score": 123,
+      "extraFields": {},
+      "studentSignature": "Okela",
+      "refereeSignature": "Trọng tài Nguyễn Văn A",
+      "round": 1,
+      "submittedAt": "2026-03-16T12:06:28.209Z"
+    },
+    {
+      "id": "score-mmt53qhr",
+      "teamId": "team-mmt4vr6t",
+      "contestContentId": "content-mmszr7h5",
+      "refereeId": "user-2",
+      "time": "123",
+      "score": 123,
+      "extraFields": {},
+      "studentSignature": "Quốc Bảo ",
+      "refereeSignature": "Trọng tài Nguyễn Văn A",
+      "round": 1,
+      "submittedAt": "2026-03-16T12:08:32.991Z"
+    },
+    {
+      "id": "score-mmt55eiy",
+      "teamId": "team-mmt4vr6t",
+      "contestContentId": "content-mmszr7h5",
+      "refereeId": "user-2",
+      "time": "00:12:23",
+      "score": 29,
+      "extraFields": {},
+      "studentSignature": "Trân trọng",
+      "refereeSignature": "Trọng tài Nguyễn Văn A",
+      "round": 1,
+      "submittedAt": "2026-03-16T12:09:50.794Z"
+    }
+  ]
+}

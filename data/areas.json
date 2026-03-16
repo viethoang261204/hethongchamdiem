@@ -1,0 +1,25 @@
+{
+  "areas": [
+    {
+      "id": "area-1",
+      "competitionId": "comp-1",
+      "contestContentId": "content-1",
+      "name": "Khu vực A - Sân 1",
+      "order": 1
+    },
+    {
+      "id": "area-2",
+      "competitionId": "comp-1",
+      "contestContentId": "content-1",
+      "name": "Khu vực B - Sân 2",
+      "order": 2
+    },
+    {
+      "id": "area-3",
+      "competitionId": "comp-1",
+      "contestContentId": "content-2",
+      "name": "Khu vực C - Robot cứu hộ",
+      "order": 1
+    }
+  ]
+}

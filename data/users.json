@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": "user-1",
+      "username": "admin",
+      "password": "admin123",
+      "role": "admin",
+      "fullName": "Quản trị viên"
+    },
+    {
+      "id": "user-2",
+      "username": "trongtai1",
+      "password": "123",
+      "role": "referee",
+      "fullName": "Trọng tài Nguyễn Văn A"
+    }
+  ]
+}

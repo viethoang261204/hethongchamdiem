@@ -1,0 +1,800 @@
+/* Nhutinportal-style Admin */
+.nhutin-admin {
+  min-height: 100vh;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  background: linear-gradient(180deg, #bfdbfe 0%, #93c5fd 25%, #bae6fd 50%, #cffafe 75%, #e0f2fe 100%);
+  background-attachment: fixed;
+}
+
+.nhutin-admin .sidebar {
+  left: 0;
+  top: 0;
+  width: 280px;
+  min-width: 280px;
+  background: linear-gradient(180deg, #0077b6 0%, #005a8d 100%);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  z-index: 100;
+  transition: transform 0.3s ease;
+}
+
+.nhutin-admin .sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 24px;
+}
+
+.nhutin-admin .sidebar-logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.nhutin-admin .sidebar-logo-fallback {
+  display: none;
+}
+
+.nhutin-admin .sidebar-logo-fallback.show {
+  display: flex;
+}
+
+.nhutin-admin .logo-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nhutin-admin .logo-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: #fff;
+  fill: none;
+  stroke-width: 2;
+}
+
+.nhutin-admin .logo-text {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.nhutin-admin .nav-menu {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.nhutin-admin .nav-section {
+  margin-bottom: 24px;
+}
+
+.nhutin-admin .nav-section-title {
+  color: rgba(255,255,255,0.5);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+
+.nhutin-admin .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.75);
+  text-decoration: none;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-bottom: 2px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.nhutin-admin .nav-item:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  text-decoration: none;
+}
+
+.nhutin-admin .nav-item.active {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-weight: 600;
+}
+
+.nhutin-admin .nav-item-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nhutin-admin .nav-item-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.nhutin-admin .user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.nhutin-admin .sidebar-footer {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 16px;
+}
+
+.nhutin-admin .user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.nhutin-admin .user-name {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nhutin-admin .user-email {
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+}
+
+.nhutin-admin .logout-btn {
+  margin-top: 8px;
+  color: rgba(255,255,255,0.8);
+}
+
+.nhutin-admin .main-content {
+  flex: 1;
+  margin-left: 280px;
+  padding: 32px;
+  min-height: 100vh;
+}
+
+.nhutin-admin .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.nhutin-admin .page-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px 0;
+}
+
+.nhutin-admin .page-subtitle {
+  color: #666;
+  font-size: 14px;
+  margin: 0;
+}
+
+.nhutin-admin .breadcrumb {
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.nhutin-admin .breadcrumb a {
+  color: #0077b6;
+  text-decoration: none;
+}
+
+.nhutin-admin .breadcrumb span {
+  margin: 0 4px;
+}
+
+.nhutin-admin .card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.nhutin-admin .filters-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.nhutin-admin .search-box {
+  flex: 1;
+  min-width: 220px;
+  position: relative;
+}
+
+.nhutin-admin .search-box input {
+  width: 100%;
+  padding: 12px 16px 12px 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.nhutin-admin .search-box input:focus {
+  outline: none;
+  border-color: #0077b6;
+  box-shadow: 0 0 0 3px rgba(0,119,182,0.12);
+}
+
+.nhutin-admin .filter-select {
+  padding: 12px 36px 12px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  cursor: pointer;
+  min-width: 160px;
+}
+
+.nhutin-admin .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  font-family: inherit;
+  border: none;
+}
+
+.nhutin-admin .btn-primary {
+  background: linear-gradient(135deg, #0096c7 0%, #0077b6 100%);
+  color: #fff;
+}
+
+.nhutin-admin .btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,119,182,0.3);
+}
+
+.nhutin-admin .btn-secondary {
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #e5e7eb;
+}
+
+.nhutin-admin .btn-secondary:hover {
+  background: #e8e8e8;
+}
+
+.nhutin-admin .btn-danger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.nhutin-admin .btn-danger:hover {
+  background: #b91c1c;
+}
+
+.nhutin-admin .table-container {
+  overflow-x: auto;
+}
+
+.nhutin-admin table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nhutin-admin thead {
+  background: #f9fafb;
+}
+
+.nhutin-admin th {
+  padding: 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nhutin-admin td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 14px;
+  color: #333;
+}
+
+.nhutin-admin tbody tr:hover {
+  background: #f9fafb;
+}
+
+.nhutin-admin .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.nhutin-admin .form-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+
+.nhutin-admin .form-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nhutin-admin .form-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.nhutin-admin .form-modal-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.nhutin-admin .form-modal-close:hover {
+  background: #f3f4f6;
+  color: #1a1a1a;
+}
+
+.nhutin-admin .form-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.nhutin-admin .form-group {
+  margin-bottom: 16px;
+}
+
+.nhutin-admin .form-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.nhutin-admin .form-input,
+.nhutin-admin .form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+.nhutin-admin .form-select {
+  cursor: pointer;
+  appearance: auto;
+}
+
+.nhutin-admin .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.nhutin-admin .form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.nhutin-admin .form-actions .btn-secondary {
+  min-width: 80px;
+}
+
+.nhutin-admin .form-actions .btn-primary {
+  min-width: 120px;
+}
+
+.nhutin-admin .form-error-inline {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.nhutin-admin .form-input-error {
+  border-color: #dc2626 !important;
+  background: #fef2f2;
+}
+
+.nhutin-admin .form-error-text {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Dashboard - welcome & stats */
+.nhutin-admin .welcome-text {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px 0;
+}
+
+.nhutin-admin .welcome-sub {
+  color: #666;
+  font-size: 14px;
+  margin: 0;
+}
+
+.nhutin-admin .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.nhutin-admin .stat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.nhutin-admin .stat-card-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  text-decoration: none;
+  color: inherit;
+}
+
+.nhutin-admin .stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.nhutin-admin .stat-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+}
+
+.nhutin-admin .stat-icon.blue {
+  background: #CAF0F8;
+}
+
+.nhutin-admin .stat-icon.blue svg {
+  stroke: #0077b6;
+}
+
+.nhutin-admin .stat-icon.green {
+  background: #D1FAE5;
+}
+
+.nhutin-admin .stat-icon.green svg {
+  stroke: #059669;
+}
+
+.nhutin-admin .stat-icon.orange {
+  background: #FED7AA;
+}
+
+.nhutin-admin .stat-icon.orange svg {
+  stroke: #EA580C;
+}
+
+.nhutin-admin .stat-icon.purple {
+  background: #E9D5FF;
+}
+
+.nhutin-admin .stat-icon.purple svg {
+  stroke: #9333EA;
+}
+
+.nhutin-admin .stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.nhutin-admin .stat-label {
+  font-size: 13px;
+  color: #888;
+  font-weight: 500;
+}
+
+.nhutin-admin .two-columns {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+/* Scoreboard sections in Dashboard */
+.nhutin-admin .scoreboard-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.nhutin-admin .scoreboard-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.nhutin-admin .scoreboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nhutin-admin .scoreboard-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.nhutin-admin .scoreboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.nhutin-admin .scoreboard-table th,
+.nhutin-admin .scoreboard-table td {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.nhutin-admin .scoreboard-table th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.nhutin-admin .scoreboard-table td {
+  border-bottom: 1px solid #f3f4f6;
+  color: #1a1a1a;
+}
+
+.nhutin-admin .rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nhutin-admin .rank-1 {
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+.nhutin-admin .rank-2 {
+  background: #F3F4F6;
+  color: #4B5563;
+}
+
+.nhutin-admin .rank-3 {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.nhutin-admin .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.nhutin-admin .card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.nhutin-admin .card-badge {
+  background: #CAF0F8;
+  color: #0077b6;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  text-decoration: none;
+}
+
+.nhutin-admin .card-badge:hover {
+  text-decoration: none;
+  opacity: 0.9;
+}
+
+.nhutin-admin .quick-actions {
+  display: grid;
+  gap: 12px;
+}
+
+.nhutin-admin .quick-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  transition: all 0.2s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.nhutin-admin .quick-action:hover {
+  background: #CAF0F8;
+  transform: translateX(4px);
+  text-decoration: none;
+  color: inherit;
+}
+
+.nhutin-admin .quick-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nhutin-admin .quick-icon.blue {
+  background: #CAF0F8;
+}
+
+.nhutin-admin .quick-icon.blue svg {
+  stroke: #0077b6;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+  fill: none;
+}
+
+.nhutin-admin .quick-info {
+  flex: 1;
+}
+
+.nhutin-admin .quick-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+
+.nhutin-admin .quick-desc {
+  font-size: 12px;
+  color: #888;
+}
+
+.nhutin-admin .status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.nhutin-admin .status.active {
+  background: #D1FAE5;
+  color: #059669;
+}
+
+.nhutin-admin .status.inactive {
+  background: #F3F4F6;
+  color: #6B7280;
+}
+
+@media (max-width: 1024px) {
+  .nhutin-admin .two-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 899px) {
+  .nhutin-admin .sidebar {
+    transform: translateX(-100%);
+  }
+  .nhutin-admin .main-content {
+    margin-left: 0;
+    padding: 24px 16px;
+  }
+  .nhutin-admin .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
