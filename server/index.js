@@ -160,6 +160,11 @@ app.put('/api/competitions/:id', async (req, res) => {
 
 app.delete('/api/competitions/:id', async (req, res) => {
   try {
+    const { contestContents } = await readData('contestContents');
+    const linked = contestContents.filter(c => c.competitionId === req.params.id);
+    if (linked.length > 0) {
+      return res.status(400).json({ error: `Không thể xóa cuộc thi này vì còn ${linked.length} nội dung thi (${linked.map(c => `"${c.name}"`).join(', ')}). Hãy xóa các nội dung thi trước.` });
+    }
     const data = await readData('competitions');
     data.competitions = data.competitions.filter(c => c.id !== req.params.id);
     await writeData('competitions', data);
@@ -217,6 +222,16 @@ app.put('/api/contents/:id', async (req, res) => {
 
 app.delete('/api/contents/:id', async (req, res) => {
   try {
+    const { teams } = await readData('teams');
+    const linkedTeams = teams.filter(t => t.contestContentId === req.params.id);
+    if (linkedTeams.length > 0) {
+      return res.status(400).json({ error: `Không thể xóa nội dung thi này vì còn ${linkedTeams.length} đội thi (${linkedTeams.slice(0, 3).map(t => `"${t.name}"`).join(', ')}${linkedTeams.length > 3 ? '...' : ''}). Hãy xóa các đội thi trước.` });
+    }
+    const { areas } = await readData('areas');
+    const linkedAreas = areas.filter(a => a.contestContentId === req.params.id);
+    if (linkedAreas.length > 0) {
+      return res.status(400).json({ error: `Không thể xóa nội dung thi này vì còn ${linkedAreas.length} khu vực thi (${linkedAreas.map(a => `"${a.name}"`).join(', ')}). Hãy xóa các khu vực trước.` });
+    }
     const data = await readData('contestContents');
     data.contestContents = data.contestContents.filter(c => c.id !== req.params.id);
     await writeData('contestContents', data);
@@ -295,6 +310,11 @@ app.put('/api/students/:id', async (req, res) => {
 
 app.delete('/api/students/:id', async (req, res) => {
   try {
+    const { teams } = await readData('teams');
+    const linkedTeams = teams.filter(t => (t.studentIds || []).includes(req.params.id));
+    if (linkedTeams.length > 0) {
+      return res.status(400).json({ error: `Không thể xóa học sinh này vì đang là thành viên của ${linkedTeams.length} đội (${linkedTeams.map(t => `"${t.name}"`).join(', ')}). Hãy xóa học sinh khỏi các đội trước.` });
+    }
     const data = await readData('students');
     data.students = data.students.filter(s => s.id !== req.params.id);
     await writeData('students', data);
@@ -357,6 +377,11 @@ app.put('/api/teams/:id', async (req, res) => {
 
 app.delete('/api/teams/:id', async (req, res) => {
   try {
+    const { scores } = await readData('scores');
+    const linkedScores = scores.filter(s => s.teamId === req.params.id);
+    if (linkedScores.length > 0) {
+      return res.status(400).json({ error: `Không thể xóa đội này vì còn ${linkedScores.length} bản ghi điểm liên quan. Hãy xóa các bản ghi điểm của đội trước.` });
+    }
     const data = await readData('teams');
     data.teams = data.teams.filter(t => t.id !== req.params.id);
     await writeData('teams', data);
@@ -476,7 +501,12 @@ app.delete('/api/users/:id', async (req, res) => {
   try {
     const data = await readData('users');
     const u = data.users.find(x => x.id === req.params.id);
-    if (u?.role === 'admin') return res.status(400).json({ error: 'Cannot delete admin' });
+    if (u?.role === 'admin') return res.status(400).json({ error: 'Không thể xóa tài khoản admin.' });
+    const { scores } = await readData('scores');
+    const linkedScores = scores.filter(s => s.refereeId === req.params.id);
+    if (linkedScores.length > 0) {
+      return res.status(400).json({ error: `Không thể xóa trọng tài này vì đã có ${linkedScores.length} bản ghi điểm được chấm. Hãy xóa các bản ghi điểm liên quan trước.` });
+    }
     data.users = data.users.filter(u => u.id !== req.params.id);
     await writeData('users', data);
     res.json({ ok: true });

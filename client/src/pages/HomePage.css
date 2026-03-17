@@ -47,7 +47,7 @@
 .home-logo:hover { text-decoration: none; }
 
 .home-logo-img {
-  height: 38px;
+  height: 56px;
   width: auto;
   object-fit: contain;
 }
@@ -174,7 +174,7 @@
 }
 
 .hero-logo {
-  max-height: 90px;
+  max-height: 160px;
   width: auto;
   margin-bottom: 16px;
   object-fit: contain;
