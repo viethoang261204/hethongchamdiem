@@ -51,10 +51,7 @@ export default function AdminLayout() {
     <div className="app-container nhutin-admin">
       <aside className="sidebar" id="sidebar">
         <div className="sidebar-header">
-          <img src="/images/logo1.png" alt="Logo" className="sidebar-logo-img" onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling?.classList.add('show'); }} />
-          <div className="logo-icon sidebar-logo-fallback">
-            <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-          </div>
+          <img src="/images/logo1.png" alt="Logo" className="sidebar-logo-img" onError={(e) => { e.target.style.display = 'none'; }} />
           <span className="logo-text">ENJOY AI Admin</span>
         </div>
         <nav className="nav-menu">

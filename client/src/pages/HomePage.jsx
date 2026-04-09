@@ -46,14 +46,64 @@ export default function HomePage() {
   const entries = Object.values(leaderboards);
 
   const rankBadge = (i) => {
-    if (i === 0) return <span className="rank-badge gold">🥇 1</span>;
-    if (i === 1) return <span className="rank-badge silver">🥈 2</span>;
-    if (i === 2) return <span className="rank-badge bronze">🥉 3</span>;
+    if (i === 0) return <span className="rank-badge gold">1</span>;
+    if (i === 1) return <span className="rank-badge silver">2</span>;
+    if (i === 2) return <span className="rank-badge bronze">3</span>;
     return <span className="rank-num">{i + 1}</span>;
   };
 
+  const tickerItems = [
+    'ENJOY AI ASIA OPEN',
+    'Kết quả thời gian thực',
+    'Chấm điểm chính xác',
+    'Chuẩn quốc tế',
+    'Giải đấu lập trình AI hàng đầu',
+    'Live Scoreboard',
+    'AI Competition Platform',
+  ];
+
+  // Generate meteors — fall from top-right → bottom-left, infrequent
+  const meteors = Array.from({ length: 6 }).map((_, i) => ({
+    id: i,
+    top: `${-5 + Math.random() * 35}%`,
+    left: `${45 + Math.random() * 55}%`,
+    delay: `${i * 4 + Math.random() * 8}s`,
+    dur: `${1.4 + Math.random() * 1}s`,
+    size: `${100 + Math.random() * 120}px`,
+  }));
+
+  // Universe stars (static across whole page)
+  const universeStars = Array.from({ length: 120 }).map((_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: 1 + Math.random() * 2,
+    dur: 2 + Math.random() * 4,
+    delay: Math.random() * 8,
+    op: 0.2 + Math.random() * 0.7,
+  }));
+
   return (
     <div className="homepage">
+
+      {/* UNIVERSE BACKGROUND — full page */}
+      <div className="universe-bg" aria-hidden="true">
+        {universeStars.map(s => (
+          <span key={s.id} className="uni-star" style={{
+            '--x': `${s.x}%`, '--y': `${s.y}%`,
+            '--size': `${s.size}px`, '--d': `${s.dur}s`,
+            '--delay': `${s.delay}s`, '--op': s.op,
+          }} />
+        ))}
+        {meteors.map(m => (
+          <span key={m.id} className="meteor" style={{
+            '--top': m.top, '--left': m.left,
+            '--delay': m.delay, '--dur': m.dur,
+            '--size': m.size,
+          }} />
+        ))}
+      </div>
+
       {/* HEADER */}
       <header className={`home-header${scrolled ? ' scrolled' : ''}`}>
         <div className="home-header-inner container">
@@ -74,6 +124,18 @@ export default function HomePage() {
         </div>
       </header>
 
+      {/* TICKER */}
+      <div className="ticker-bar">
+        <div className="ticker-inner">
+          {[...tickerItems, ...tickerItems].map((item, i) => (
+            <span key={i} className="ticker-item">
+              {item}
+              <span className="ticker-sep">|</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* HERO */}
       <section className="hero">
         <div className="hero-bg">
@@ -82,7 +144,9 @@ export default function HomePage() {
           <div className="hero-orb hero-orb-3" />
         </div>
         <div className="container hero-inner">
-          <div className="hero-badge">🏆 Giải đấu lập trình AI hàng đầu</div>
+          <div className="hero-badge">
+            Giải đấu lập trình AI hàng đầu Việt Nam
+          </div>
           <img
             src="/images/logo2.png"
             alt=""
@@ -111,7 +175,7 @@ export default function HomePage() {
               <div className="hero-stat-value">
                 {entries.reduce((s, e) => s + (e.list?.length || 0), 0) || '—'}
               </div>
-              <div className="hero-stat-label">Bảng điểm</div>
+              <div className="hero-stat-label">Đội thi</div>
             </div>
           </div>
           <div className="hero-features">
@@ -133,11 +197,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-        <div className="hero-wave">
-          <svg viewBox="0 0 1440 60" preserveAspectRatio="none">
-            <path d="M0,40 C360,80 1080,0 1440,40 L1440,60 L0,60 Z" fill="#f8fafc" />
-          </svg>
-        </div>
       </section>
 
       {/* LEADERBOARD */}
@@ -145,7 +204,7 @@ export default function HomePage() {
         <div className="container">
           <div className="bxh-header">
             <div>
-              <h2 className="bxh-title">📊 Bảng xếp hạng</h2>
+              <h2 className="bxh-title">Bảng xếp hạng</h2>
               <p className="bxh-desc">Kết quả theo từng nội dung thi của từng cuộc thi</p>
             </div>
           </div>
@@ -169,64 +228,68 @@ export default function HomePage() {
                   .filter(e => e.content.competitionId === comp.id)
                   .sort((a, b) => (a.content.order || 0) - (b.content.order || 0));
                 return (
-                  <div key={comp.id} className="bxh-comp">
+                  <div key={comp.id} className="bxh-comp-wrap">
+                  <div className="bxh-comp">
                     <div className="bxh-comp-header">
                       <div className="bxh-comp-icon">🏆</div>
                       <div>
                         <h3 className="bxh-comp-name">{comp.name}</h3>
                         <p className="bxh-comp-meta">
-                          <span className="meta-chip">📍 {comp.location}</span>
-                          <span className="meta-chip">📅 {comp.startDate} – {comp.endDate}</span>
+                          {comp.location && <span className="meta-chip">📍 {comp.location}</span>}
+                          {(comp.startDate || comp.endDate) && (
+                            <span className="meta-chip">📅 {comp.startDate} – {comp.endDate}</span>
+                          )}
                         </p>
                       </div>
                     </div>
 
-                    {compEntries.length === 0 && (
-                      <p className="bxh-no-content">Chưa có nội dung thi.</p>
-                    )}
+                    <div className="bxh-comp-body">
+                      {compEntries.length === 0 && (
+                        <p className="bxh-no-content">Chưa có nội dung thi.</p>
+                      )}
 
-                    <div className="bxh-contents-grid">
-                      {compEntries.map(({ content, list }) => (
-                        <div key={content.id} className="bxh-content-card">
-                          <div className="bxh-content-header">
-                            <h4 className="bxh-content-name">{content.name}</h4>
-                            <span className="bxh-content-count">{list.length} đội</span>
-                          </div>
-                          {list.length === 0 ? (
-                            <div className="bxh-no-score">
-                              <span>Chưa có điểm</span>
+                      <div className="bxh-contents-grid">
+                        {compEntries.map(({ content, list }) => (
+                          <div key={content.id} className="bxh-content-card">
+                            <div className="bxh-content-header">
+                              <h4 className="bxh-content-name">{content.name}</h4>
+                              <span className="bxh-content-count">{list.length} đội</span>
                             </div>
-                          ) : (
-                            <div className="table-wrap">
-                              <table className="bxh-table">
-                                <thead>
-                                  <tr>
-                                    <th>Hạng</th>
-                                    <th>Đội</th>
-                                    <th>Thời gian</th>
-                                    <th>Điểm</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {list.slice(0, 20).map((row, i) => (
-                                    <tr key={row.id} className={i < 3 ? `top-row top-${i + 1}` : ''}>
-                                      <td className="rank-cell">{rankBadge(i)}</td>
-                                      <td className="team-cell">{row.team?.name || '—'}</td>
-                                      <td className="time-cell">{row.time || '—'}</td>
-                                      <td className="score-cell">
-                                        <span className={`score-badge${i === 0 ? ' score-gold' : i === 1 ? ' score-silver' : i === 2 ? ' score-bronze' : ''}`}>
-                                          {row.score ?? '—'}
-                                        </span>
-                                      </td>
+                            {list.length === 0 ? (
+                              <div className="bxh-no-score">Chưa có điểm</div>
+                            ) : (
+                              <div className="table-wrap">
+                                <table className="bxh-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Hạng</th>
+                                      <th>Đội thi</th>
+                                      <th>Thời gian</th>
+                                      <th>Điểm</th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                                  </thead>
+                                  <tbody>
+                                    {list.slice(0, 20).map((row, i) => (
+                                      <tr key={row.id} className={i < 3 ? `top-row top-${i + 1}` : ''}>
+                                        <td className="rank-cell">{rankBadge(i)}</td>
+                                        <td className="team-cell">{row.team?.name || '—'}</td>
+                                        <td className="time-cell">{row.time || '—'}</td>
+                                        <td className="score-cell">
+                                          <span className={`score-badge${i === 0 ? ' score-gold' : i === 1 ? ' score-silver' : i === 2 ? ' score-bronze' : ''}`}>
+                                            {row.score ?? '—'}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  </div>
                   </div>
                 );
               })}
