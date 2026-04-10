@@ -59,50 +59,143 @@
       "order": 2
     },
     {
-      "id": "content-mmszqzdc",
-      "competitionId": "comp-mmsz5ad3",
-      "name": "Drone",
-      "description": "",
+      "id": "content-asia-1",
+      "competitionId": "comp-enjoyai-asia",
+      "name": "Ancient Civilizations (Nền văn minh cổ đại)",
+      "description": "Từ Mầm non đến Lớp 3",
       "scoreSheetTemplate": {
         "fields": [
-          {
-            "id": "thoi_gian",
-            "label": "Thời gian",
-            "type": "time",
-            "required": true
-          },
           {
             "id": "diem",
             "label": "Điểm",
             "type": "number",
             "required": true
+          },
+          {
+            "id": "ghi_chu",
+            "label": "Ghi chú",
+            "type": "text",
+            "required": false
           }
         ]
       },
       "order": 1
     },
     {
-      "id": "content-mmszr7h5",
-      "competitionId": "comp-mmsz5ad3",
-      "name": "Flycam",
-      "description": "",
+      "id": "content-asia-2",
+      "competitionId": "comp-enjoyai-asia",
+      "name": "Mining Expedition (Cuộc Thám Hiểm Khai Khoáng)",
+      "description": "Từ Lớp 1 đến Lớp 6",
       "scoreSheetTemplate": {
         "fields": [
-          {
-            "id": "thoi_gian",
-            "label": "Thời gian",
-            "type": "time",
-            "required": true
-          },
           {
             "id": "diem",
             "label": "Điểm",
             "type": "number",
             "required": true
+          },
+          {
+            "id": "ghi_chu",
+            "label": "Ghi chú",
+            "type": "text",
+            "required": false
           }
         ]
       },
       "order": 2
+    },
+    {
+      "id": "content-asia-3",
+      "competitionId": "comp-enjoyai-asia",
+      "name": "Invention Trail (Con đường phát minh)",
+      "description": "Từ Lớp 1 đến Lớp 12",
+      "templateType": "invention_trail",
+      "scoreSheetTemplate": {
+        "tasks": [
+          { "id": "compass",     "name": "La bàn",              "nameEn": "Compass",               "maxScore": 50,  "description": "Hình chiếu thẳng đứng của kim đô thăng hàng với miếng màu vàng bên dưới." },
+          { "id": "papermaking", "name": "Làm giấy",            "nameEn": "Papermaking",           "maxScore": 60,  "description": "Tờ giấy rời hoàn toàn khỏi bảng trên và nằm trên bảng dưới." },
+          { "id": "gunpower",    "name": "Thuốc súng",          "nameEn": "Gunpower",              "maxScore": 40,  "description": "Viên đạn rời hoàn toàn vào khung vuông và chạm vào mặt đáy." },
+          { "id": "printing",    "name": "In chữ rời",          "nameEn": "Movable-Type printing", "maxScore": 40,  "maxScoreNote": "40/lượt", "description": "Khối chữ được đặt vào vị trí nam châm và cả hai nam châm đều hút chặt." },
+          { "id": "seismoscope", "name": "Máy đo địa chấn",    "nameEn": "Seismoscope",           "maxScore": 40,  "description": "Viên bi thép rơi vào khung bao quanh phía dưới (không chạm vào mặt đáy hoặc mặt sàn)." },
+          { "id": "pyramid",     "name": "Kim tự tháp",         "nameEn": "Pyramid",               "maxScore": 60,  "description": "Kim tự tháp được đặt trên bệ thứ hai và đáy chỉ chạm bệ này." },
+          { "id": "greatwall",   "name": "Vạn lý trường thành", "nameEn": "GreatWall",             "maxScore": 60,  "description": "Vật liệu xây dựng được đặt lên trên Vạn Lý Trường Thành và chỉ chạm vào mô hình này." },
+          { "id": "bonus_task",  "name": "Nhiệm vụ thưởng",    "nameEn": "Bonus task",            "maxScore": 100, "description": "Được thông báo ngay trong cuộc thi đấu." }
+        ],
+        "fields": [
+          { "id": "diem",      "label": "Điểm",      "type": "number", "required": true },
+          { "id": "thoi_gian", "label": "Thời gian", "type": "time",   "required": true }
+        ]
+      },
+      "order": 3
+    },
+    {
+      "id": "content-asia-4",
+      "competitionId": "comp-enjoyai-asia",
+      "name": "Battle of Stars (Trận chiến các ngôi sao)",
+      "description": "Từ Lớp 4 đến Lớp 12",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          },
+          {
+            "id": "ghi_chu",
+            "label": "Ghi chú",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      "order": 4
+    },
+    {
+      "id": "content-asia-5",
+      "competitionId": "comp-enjoyai-asia",
+      "name": "Fly Smart cup",
+      "description": "Từ Mầm non đến Lớp 6",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          },
+          {
+            "id": "ghi_chu",
+            "label": "Ghi chú",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      "order": 5
+    },
+    {
+      "id": "content-asia-6",
+      "competitionId": "comp-enjoyai-asia",
+      "name": "Skyline Adventure (Cuộc Phiêu Lưu Trên Bầu Trời)",
+      "description": "Từ Lớp 1 đến Lớp 12",
+      "scoreSheetTemplate": {
+        "fields": [
+          {
+            "id": "diem",
+            "label": "Điểm",
+            "type": "number",
+            "required": true
+          },
+          {
+            "id": "ghi_chu",
+            "label": "Ghi chú",
+            "type": "text",
+            "required": false
+          }
+        ]
+      },
+      "order": 6
     }
   ]
 }

@@ -10,6 +10,7 @@ import AdminTeams from './pages/admin/AdminTeams';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminRefereeAccounts from './pages/admin/AdminRefereeAccounts';
 import AdminScores from './pages/admin/AdminScores';
+import AdminScoreDetail from './pages/admin/AdminScoreDetail';
 import AdminScoreboard from './pages/admin/AdminScoreboard';
 import AdminContentsPage from './pages/admin/AdminContentsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -68,6 +69,7 @@ export default function App() {
               <Route path="students" element={<AdminStudents />} />
               <Route path="referee-accounts" element={<AdminRefereeAccounts />} />
               <Route path="scores" element={<AdminScores />} />
+              <Route path="scores/:scoreId" element={<AdminScoreDetail />} />
             </>
           )}
         </Route>

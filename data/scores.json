@@ -1,43 +1,66 @@
 {
   "scores": [
     {
-      "id": "score-mmt5127k",
-      "teamId": "team-mmt4vr6t",
-      "contestContentId": "content-mmszr7h5",
+      "id": "score-mnsklzep",
+      "teamId": "team-mnskkitv",
+      "contestContentId": "content-asia-3",
       "refereeId": "user-2",
-      "time": "12:02",
-      "score": 123,
-      "extraFields": {},
-      "studentSignature": "Okela",
+      "time": "23223",
+      "score": 238,
+      "round": 12,
+      "extraFields": {
+        "bangThi": "A",
+        "taskScores": {
+          "compass": "2",
+          "papermaking": "2",
+          "gunpower": "3",
+          "printing": "23",
+          "seismoscope": "21",
+          "pyramid": "52",
+          "greatwall": "123",
+          "bonus_task": "12"
+        },
+        "rerunCount": "0",
+        "extraReward": 0,
+        "teamMembers": "Việt Minh",
+        "chiefReferee": "Việt Hoàng",
+        "scorekeeper": "",
+        "remarks": ""
+      },
+      "studentSignature": "Việt Minh",
       "refereeSignature": "Trọng tài Nguyễn Văn A",
-      "round": 1,
-      "submittedAt": "2026-03-16T12:06:28.209Z"
+      "submittedAt": "2026-04-10T07:14:34.753Z"
     },
     {
-      "id": "score-mmt53qhr",
-      "teamId": "team-mmt4vr6t",
-      "contestContentId": "content-mmszr7h5",
+      "id": "score-mnsl4i7n",
+      "teamId": "team-mnskkitv",
+      "contestContentId": "content-asia-3",
       "refereeId": "user-2",
-      "time": "123",
-      "score": 123,
-      "extraFields": {},
-      "studentSignature": "Quốc Bảo ",
-      "refereeSignature": "Trọng tài Nguyễn Văn A",
+      "time": "22",
+      "score": 1052,
       "round": 1,
-      "submittedAt": "2026-03-16T12:08:32.991Z"
-    },
-    {
-      "id": "score-mmt55eiy",
-      "teamId": "team-mmt4vr6t",
-      "contestContentId": "content-mmszr7h5",
-      "refereeId": "user-2",
-      "time": "00:12:23",
-      "score": 29,
-      "extraFields": {},
-      "studentSignature": "Trân trọng",
+      "extraFields": {
+        "bangThi": "qqq",
+        "taskScores": {
+          "compass": "23",
+          "papermaking": "213",
+          "gunpower": "213",
+          "printing": "123",
+          "seismoscope": "123",
+          "pyramid": "21",
+          "greatwall": "123",
+          "bonus_task": "213"
+        },
+        "rerunCount": "0",
+        "extraReward": 0,
+        "teamMembers": "Nguyễn Minh Việt Hoàng, Quốc Bảo",
+        "chiefReferee": "",
+        "scorekeeper": "",
+        "remarks": ""
+      },
+      "studentSignature": "Nguyễn Minh Việt Hoàng, Quốc Bảo",
       "refereeSignature": "Trọng tài Nguyễn Văn A",
-      "round": 1,
-      "submittedAt": "2026-03-16T12:09:50.794Z"
+      "submittedAt": "2026-04-10T07:28:58.931Z"
     }
   ]
 }

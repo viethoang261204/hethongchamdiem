@@ -16,7 +16,7 @@ export default function AdminTeams() {
   const [filterComp, setFilterComp] = useState('');
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ name: '', studentIds: [], region: 'bac', competitionId: '', contestContentId: '' });
+  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const SECURITY_CODE = '26122004';
@@ -93,7 +93,7 @@ export default function AdminTeams() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ name: '', studentIds: [], region: 'bac', competitionId: filterComp || '', contestContentId: '' });
+    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '' });
     setErrors({});
   };
 
@@ -103,7 +103,6 @@ export default function AdminTeams() {
     setForm({
       name: team.name || '',
       studentIds: team.studentIds || [],
-      region: team.region || 'bac',
       competitionId: content?.competitionId || '',
       contestContentId: team.contestContentId || '',
     });
@@ -208,14 +207,12 @@ export default function AdminTeams() {
           name: form.name,
           competitionId: form.competitionId,
           studentIds: form.studentIds,
-          region: form.region,
           order: teams.length + 1,
         });
       } else {
         await api.putTeam(modal.id, {
           name: form.name,
           studentIds: form.studentIds,
-          region: form.region,
         });
       }
       setModal(null);
@@ -289,14 +286,13 @@ export default function AdminTeams() {
                 <th>Đội</th>
                 <th>Giải đấu</th>
                 <th>Nội dung</th>
-                <th>Vùng</th>
                 <th>Học sinh</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {teamsFiltered.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
               ) : teamsFiltered.map((t) => {
                 const mems = (t.studentIds || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
                 return (
@@ -304,7 +300,6 @@ export default function AdminTeams() {
                     <td>{t.name}</td>
                     <td>{getCompetitionName(t.contestContentId)}</td>
                     <td>{getContentName(t.contestContentId)}</td>
-                    <td>{t.region === 'trung' ? 'Trung' : t.region === 'nam' ? 'Nam' : 'Bắc'}</td>
                     <td>{mems.map(m => m.fullName).join(', ')}</td>
                     <td>
                       <Link to={`/admin/competitions/${getCompetitionName(t.contestContentId)}/contents/${t.contestContentId}/scoreboard`} className="btn btn-secondary" style={{ marginRight: 8 }}>Điểm</Link>
@@ -360,14 +355,6 @@ export default function AdminTeams() {
                 <label className="form-label">Tên đội <span style={{ color: '#dc2626' }}>*</span></label>
                 <input className={`form-input ${errors.name ? 'form-input-error' : ''}`} value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); setErrors({ ...errors, name: '' }); }} />
                 {errors.name && <div className="form-error-text">{errors.name}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Vùng</label>
-                <select className="form-input form-select" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
-                  <option value="bac">Bắc</option>
-                  <option value="trung">Trung</option>
-                  <option value="nam">Nam</option>
-                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Trường (lọc học sinh)</label>

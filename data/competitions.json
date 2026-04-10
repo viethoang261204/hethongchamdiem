@@ -1,14 +1,14 @@
 {
   "competitions": [
     {
-      "id": "comp-mmsz5ad3",
-      "name": "ENJOY AI 2025",
+      "id": "comp-enjoyai-asia",
+      "name": "ENJOY AI ASIA OPEN 2026",
       "description": "",
       "location": "Hà Nội",
-      "startDate": "2026-05-10",
-      "endDate": "2026-05-30",
+      "startDate": "2026-06-10",
+      "endDate": "2026-05-22",
       "isActive": true,
-      "createdAt": "2026-03-16T09:21:47.703Z"
+      "createdAt": "2026-04-10T00:00:00.000Z"
     }
   ]
 }

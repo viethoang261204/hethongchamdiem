@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import './AdminLayout.css';
@@ -125,7 +126,8 @@ export default function AdminScores() {
                     <td>{s.time || '-'}</td>
                     <td><strong>{s.score ?? '-'}</strong></td>
                     <td>{s.submittedAt ? new Date(s.submittedAt).toLocaleString('vi-VN') : '-'}</td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <Link to={`/admin/scores/${s.id}`} className="btn btn-secondary" style={{ marginRight: 8 }}>Xem</Link>
                       <button type="button" className="btn btn-danger" onClick={() => remove(s.id)}>Xóa</button>
                     </td>
                   </tr>

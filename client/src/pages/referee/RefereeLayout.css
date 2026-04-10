@@ -743,3 +743,34 @@
     padding: 20px 16px 32px;
   }
 }
+
+/* ─── Print (generic score detail) ──────────────────────── */
+@media print {
+  .referee-panel .sidebar,
+  .referee-panel .sidebar-footer,
+  .no-print {
+    display: none !important;
+  }
+  .referee-panel .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  .score-form-card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    max-width: 100% !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .score-form-header,
+  .score-section-title {
+    background: #f0f0f0 !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+}

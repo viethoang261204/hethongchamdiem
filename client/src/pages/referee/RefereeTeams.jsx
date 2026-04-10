@@ -14,7 +14,7 @@ export default function RefereeTeams() {
       api.getTeams(contentId),
       api.getStudents(),
     ]).then(([teamsList, st]) => {
-      setTeams(teamsList.filter(t => (t.region || 'bac') === region));
+      setTeams(teamsList);
       setStudents(st);
     }).catch(console.error).finally(() => setLoading(false));
   }, [contentId, region]);
@@ -30,8 +30,6 @@ export default function RefereeTeams() {
       </Link>
       <div className="breadcrumb" style={{ marginBottom: '1rem' }}>
         <Link to="/referee">Chấm điểm</Link>
-        <span> / </span>
-        <span>{region === 'trung' ? 'Trung' : region === 'nam' ? 'Nam' : 'Bắc'}</span>
       </div>
       <h1 className="referee-page-title">Danh sách đội</h1>
       <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>Ấn vào từng đội để chấm điểm.</p>

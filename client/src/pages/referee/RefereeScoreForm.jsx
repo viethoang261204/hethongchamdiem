@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
+import InventionTrailScoreForm from './InventionTrailScoreForm';
 import './RefereeLayout.css';
 
 export default function RefereeScoreForm() {
@@ -13,6 +14,7 @@ export default function RefereeScoreForm() {
   const [team, setTeam] = useState(null);
   const [content, setContent] = useState(null);
   const [existing, setExisting] = useState([]);
+  const [memberNames, setMemberNames] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -24,10 +26,19 @@ export default function RefereeScoreForm() {
       api.getContents(competitionId).then(list => list.find(c => c.id === contentId)),
       api.getTeams(contentId).then(list => list.find(t => t.id === teamId)),
       api.getTeamScores(teamId),
-    ]).then(([contentData, teamData, scores]) => {
+      api.getStudents(),
+    ]).then(([contentData, teamData, scores, students]) => {
       setContent(contentData);
       setTeam(teamData);
       setExisting(scores);
+      if (teamData?.studentIds?.length) {
+        const names = teamData.studentIds
+          .map(id => students.find(s => s.id === id))
+          .filter(Boolean)
+          .map(s => s.fullName)
+          .join(', ');
+        setMemberNames(names);
+      }
     }).catch(console.error).finally(() => setLoading(false));
   }, [competitionId, contentId, teamId]);
 
@@ -83,6 +94,20 @@ export default function RefereeScoreForm() {
   const backUrl = `/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`;
 
   if (loading) return <p className="page-title">Đang tải...</p>;
+
+  // Render dedicated form for Invention Trail
+  if (content?.templateType === 'invention_trail') {
+    return (
+      <InventionTrailScoreForm
+        team={team}
+        content={content}
+        competitionId={competitionId}
+        contentId={contentId}
+        region={region}
+        memberNames={memberNames}
+      />
+    );
+  }
 
   return (
     <div>
