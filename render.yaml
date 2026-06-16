@@ -3,7 +3,7 @@ services:
     name: hethongchamdiem
     env: node
     buildCommand: cd client && npm install && npm run build && cd ../server && npm install
-    startCommand: cd server && node index.js
+    startCommand: cd server && node index.cjs
     headers:
       - path: /*
         name: Cache-Control
