@@ -4,10 +4,6 @@ services:
     env: node
     buildCommand: cd client && npm install && npm run build && cd ../server && npm install
     startCommand: cd server && node index.cjs
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
     envVars:
       - key: VITE_SUPABASE_URL
         sync: false
