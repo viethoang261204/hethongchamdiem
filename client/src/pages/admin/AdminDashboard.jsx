@@ -47,25 +47,24 @@ export default function AdminDashboard() {
     setStats(data.stats);
     setCompetitions(data.comps.filter(c => c.is_active !== false));
 
-    // Stage 2: load contents + scoreboards song song (không block UI stats)
     setExtraLoading(true);
     (async () => {
       const contentsMap = {};
       const scoreboardsMap = {};
-      await Promise.all(data.comps.map(async (comp) => {
+      for (const comp of data.comps) {
         try {
           const contents = await api.getContents(comp.id);
           contentsMap[comp.id] = contents;
-          await Promise.all(contents.map(async (content) => {
+          for (const content of contents) {
             try {
               const sb = await api.getScoreboard(content.id);
               if (sb.length > 0) scoreboardsMap[content.id] = sb.slice(0, 5);
             } catch (_) {}
-          }));
+          }
         } catch (_) {}
-      }));
-      setContentsByComp(contentsMap);
-      setScoreboards(scoreboardsMap);
+      }
+      setContentsByComp({ ...contentsMap });
+      setScoreboards({ ...scoreboardsMap });
       setExtraLoading(false);
     })();
   }, [data]);
