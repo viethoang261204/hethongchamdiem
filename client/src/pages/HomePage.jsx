@@ -133,7 +133,7 @@ export default function HomePage() {
           </Link>
           <nav className="home-nav">
             <Link to="/" className="nav-link active">Home</Link>
-            <Link to="/admin" className="nav-link">Admin</Link>
+            <Link to="/admin" className="nav-link nav-link-admin">Admin</Link>
             <Link to="/referee" className="nav-link nav-link-outline">Referee</Link>
           </nav>
         </div>
