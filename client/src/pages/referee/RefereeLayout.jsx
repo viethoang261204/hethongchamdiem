@@ -32,9 +32,9 @@ export default function RefereeLayout() {
             src="/images/logo1.png"
             alt="Logo"
             className="sidebar-logo-img"
-            onError={(e) => { e.target.style.display = 'none'; }}
+            onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling?.classList.add('show'); }}
           />
-          <span className="logo-text">
+          <span className="logo-text show">
             ENJOY AI
             <small>Trọng tài</small>
           </span>

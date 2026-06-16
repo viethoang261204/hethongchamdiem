@@ -202,8 +202,9 @@ export default function HomePage() {
               src="/images/logo2.png"
               alt=""
               className="hero-logo"
-              onError={(e) => { e.target.style.display = 'none'; }}
+              onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling?.classList.add('show'); }}
             />
+            <div className="hero-logo-text">ENJOY AI</div>
           </div>
 
         </div>
