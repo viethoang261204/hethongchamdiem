@@ -1,0 +1,471 @@
+import { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { api } from '../../api';
+import { useNotify } from '../../context/NotifyContext';
+import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import './AdminLayout.css';
+
+export default function AdminScores() {
+  const { showConfirm, showAlert } = useNotify();
+  const [scores, setScores] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [contents, setContents] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [images, setImages] = useState({}); // scoreId -> [image,...]
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [filterComp, setFilterComp] = useState('');
+  const [filterContent, setFilterContent] = useState('');
+  const [modal, setModal] = useState(null);
+  const [form, setForm] = useState(emptyForm());
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [imageModal, setImageModal] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const SECURITY_CODE = '26122004';
+
+  function emptyForm() {
+    return {
+      team_id: '',
+      contest_content_id: '',
+      referee_id: null,
+      score: 0,
+      time: '',
+      notes: '',
+      criteria_scores: {},
+    };
+  }
+
+  const load = async () => {
+    setLoadError(null);
+    try {
+      const [compList, scoreList] = await Promise.all([
+        api.getCompetitions(),
+        api.getScores(),
+      ]);
+      setCompetitions(compList);
+      setScores(scoreList);
+      const allContents = [];
+      for (const c of compList) {
+        const cont = await api.getContents(c.id);
+        allContents.push(...cont);
+      }
+      setContents(allContents);
+      // Load tất cả teams theo từng content để dropdown đầy đủ khi thêm/sửa phiếu
+      const allTeams = [];
+      for (const c of allContents) {
+        try {
+          const ts = await api.getTeams(c.id);
+          allTeams.push(...ts);
+        } catch (_) {}
+      }
+      setTeams(allTeams);
+      // Tải ảnh thumbnail cho mỗi phiếu
+      const imgMap = {};
+      for (const s of scoreList) {
+        try {
+          const imgs = await api.getScoreImages(s.id);
+          if (imgs.length) imgMap[s.id] = imgs;
+        } catch (_) {}
+      }
+      setImages(imgMap);
+    } catch (e) {
+      console.error(e);
+      setLoadError(e?.message || 'Lỗi không xác định');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const filtered = useMemo(() => {
+    let list = scores;
+    if (filterComp) {
+      const contentIdsInComp = new Set(contents.filter(c => c.competition_id === filterComp).map(c => c.id));
+      list = list.filter(s => contentIdsInComp.has(s.contest_content_id));
+    }
+    if (filterContent) list = list.filter(s => s.contest_content_id === filterContent);
+    if (search.trim()) {
+      const s = search.toLowerCase().trim();
+      list = list.filter(x => (x.team?.name || '').toLowerCase().includes(s));
+    }
+    return list;
+  }, [scores, filterComp, filterContent, search, contents]);
+
+  const contentName = (id) => contents.find(c => c.id === id)?.name || id;
+  const compName = (id) => competitions.find(c => c.id === id)?.name || id;
+  const teamName = (id) => teams.find(t => t.id === id)?.name || '-';
+
+  const openAdd = () => {
+    setModal('add');
+    setForm({ ...emptyForm(), contest_content_id: filterContent || (contents[0]?.id || '') });
+    setErrors({});
+  };
+
+  const openEdit = (s) => {
+    setModal({ id: s.id });
+    setForm({
+      team_id: s.team_id,
+      contest_content_id: s.contest_content_id,
+      referee_id: s.referee_id || null,
+      score: s.score ?? 0,
+      time: s.time || '',
+      notes: s.notes || '',
+      criteria_scores: s.criteria_scores || {},
+    });
+    setErrors({});
+  };
+
+  const validate = () => {
+    const errs = {};
+    if (!form.contest_content_id) errs.contest_content_id = 'Chưa chọn nội dung thi.';
+    if (!form.team_id) errs.team_id = 'Chưa chọn đội thi.';
+    const sc = Number(form.score);
+    if (Number.isNaN(sc)) errs.score = 'Điểm phải là số.';
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const save = async () => {
+    if (!validate()) {
+      showAlert('Vui lòng nhập đầy đủ thông tin bắt buộc.', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        team_id: form.team_id,
+        contest_content_id: form.contest_content_id,
+        referee_id: form.referee_id || null,
+        score: Number(form.score) || 0,
+        time: form.time?.toString().trim() || null,
+        notes: form.notes?.trim() || null,
+        criteria_scores: form.criteria_scores || {},
+      };
+      if (modal === 'add') {
+        await api.postScore(body);
+      } else if (modal?.id) {
+        await api.putScore(modal.id, body);
+      }
+      setModal(null);
+      load();
+      showAlert('Đã lưu.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi khi lưu phiếu điểm.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (id) => {
+    const ok = await showConfirm({ message: 'Xóa phiếu điểm này?', confirmText: 'Xóa', cancelText: 'Hủy', danger: true });
+    if (!ok) return;
+    setDeleteConfirm({ id, securityCode: '' });
+  };
+
+  const confirmDelete = async () => {
+    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+      showAlert('Mã bảo mật không đúng!', 'error');
+      return;
+    }
+    try {
+      await api.deleteScore(deleteConfirm.id);
+      setDeleteConfirm(null);
+      load();
+      showAlert('Đã xóa.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    }
+  };
+
+  const teamsInContent = useMemo(() => {
+    if (!form.contest_content_id) return [];
+    return teams.filter(t => t.contest_content_id === form.contest_content_id);
+  }, [form.contest_content_id, teams]);
+
+  const handleUploadImage = async (scoreId, file) => {
+    if (!file) return;
+    setUploadingImage(true);
+    try {
+      await api.uploadScoreImage({ scoreId, file });
+      showAlert('Đã tải ảnh lên.', 'success');
+      load();
+    } catch (e) {
+      showAlert(e.message || 'Lỗi upload.', 'error');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleDeleteImage = async (img) => {
+    const ok = await showConfirm({ message: 'Xóa ảnh này?', confirmText: 'Xóa', cancelText: 'Hủy', danger: true });
+    if (!ok) return;
+    try {
+      await api.deleteScoreImage(img.id, img.storage_path);
+      showAlert('Đã xóa ảnh.', 'success');
+      load();
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    }
+  };
+
+  return (
+    <div className="nhutin-admin">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Quản lý phiếu điểm</h1>
+          <p className="page-subtitle">Tổng số: {filtered.length} phiếu</p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={openAdd}
+          disabled={contents.length === 0 || teams.length === 0}
+        >
+          Thêm phiếu điểm
+        </button>
+      </div>
+
+      {loadError && <ErrorBox error={loadError} onRetry={load} />}
+      <div className="filters-bar">
+        <div className="search-box">
+          <input type="text" placeholder="Tìm theo tên đội..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <select className="filter-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterContent(''); }}>
+          <option value="">Tất cả cuộc thi</option>
+          {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select className="filter-select" value={filterContent} onChange={(e) => setFilterContent(e.target.value)} disabled={!filterComp}>
+          <option value="">Tất cả nội dung</option>
+          {contents.filter(c => !filterComp || c.competition_id === filterComp).map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="card">
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Cuộc thi / Nội dung</th>
+                <th>Đội</th>
+                <th>Thời gian</th>
+                <th>Điểm</th>
+                <th>Ảnh</th>
+                <th>Ngày nộp</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có phiếu điểm</td></tr>
+              ) : filtered.map((s) => {
+                const imgs = images[s.id] || [];
+                return (
+                  <tr key={s.id}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{compName(contents.find(c => c.id === s.contest_content_id)?.competition_id)}</div>
+                      <div style={{ fontSize: 12, color: '#94a3b8' }}>{contentName(s.contest_content_id)}</div>
+                    </td>
+                    <td>{s.team?.name || teamName(s.team_id) || '-'}</td>
+                    <td>{s.time || '-'}</td>
+                    <td><strong>{s.score ?? '-'}</strong></td>
+                    <td>
+                      {imgs.length > 0 ? (
+                        <button
+                          type="button"
+                          className="image-thumb-list"
+                          onClick={() => setImageModal({ scoreId: s.id, score: s, images: imgs })}
+                          style={{ background: 'none', cursor: 'pointer' }}
+                          title="Xem ảnh"
+                        >
+                          {imgs.slice(0, 3).map(img => (
+                            <img key={img.id} src={img.public_url} alt={img.file_name || ''} />
+                          ))}
+                          {imgs.length > 3 && <span className="more">+{imgs.length - 3}</span>}
+                        </button>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
+                      )}
+                    </td>
+                    <td>{s.submitted_at ? new Date(s.submitted_at).toLocaleString('vi-VN') : '-'}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <Link to={`/admin/scores/${s.id}`} className="btn btn-secondary" style={{ marginRight: 8 }}>Xem</Link>
+                      <button type="button" className="btn btn-secondary" onClick={() => openEdit(s)} style={{ marginRight: 8 }}>Sửa</button>
+                      <button type="button" className="btn btn-danger" onClick={() => remove(s.id)}>Xóa</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {modal && (
+        <div className="modal-overlay" onClick={() => !saving && setModal(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">{modal === 'add' ? 'Thêm phiếu điểm' : 'Sửa phiếu điểm'}</h3>
+              <button type="button" className="form-modal-close" onClick={() => setModal(null)} aria-label="Đóng">×</button>
+            </div>
+            <div className="form-modal-body">
+              <div className="form-group">
+                <label className="form-label">Nội dung thi <span style={{ color: '#dc2626' }}>*</span></label>
+                <select
+                  className={`form-input form-select ${errors.contest_content_id ? 'form-input-error' : ''}`}
+                  value={form.contest_content_id}
+                  onChange={(e) => { setForm({ ...form, contest_content_id: e.target.value, team_id: '' }); setErrors({ ...errors, contest_content_id: '' }); }}
+                >
+                  <option value="">-- Chọn nội dung --</option>
+                  {contents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {errors.contest_content_id && <div className="form-error-text">{errors.contest_content_id}</div>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Đội thi <span style={{ color: '#dc2626' }}>*</span></label>
+                <select
+                  className={`form-input form-select ${errors.team_id ? 'form-input-error' : ''}`}
+                  value={form.team_id}
+                  onChange={(e) => { setForm({ ...form, team_id: e.target.value }); setErrors({ ...errors, team_id: '' }); }}
+                  disabled={!form.contest_content_id}
+                >
+                  <option value="">-- Chọn đội --</option>
+                  {teamsInContent.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {errors.team_id && <div className="form-error-text">{errors.team_id}</div>}
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Điểm <span style={{ color: '#dc2626' }}>*</span></label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className={`form-input ${errors.score ? 'form-input-error' : ''}`}
+                    value={form.score}
+                    onChange={(e) => { setForm({ ...form, score: e.target.value }); setErrors({ ...errors, score: '' }); }}
+                  />
+                  {errors.score && <div className="form-error-text">{errors.score}</div>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Thời gian</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={form.time}
+                    onChange={(e) => setForm({ ...form, time: e.target.value })}
+                    placeholder="VD: 02:35"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Ghi chú</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setModal(null)} disabled={saving}>Hủy</button>
+              <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? 'Đang lưu...' : 'Lưu phiếu điểm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {imageModal && (
+        <div className="modal-overlay" onClick={() => setImageModal(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">Ảnh phiếu điểm — {imageModal.score?.team?.name || ''}</h3>
+              <button type="button" className="form-modal-close" onClick={() => setImageModal(null)} aria-label="Đóng">×</button>
+            </div>
+            <div className="form-modal-body">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <label className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    disabled={uploadingImage}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        await handleUploadImage(imageModal.scoreId, file);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                  {uploadingImage ? 'Đang tải lên...' : '+ Thêm ảnh'}
+                </label>
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>JPG/PNG/WEBP, tối đa 5MB.</span>
+              </div>
+              {imageModal.images.length === 0 ? (
+                <div className="image-empty">Chưa có ảnh nào.</div>
+              ) : (
+                <div className="image-grid">
+                  {imageModal.images.map(img => (
+                    <div key={img.id} className="image-card">
+                      <a href={img.public_url} target="_blank" rel="noreferrer">
+                        <img src={img.public_url} alt={img.file_name || ''} loading="lazy" />
+                      </a>
+                      <div className="image-overlay">
+                        <button type="button" className="btn btn-danger" onClick={() => handleDeleteImage(img)}>Xóa</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setImageModal(null)}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">Xác nhận xóa</h3>
+              <button type="button" className="form-modal-close" onClick={() => setDeleteConfirm(null)} aria-label="Đóng">×</button>
+            </div>
+            <div className="form-modal-body">
+              <p style={{ marginBottom: 16, color: '#374151' }}>Nhập mã bảo mật để xóa phiếu điểm:</p>
+              <div className="form-group">
+                <label className="form-label">Mã bảo mật</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={deleteConfirm.securityCode}
+                  onChange={(e) => setDeleteConfirm({ ...deleteConfirm, securityCode: e.target.value })}
+                  placeholder="Nhập mã bảo mật"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Hủy</button>
+              <button type="button" className="btn btn-danger" onClick={confirmDelete}>Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
