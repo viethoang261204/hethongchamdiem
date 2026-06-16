@@ -1,9 +1,9 @@
 services:
   - type: web
     name: hethongchamdiem
-    env: static
-    buildCommand: cd client && npm install && npm run build
-    staticPublishPath: client/dist
+    env: node
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: cd server && node index.js
     headers:
       - path: /*
         name: Cache-Control
