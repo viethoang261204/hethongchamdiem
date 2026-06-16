@@ -1,14 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
+import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
+
+const capi = createCachedApi(api);
 
 export default function AdminStudents() {
   const { showConfirm, showAlert } = useNotify();
   const { data: loaded, loading, error, reload, setData } = useApiLoader(
     async () => {
-      const [data, sch] = await Promise.all([api.getStudents(), api.getSchools()]);
+      const [data, sch] = await Promise.all([capi.getStudents(), capi.getSchools()]);
       return { list: data, schools: sch };
     },
     []
@@ -78,6 +81,7 @@ export default function AdminStudents() {
       } else {
         await api.putStudent(modal.id, form);
       }
+      clearApiCache();
       setModal(null);
       load();
       showAlert('Đã lưu.', 'success');
@@ -99,6 +103,7 @@ export default function AdminStudents() {
     }
     try {
       await api.deleteStudent(deleteConfirm.id);
+      clearApiCache();
       setDeleteConfirm(null);
       load();
       showAlert('Đã xóa.', 'success');

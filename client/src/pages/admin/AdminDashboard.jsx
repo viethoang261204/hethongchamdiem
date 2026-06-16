@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { createCachedApi } from '../../apiCache';
 import { useAuth } from '../../App';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
+
+const capi = createCachedApi(api);
 
 const ICONS = {
   home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
@@ -26,10 +29,10 @@ export default function AdminDashboard() {
   // Stage 1: load stats + competitions list qua useApiLoader (có error UI chuẩn)
   const { data, loading, error, reload } = useApiLoader(async () => {
     const [comps, students, users, scores] = await Promise.all([
-      api.getCompetitions(),
-      api.getStudents(),
-      api.getUsers('referee'),
-      api.getScores(),
+      capi.getCompetitions(),
+      capi.getStudents(),
+      capi.getUsers('referee'),
+      capi.getScores(),
     ]);
     return {
       comps,
@@ -53,11 +56,11 @@ export default function AdminDashboard() {
       const scoreboardsMap = {};
       for (const comp of data.comps) {
         try {
-          const contents = await api.getContents(comp.id);
+          const contents = await capi.getContents(comp.id);
           contentsMap[comp.id] = contents;
           for (const content of contents) {
             try {
-              const sb = await api.getScoreboard(content.id);
+              const sb = await capi.getScoreboard(content.id);
               if (sb.length > 0) scoreboardsMap[content.id] = sb.slice(0, 5);
             } catch (_) {}
           }

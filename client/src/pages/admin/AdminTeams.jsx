@@ -1,19 +1,22 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
+
+const capi = createCachedApi(api);
 
 export default function AdminTeams() {
   const { showConfirm, showAlert } = useNotify();
   const { data, loading, error, reload, setData } = useApiLoader(async () => {
     const [comps, allCont, tm, st, sch] = await Promise.all([
-      api.getCompetitions(),
-      api.getAllContents(),
-      api.getAllTeams(),
-      api.getStudents(),
-      api.getSchools(),
+      capi.getCompetitions(),
+      capi.getAllContents(),
+      capi.getAllTeams(),
+      capi.getStudents(),
+      capi.getSchools(),
     ]);
     return {
       competitions: comps.filter(c => c.is_active !== false),
@@ -53,7 +56,7 @@ export default function AdminTeams() {
         return;
       }
       try {
-        const list = await api.getContents(form.competitionId);
+        const list = await capi.getContents(form.competitionId);
         setContents(list);
         if (list.length > 0 && !form.contestContentId) {
           setForm(prev => ({ ...prev, contestContentId: list[0].id }));
@@ -139,6 +142,7 @@ export default function AdminTeams() {
           const created = await api.postSchool({ name: schoolName, level: 'THPT' });
           schoolId = created.id;
           setSchools((prev) => [created, ...prev]);
+          clearApiCache();
         }
       }
       const created = await api.postStudent({
@@ -147,6 +151,7 @@ export default function AdminTeams() {
         dateOfBirth: studentForm.dateOfBirth,
         schoolId,
       });
+      clearApiCache();
       setData((prev) => prev ? { ...prev, students: [created, ...prev.students] } : prev);
       setForm((prev) => ({ ...prev, studentIds: [...prev.studentIds, created.id] }));
       setStudentModal(false);
@@ -223,8 +228,9 @@ export default function AdminTeams() {
           studentIds: form.studentIds,
         });
       }
+      clearApiCache();
       setModal(null);
-      const [tm, st] = await Promise.all([api.getAllTeams(), api.getStudents()]);
+      const [tm, st] = await Promise.all([capi.getAllTeams(), capi.getStudents()]);
       setData((prev) => prev ? { ...prev, teams: tm, students: st } : prev);
       showAlert('Đã lưu.', 'success');
     } catch (e) {
@@ -246,8 +252,9 @@ export default function AdminTeams() {
     }
     try {
       await api.deleteTeam(deleteConfirm.id);
+      clearApiCache();
       setDeleteConfirm(null);
-      const [tm, st] = await Promise.all([api.getAllTeams(), api.getStudents()]);
+      const [tm, st] = await Promise.all([capi.getAllTeams(), capi.getStudents()]);
       setData((prev) => prev ? { ...prev, teams: tm, students: st } : prev);
       showAlert('Đã xóa.', 'success');
     } catch (e) {

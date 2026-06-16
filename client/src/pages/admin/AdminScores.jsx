@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
+
+const capi = createCachedApi(api);
 
 export default function AdminScores() {
   const { showConfirm, showAlert } = useNotify();
@@ -41,40 +44,20 @@ export default function AdminScores() {
   const load = async () => {
     setLoadError(null);
     try {
-      const [compList, scoreList] = await Promise.all([
-        api.getCompetitions(),
-        api.getScores(),
+      const [compList, scoreList, allContents, allTeams] = await Promise.all([
+        capi.getCompetitions(),
+        capi.getScores(),
+        capi.getAllContents(),
+        capi.getAllTeams(),
       ]);
       setCompetitions(compList);
       setScores(scoreList);
-      const allContents = [];
-      for (const c of compList) {
-        const cont = await api.getContents(c.id);
-        allContents.push(...cont);
-      }
       setContents(allContents);
-      // Load tất cả teams theo từng content để dropdown đầy đủ khi thêm/sửa phiếu
-      const allTeams = [];
-      for (const c of allContents) {
-        try {
-          const ts = await api.getTeams(c.id);
-          allTeams.push(...ts);
-        } catch (_) {}
-      }
       setTeams(allTeams);
-      // Tải ảnh thumbnail cho mỗi phiếu
-      const imgMap = {};
-      for (const s of scoreList) {
-        try {
-          const imgs = await api.getScoreImages(s.id);
-          if (imgs.length) imgMap[s.id] = imgs;
-        } catch (_) {}
-      }
-      setImages(imgMap);
+      setLoading(false);
     } catch (e) {
       console.error(e);
       setLoadError(e?.message || 'Lỗi không xác định');
-    } finally {
       setLoading(false);
     }
   };
@@ -150,6 +133,7 @@ export default function AdminScores() {
       } else if (modal?.id) {
         await api.putScore(modal.id, body);
       }
+      clearApiCache();
       setModal(null);
       load();
       showAlert('Đã lưu.', 'success');
@@ -173,6 +157,7 @@ export default function AdminScores() {
     }
     try {
       await api.deleteScore(deleteConfirm.id);
+      clearApiCache();
       setDeleteConfirm(null);
       load();
       showAlert('Đã xóa.', 'success');
@@ -186,13 +171,22 @@ export default function AdminScores() {
     return teams.filter(t => t.contest_content_id === form.contest_content_id);
   }, [form.contest_content_id, teams]);
 
+  const loadImagesFor = async (scoreId) => {
+    try {
+      const imgs = await api.getScoreImages(scoreId);
+      setImages(prev => ({ ...prev, [scoreId]: imgs }));
+      return imgs;
+    } catch (_) { return []; }
+  };
+
   const handleUploadImage = async (scoreId, file) => {
     if (!file) return;
     setUploadingImage(true);
     try {
       await api.uploadScoreImage({ scoreId, file });
+      clearApiCache();
+      await loadImagesFor(scoreId);
       showAlert('Đã tải ảnh lên.', 'success');
-      load();
     } catch (e) {
       showAlert(e.message || 'Lỗi upload.', 'error');
     } finally {
@@ -205,8 +199,8 @@ export default function AdminScores() {
     if (!ok) return;
     try {
       await api.deleteScoreImage(img.id, img.storage_path);
+      clearApiCache();
       showAlert('Đã xóa ảnh.', 'success');
-      load();
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
     }
@@ -281,7 +275,10 @@ export default function AdminScores() {
                         <button
                           type="button"
                           className="image-thumb-list"
-                          onClick={() => setImageModal({ scoreId: s.id, score: s, images: imgs })}
+                          onClick={async () => {
+                            const imgs = images[s.id] || (await loadImagesFor(s.id));
+                            setImageModal({ scoreId: s.id, score: s, images: imgs });
+                          }}
                           style={{ background: 'none', cursor: 'pointer' }}
                           title="Xem ảnh"
                         >
