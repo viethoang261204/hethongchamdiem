@@ -593,6 +593,23 @@
   background: #fff5f5;
 }
 
+.nhutin-admin .checkbox-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.nhutin-admin .checkbox-list label {
+  display: block;
+  padding: 5px 0;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: #1e293b;
+}
+
 .nhutin-admin .form-error-text {
   color: #ef4444;
   font-size: 12px;
