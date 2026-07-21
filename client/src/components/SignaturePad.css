@@ -1,0 +1,93 @@
+/* ─── Ô ký tên trong form ─────────────────────────────── */
+.sigbox { display: flex; flex-direction: column; gap: 6px; }
+.sigbox-label { font-size: 13px; font-weight: 600; opacity: 0.85; }
+
+.sigbox-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  border: 2px dashed rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.05);
+  cursor: pointer;
+  padding: 6px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sigbox-area:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.06); }
+.sigbox-area.signed {
+  border-style: solid;
+  border-color: rgba(34, 197, 94, 0.5);
+  background: #fff;
+}
+.sigbox-placeholder { color: #94a3b8; font-size: 15px; font-weight: 600; }
+.sigbox-img { max-height: 70px; max-width: 100%; object-fit: contain; }
+
+.sigbox-clear {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  color: #f87171;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+/* ─── Modal ký ─────────────────────────────────────────── */
+.sigpad-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+.sigpad-modal {
+  background: #fff;
+  color: #1e293b;
+  border-radius: 16px;
+  padding: 20px;
+  width: min(640px, 100%);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+.sigpad-title { font-size: 17px; font-weight: 800; }
+.sigpad-hint { font-size: 13px; color: #64748b; margin: 4px 0 12px; }
+
+.sigpad-canvas {
+  width: 100%;
+  height: 220px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background:
+    linear-gradient(to top, transparent 54px, transparent 55px),
+    #f8fafc;
+  touch-action: none; /* chặn scroll khi ký trên cảm ứng */
+  display: block;
+  cursor: crosshair;
+}
+
+.sigpad-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.sigpad-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.sigpad-btn-ghost { background: #f1f5f9; color: #475569; }
+.sigpad-btn-primary { background: #2563eb; color: #fff; }
+.sigpad-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 520px) {
+  .sigpad-canvas { height: 180px; }
+  .sigpad-actions { flex-wrap: wrap; }
+}

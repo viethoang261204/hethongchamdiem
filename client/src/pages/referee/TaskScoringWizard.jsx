@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api, taskImageUrl } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
+import SignatureBox from '../../components/SignaturePad';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
@@ -69,6 +70,9 @@ export default function TaskScoringWizard({
     prevCS.refereeSignature || user?.fullName || user?.username || ''
   );
   const [remarks, setRemarks] = useState(prevCS.remarks || existingScore?.notes || '');
+  // Chữ ký tay (data URL PNG) — học sinh ký trực tiếp trên iPad/điện thoại
+  const [studentSigImage, setStudentSigImage] = useState(prevCS.studentSignatureImage || '');
+  const [refereeSigImage, setRefereeSigImage] = useState(prevCS.refereeSignatureImage || '');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -141,6 +145,8 @@ export default function TaskScoringWizard({
           remarks,
           refereeSignature: refereeSignature || user?.full_name || user?.username,
           studentSignature: teamMembers,
+          studentSignatureImage: studentSigImage || null,
+          refereeSignatureImage: refereeSigImage || null,
         },
         notes: remarks || null,
       };
@@ -472,7 +478,7 @@ export default function TaskScoringWizard({
               />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Học sinh / Đội trưởng ký</label>
+              <label className="ts-label">Tên học sinh / đội trưởng</label>
               <input
                 type="text"
                 className="ts-input"
@@ -482,12 +488,26 @@ export default function TaskScoringWizard({
               />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Trọng tài ký</label>
+              <label className="ts-label">Tên trọng tài</label>
               <input
                 type="text"
                 className="ts-input"
                 value={refereeSignature}
                 onChange={(e) => setRefereeSignature(e.target.value)}
+              />
+            </div>
+            <div className="ts-form-row">
+              <SignatureBox
+                label="Học sinh / Đội trưởng ký"
+                value={studentSigImage}
+                onChange={setStudentSigImage}
+              />
+            </div>
+            <div className="ts-form-row">
+              <SignatureBox
+                label="Trọng tài ký"
+                value={refereeSigImage}
+                onChange={setRefereeSigImage}
               />
             </div>
             <div className="ts-form-row ts-full">

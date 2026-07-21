@@ -130,9 +130,19 @@ function InventionTrailSheet({ score, sheetRef }) {
           <tbody>
             <tr>
               <td className="it-sign-label">Thành viên đội thi (Team members):</td>
-              <td className="it-sign-value"><strong>{ef.teamMembers || score.studentSignature || ''}</strong></td>
+              <td className="it-sign-value">
+                <strong>{ef.teamMembers || score.studentSignature || ''}</strong>
+                {ef.studentSignatureImage && (
+                  <div><img src={ef.studentSignatureImage} alt="Chữ ký học sinh" style={{ maxHeight: 60, maxWidth: '100%' }} /></div>
+                )}
+              </td>
               <td className="it-sign-label">Trọng tài (Referee):</td>
-              <td className="it-sign-value"><strong>{score.refereeSignature || ''}</strong></td>
+              <td className="it-sign-value">
+                <strong>{score.refereeSignature || ''}</strong>
+                {ef.refereeSignatureImage && (
+                  <div><img src={ef.refereeSignatureImage} alt="Chữ ký trọng tài" style={{ maxHeight: 60, maxWidth: '100%' }} /></div>
+                )}
+              </td>
             </tr>
             <tr>
               <td className="it-sign-label">Ghi chú (Remarks)</td>
@@ -186,11 +196,21 @@ function GenericSheet({ score, content, sheetRef }) {
           ))}
           <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
             <td style={{ padding: '10px 8px', fontWeight: 600, color: '#475569', fontSize: 13 }}>Học sinh ký</td>
-            <td style={{ padding: '10px 8px', color: '#1e293b', fontSize: 13 }}>{signatures.team || '-'}</td>
+            <td style={{ padding: '10px 8px', color: '#1e293b', fontSize: 13 }}>
+              {signatures.team || '-'}
+              {ef.studentSignatureImage && (
+                <div><img src={ef.studentSignatureImage} alt="Chữ ký học sinh" style={{ maxHeight: 60, maxWidth: '100%' }} /></div>
+              )}
+            </td>
           </tr>
           <tr>
             <td style={{ padding: '10px 8px', fontWeight: 600, color: '#475569', fontSize: 13 }}>Trọng tài ký</td>
-            <td style={{ padding: '10px 8px', color: '#1e293b', fontSize: 13 }}>{signatures.referee || '-'}</td>
+            <td style={{ padding: '10px 8px', color: '#1e293b', fontSize: 13 }}>
+              {signatures.referee || '-'}
+              {ef.refereeSignatureImage && (
+                <div><img src={ef.refereeSignatureImage} alt="Chữ ký trọng tài" style={{ maxHeight: 60, maxWidth: '100%' }} /></div>
+              )}
+            </td>
           </tr>
         </tbody>
       </table>
