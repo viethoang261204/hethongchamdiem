@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: CI & Deploy
 
 on:
   push:
@@ -6,12 +6,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-deploy:
+  build:
+    # Build thử client để chặn commit lỗi trước khi deploy
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: client
-
     steps:
       - uses: actions/checkout@v4
 
@@ -21,18 +18,25 @@ jobs:
           cache: 'npm'
           cache-dependency-path: client/package-lock.json
 
-      - name: Install dependencies
+      - name: Install client dependencies
+        working-directory: client
         run: npm ci
 
-      - name: Build
+      - name: Build client
+        working-directory: client
         run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Deploy to Render
+      - name: Install server dependencies
+        working-directory: server
+        run: npm install
+
+  deploy:
+    # Render tự build theo render.yaml; bước này chỉ kích hoạt deploy
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
         uses: johnbeynon/render-deploy-action@v0.0.8
         with:
           service-id: ${{ vars.RENDER_SERVICE_ID }}
           api-key: ${{ secrets.RENDER_API_KEY }}
-          dist-target: client/dist

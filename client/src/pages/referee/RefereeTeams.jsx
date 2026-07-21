@@ -1,10 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
+import { createCachedApi } from '../../apiCache';
 import './RefereeLayout.css';
+
+const capi = createCachedApi(api);
 
 export default function RefereeTeams() {
   const { competitionId, contentId, region } = useParams();
+  const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
   const [students, setStudents] = useState([]);
   const [scores, setScores] = useState([]);
@@ -14,9 +18,9 @@ export default function RefereeTeams() {
 
   useEffect(() => {
     Promise.all([
-      api.getTeams(contentId).catch(() => []),
-      api.getStudents().catch(() => []),
-      api.getScores({ contestContentId: contentId }).catch(() => []),
+      capi.getTeams(contentId).catch(() => []),
+      capi.getStudents().catch(() => []),
+      api.getScores({ contestContentId: contentId }).catch(() => []), // scores không cache vì cần fresh
     ]).then(([teamsList, st, sc]) => {
       setTeams(teamsList);
       setStudents(st);
@@ -99,13 +103,16 @@ export default function RefereeTeams() {
         <div className="referee-grid">
           {filtered.map((t) => {
             const mems = (t.student_ids || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
+            const memberNames = mems.map(m => m.full_name).join(', ');
             const teamScores = scoresByTeam[t.id] || [];
             const isDone = teamScores.length > 0;
             const lastScore = teamScores[0];
+            const scoreUrl = `/referee/competition/${competitionId}/content/${contentId}/region/${region}/team/${t.id}/score`;
             return (
               <Link
                 key={t.id}
-                to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/team/${t.id}/score`}
+                to={scoreUrl}
+                state={{ memberNames }}
                 className={`referee-card ${isDone ? 'is-done' : ''}`}
               >
                 <div className="referee-card-head">
@@ -113,7 +120,7 @@ export default function RefereeTeams() {
                   {isDone && <span className="rt-badge rt-badge-done">✓ Đã chấm</span>}
                 </div>
                 <p className="referee-card-members">
-                  {mems.length > 0 ? mems.map(m => m.full_name).join(', ') : <em style={{ color: '#475569' }}>Chưa có thành viên</em>}
+                  {mems.length > 0 ? memberNames : <em style={{ color: '#475569' }}>Chưa có thành viên</em>}
                 </p>
                 {isDone && lastScore && (
                   <div className="referee-card-foot">

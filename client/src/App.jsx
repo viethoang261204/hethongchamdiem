@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { NotifyProvider } from './context/NotifyContext';
-import { supabase, getUserProfile } from './lib/supabase';
+import { getMe, signOut } from './lib/http';
 import HomePage from './pages/HomePage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -19,7 +19,7 @@ import AdminTasks from './pages/admin/AdminTasks';
 import AdminSchools from './pages/admin/AdminSchools';
 import AdminAreas from './pages/admin/AdminAreas';
 import AdminAreaDetail from './pages/admin/AdminAreaDetail';
-import SupabaseTest from './pages/admin/SupabaseTest';
+import ServerDiag from './pages/admin/ServerDiag';
 import RefereeLogin from './pages/referee/RefereeLogin';
 import RefereeLayout from './pages/referee/RefereeLayout';
 import RefereeSelect from './pages/referee/RefereeSelect';
@@ -51,52 +51,21 @@ export default function App() {
     localStorage.setItem('enjoy-ai-user', JSON.stringify(u));
   }, []);
 
-  // Khôi phục session Supabase khi load app
+  // Khôi phục session khi load app: nếu có JWT còn hạn trong localStorage,
+  // xác thực lại với backend và lấy profile mới nhất.
   useEffect(() => {
-    const restore = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        try {
-          const profile = await getUserProfile(session.user);
-          login(profile);
-        } catch {
-          // Nếu profile không tồn tại, không restore
-        }
+    getMe().then((profile) => {
+      if (profile) login(profile);
+      else if (localStorage.getItem('enjoy-ai-user')) {
+        // token hết hạn/không hợp lệ → dọn state cũ
+        setUser(null);
+        localStorage.removeItem('enjoy-ai-user');
       }
-    };
-    restore();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        try {
-          const profile = await getUserProfile(session.user);
-          login(profile);
-        } catch {
-          login(null);
-        }
-      } else {
-        login(null);
-      }
-    });
-    return () => subscription.unsubscribe();
+    }).catch(() => {});
   }, [login]);
 
-  // Keepalive: ping Supabase mỗi 2 phút để giữ kết nối, tránh bị firewall drop
-  useEffect(() => {
-    const KEEPALIVE_MS = 2 * 60 * 1000; // 2 phút
-    const ping = async () => {
-      try {
-        await supabase.auth.getSession();
-      } catch (_) {
-        // silent — không cần thông báo
-      }
-    };
-    const id = setInterval(ping, KEEPALIVE_MS);
-    return () => clearInterval(id);
-  }, []);
-
-  const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+  const logout = useCallback(() => {
+    signOut();
     setUser(null);
     localStorage.removeItem('enjoy-ai-user');
   }, []);
@@ -123,7 +92,7 @@ export default function App() {
               <Route path="students" element={<AdminStudents />} />
               <Route path="referee-accounts" element={<AdminRefereeAccounts />} />
               <Route path="tasks" element={<AdminTasks />} />
-              <Route path="diag" element={<SupabaseTest />} />
+              <Route path="diag" element={<ServerDiag />} />
               <Route path="scores" element={<AdminScores />} />
               <Route path="scores/:scoreId" element={<AdminScoreDetail />} />
             </>

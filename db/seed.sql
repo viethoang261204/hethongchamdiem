@@ -1,171 +1,59 @@
 -- ============================================================
--- SEED DATA for ENJOY AI ASIA OPEN - Hệ thống Chấm điểm
+-- SEED DATA cho NEON - ENJOY AI ASIA OPEN - Hệ thống Chấm điểm
 -- ============================================================
--- Chạy SAU schema.sql (tạo bảng trước, rồi mới seed dữ liệu mẫu)
+-- Chạy SAU db/schema.sql (hoặc: cd server && npm run db:setup -- --seed)
 -- Idempotent: chạy nhiều lần không lỗi
+-- User nằm thẳng trong bảng users, password hash bcrypt bằng pgcrypto.
+-- Backend verify đăng nhập bằng:
+--   select * from users where email = $1
+--     and password = crypt($2, password);
+-- (hoặc dùng bcryptjs phía Node — hash $2a$ tương thích)
 -- ============================================================
 
--- Cần pgcrypto để hash password bằng bcrypt (giống Supabase Auth)
 create extension if not exists pgcrypto;
 
 -- ============================================================
--- 1. AUTH USERS (Supabase Auth)
---    3 user mẫu với UUID cố định để dễ tham chiếu
---    Password hash bằng crypt(..., gen_salt('bf')) = bcrypt
+-- 1. USERS (3 user mẫu với UUID cố định để dễ tham chiếu)
 -- ============================================================
 
 -- ADMIN: admin@enjoyai.vn / Admin@123
-insert into auth.users (
-  instance_id, id, aud, role,
-  email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at,
-  confirmation_token, email_change, email_change_token_new, recovery_token
-) values (
-  '00000000-0000-0000-0000-000000000000',
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  'authenticated', 'authenticated',
-  'admin@enjoyai.vn',
-  crypt('Admin@123', gen_salt('bf')),
-  now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"full_name":"Quản trị viên"}',
-  now(), now(),
-  '', '', '', ''
-) on conflict (id) do nothing;
-
--- TRỌNG TÀI BẮC: bac@enjoyai.vn / Ref@123
-insert into auth.users (
-  instance_id, id, aud, role,
-  email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at,
-  confirmation_token, email_change, email_change_token_new, recovery_token
-) values (
-  '00000000-0000-0000-0000-000000000000',
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-  'authenticated', 'authenticated',
-  'bac@enjoyai.vn',
-  crypt('Ref@123', gen_salt('bf')),
-  now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"full_name":"Trọng tài Miền Bắc"}',
-  now(), now(),
-  '', '', '', ''
-) on conflict (id) do nothing;
-
--- TRỌNG TÀI NAM: nam@enjoyai.vn / Ref@123
-insert into auth.users (
-  instance_id, id, aud, role,
-  email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at,
-  confirmation_token, email_change, email_change_token_new, recovery_token
-) values (
-  '00000000-0000-0000-0000-000000000000',
-  'cccccccc-cccc-cccc-cccc-cccccccccccc',
-  'authenticated', 'authenticated',
-  'nam@enjoyai.vn',
-  crypt('Ref@123', gen_salt('bf')),
-  now(),
-  '{"provider":"email","providers":["email"]}',
-  '{"full_name":"Trọng tài Miền Nam"}',
-  now(), now(),
-  '', '', '', ''
-) on conflict (id) do nothing;
-
--- ============================================================
--- 2. AUTH IDENTITIES (bắt buộc cho Supabase v2 để đăng nhập)
--- ============================================================
-
-insert into auth.identities (
-  id, user_id, identity_data, provider, provider_id,
-  last_sign_in_at, created_at, updated_at
-) values (
-  gen_random_uuid(),
-  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-  jsonb_build_object(
-    'sub', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'email', 'admin@enjoyai.vn',
-    'email_verified', true,
-    'phone_verified', false
-  ),
-  'email',
-  'admin@enjoyai.vn',
-  now(), now(), now()
-) on conflict (provider_id, provider) do nothing;
-
-insert into auth.identities (
-  id, user_id, identity_data, provider, provider_id,
-  last_sign_in_at, created_at, updated_at
-) values (
-  gen_random_uuid(),
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-  jsonb_build_object(
-    'sub', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'email', 'bac@enjoyai.vn',
-    'email_verified', true,
-    'phone_verified', false
-  ),
-  'email',
-  'bac@enjoyai.vn',
-  now(), now(), now()
-) on conflict (provider_id, provider) do nothing;
-
-insert into auth.identities (
-  id, user_id, identity_data, provider, provider_id,
-  last_sign_in_at, created_at, updated_at
-) values (
-  gen_random_uuid(),
-  'cccccccc-cccc-cccc-cccc-cccccccccccc',
-  jsonb_build_object(
-    'sub', 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-    'email', 'nam@enjoyai.vn',
-    'email_verified', true,
-    'phone_verified', false
-  ),
-  'email',
-  'nam@enjoyai.vn',
-  now(), now(), now()
-) on conflict (provider_id, provider) do nothing;
-
--- ============================================================
--- 3. PUBLIC.USERS (bảng user trong app, liên kết auth.users)
---    Insert SAU areas để gán area_id cho trọng tài
--- ============================================================
-
--- Admin
-insert into public.users (id, username, full_name, role, area_id)
+insert into users (id, email, username, password, full_name, role, area_id)
 values (
   'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'admin@enjoyai.vn',
   'admin',
+  crypt('Admin@123', gen_salt('bf')),
   'Quản trị viên',
   'admin',
   null
 ) on conflict (id) do nothing;
 
--- Trọng tài Bắc (area_id sẽ update sau khi có areas)
-insert into public.users (id, username, full_name, role, area_id)
+-- TRỌNG TÀI BẮC: bac@enjoyai.vn / Ref@123 (area_id update sau khi có areas)
+insert into users (id, email, username, password, full_name, role, area_id)
 values (
   'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'bac@enjoyai.vn',
   'trongtai_bac',
+  crypt('Ref@123', gen_salt('bf')),
   'Trọng tài Miền Bắc',
   'referee',
   null
 ) on conflict (id) do nothing;
 
--- Trọng tài Nam
-insert into public.users (id, username, full_name, role, area_id)
+-- TRỌNG TÀI NAM: nam@enjoyai.vn / Ref@123
+insert into users (id, email, username, password, full_name, role, area_id)
 values (
   'cccccccc-cccc-cccc-cccc-cccccccccccc',
+  'nam@enjoyai.vn',
   'trongtai_nam',
+  crypt('Ref@123', gen_salt('bf')),
   'Trọng tài Miền Nam',
   'referee',
   null
 ) on conflict (id) do nothing;
 
 -- ============================================================
--- 4. COMPETITION (cuộc thi mẫu)
+-- 2. COMPETITION (cuộc thi mẫu)
 -- ============================================================
 
 insert into competitions (id, name, description, location, start_date, end_date, is_active)
@@ -180,7 +68,7 @@ values (
 ) on conflict (id) do nothing;
 
 -- ============================================================
--- 5. CONTEST CONTENTS (nội dung thi)
+-- 3. CONTEST CONTENTS (nội dung thi)
 -- ============================================================
 
 insert into contest_contents (id, competition_id, name, description, order_index, scoring_method, criteria)
@@ -216,7 +104,7 @@ values (
 ) on conflict (id) do nothing;
 
 -- ============================================================
--- 6. AREAS (3 khu vực Bắc/Trung/Nam cho mỗi content)
+-- 4. AREAS (3 khu vực Bắc/Trung/Nam cho mỗi content)
 -- ============================================================
 
 insert into areas (id, contest_content_id, competition_id, name, region, order_index)
@@ -230,14 +118,14 @@ values
 on conflict (id) do nothing;
 
 -- Gán area cho 2 trọng tài (Bắc & Nam, content Robot)
-update public.users set area_id = 'a1111111-1111-1111-1111-111111111111'
+update users set area_id = 'a1111111-1111-1111-1111-111111111111'
 where id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
-update public.users set area_id = 'a3333333-3333-3333-3333-333333333333'
+update users set area_id = 'a3333333-3333-3333-3333-333333333333'
 where id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 -- ============================================================
--- 7. SCHOOLS (3 trường mẫu)
+-- 5. SCHOOLS (3 trường mẫu)
 -- ============================================================
 
 insert into schools (id, name, level, province, district, source)
@@ -248,7 +136,7 @@ values
 on conflict (id) do nothing;
 
 -- ============================================================
--- 8. TASKS (nhiệm vụ mẫu cho 2 nội dung thi)
+-- 6. TASKS (nhiệm vụ mẫu cho 2 nội dung thi)
 -- ============================================================
 
 insert into tasks (id, contest_content_id, name, name_en, description, max_score, scoring_type, order_index, is_active)
@@ -263,7 +151,7 @@ values
 on conflict (id) do nothing;
 
 -- ============================================================
--- 9. TEAMS (6 đội mẫu: 2 đội/khu vực cho content Robot)
+-- 7. TEAMS (6 đội mẫu: 2 đội/khu vực cho content Robot)
 -- ============================================================
 
 insert into teams (id, contest_content_id, area_id, name, school_id, region, order_index)
@@ -292,7 +180,7 @@ declare
   v_teams int;
   v_tasks int;
 begin
-  select count(*) into v_users from public.users;
+  select count(*) into v_users from users;
   select count(*) into v_competitions from competitions;
   select count(*) into v_contents from contest_contents;
   select count(*) into v_areas from areas;
@@ -301,11 +189,11 @@ begin
   select count(*) into v_tasks from tasks;
 
   raise notice '✅ Seed hoàn tất:';
-  raise notice '   - Users:     %', v_users;
+  raise notice '   - Users:        %', v_users;
   raise notice '   - Competitions: %', v_competitions;
-  raise notice '   - Contents:  %', v_contents;
-  raise notice '   - Areas:     %', v_areas;
-  raise notice '   - Schools:   %', v_schools;
-  raise notice '   - Teams:     %', v_teams;
-  raise notice '   - Tasks:     %', v_tasks;
+  raise notice '   - Contents:     %', v_contents;
+  raise notice '   - Areas:        %', v_areas;
+  raise notice '   - Schools:      %', v_schools;
+  raise notice '   - Teams:        %', v_teams;
+  raise notice '   - Tasks:        %', v_tasks;
 end $$;

@@ -52,20 +52,32 @@ export default function AdminDashboard() {
 
     setExtraLoading(true);
     (async () => {
+      // Parallel: load tất cả contents cùng lúc thay vì sequential for-await
+      const contentResults = await Promise.allSettled(
+        data.comps.map(comp => capi.getContents(comp.id).then(c => ({ compId: comp.id, contents: c })))
+      );
+
       const contentsMap = {};
-      const scoreboardsMap = {};
-      for (const comp of data.comps) {
-        try {
-          const contents = await capi.getContents(comp.id);
-          contentsMap[comp.id] = contents;
-          for (const content of contents) {
-            try {
-              const sb = await capi.getScoreboard(content.id);
-              if (sb.length > 0) scoreboardsMap[content.id] = sb.slice(0, 5);
-            } catch (_) {}
-          }
-        } catch (_) {}
+      const allContentItems = [];
+      for (const r of contentResults) {
+        if (r.status === 'fulfilled') {
+          contentsMap[r.value.compId] = r.value.contents;
+          allContentItems.push(...r.value.contents);
+        }
       }
+
+      // Parallel: load tất cả scoreboards cùng lúc
+      const sbResults = await Promise.allSettled(
+        allContentItems.map(content => capi.getScoreboard(content.id).then(sb => ({ contentId: content.id, sb })))
+      );
+
+      const scoreboardsMap = {};
+      for (const r of sbResults) {
+        if (r.status === 'fulfilled' && r.value.sb.length > 0) {
+          scoreboardsMap[r.value.contentId] = r.value.sb.slice(0, 5);
+        }
+      }
+
       setContentsByComp({ ...contentsMap });
       setScoreboards({ ...scoreboardsMap });
       setExtraLoading(false);
@@ -159,7 +171,7 @@ export default function AdminDashboard() {
                                     <td>
                                       <span className={`rank-badge rank-${i + 1}`}>{i + 1}</span>
                                     </td>
-                                    <td>{s.team?.name || '-'}</td>
+                                    <td>{s.teams?.name || s.team?.name || '-'}</td>
                                     <td><strong>{s.score ?? '-'}</strong></td>
                                   </tr>
                                 ))}

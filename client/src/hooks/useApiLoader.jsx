@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
 
 // ============================================================
 // useOnlineStatus — theo dõi trạng thái mạng
@@ -72,37 +71,9 @@ export function useApiLoader(fetcher, deps = []) {
         if (cancelled || !aliveRef.current) return;
         setData(result ?? null);
       })
-      .catch(async (err) => {
+      .catch((err) => {
         if (cancelled || !aliveRef.current) return;
         console.error('[useApiLoader]', err);
-
-        // Thử refresh session một lần trước khi báo lỗi
-        const msg = err?.message || '';
-        const isAuthError = [
-          'JWS signature verification',
-          'Invalid JWT',
-          'expired',
-          'signature',
-          'unauthorized',
-        ].some((fatal) => msg.toLowerCase().includes(fatal.toLowerCase()));
-
-        if (isAuthError) {
-          console.log('[useApiLoader] Auth error detected — attempting session refresh');
-          try {
-            await supabase.auth.refreshSession();
-            console.log('[useApiLoader] Session refreshed — retrying fetcher');
-            const result = await fetcher();
-            if (!cancelled && aliveRef.current) {
-              setData(result ?? null);
-              setError(null);
-              setLoading(false);
-            }
-            return;
-          } catch (retryErr) {
-            console.error('[useApiLoader] Retry after refresh failed:', retryErr);
-          }
-        }
-
         setError(err?.message || 'Lỗi không xác định');
       })
       .finally(() => {

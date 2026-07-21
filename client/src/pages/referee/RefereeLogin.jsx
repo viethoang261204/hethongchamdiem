@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
-import { signIn, getUserProfile } from '../../lib/supabase';
+import { signIn, signOut } from '../../lib/http';
 import '../admin/AdminLogin.css';
 
 export default function RefereeLogin() {
@@ -18,9 +18,9 @@ export default function RefereeLogin() {
     setError('');
     setLoading(true);
     try {
-      const { user } = await signIn(email, password);
-      const profile = await getUserProfile(user);
+      const profile = await signIn(email.trim(), password);
       if (profile.role !== 'referee') {
+        signOut();
         setError('Chỉ tài khoản Trọng tài được đăng nhập tại đây.');
         setLoading(false);
         return;

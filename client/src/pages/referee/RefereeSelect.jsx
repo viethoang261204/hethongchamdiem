@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
+import { createCachedApi } from '../../apiCache';
 import './RefereeLayout.css';
+
+const capi = createCachedApi(api);
 
 export default function RefereeSelect() {
   const [competitions, setCompetitions] = useState([]);
@@ -11,12 +14,12 @@ export default function RefereeSelect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.getCompetitions().then(setCompetitions).catch(console.error);
+    capi.getCompetitions().then(setCompetitions).catch(console.error);
   }, []);
 
   useEffect(() => {
     if (!selectedComp) return;
-    api.getContents(selectedComp.id).then(setContents).catch(console.error);
+    capi.getContents(selectedComp.id).then(setContents).catch(console.error);
   }, [selectedComp?.id]);
 
   const selectCompetition = (c) => {

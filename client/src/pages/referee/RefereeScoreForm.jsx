@@ -1,28 +1,32 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import { api } from '../../api';
+import { createCachedApi } from '../../apiCache';
 import TaskScoringWizard from './TaskScoringWizard';
 import InventionTrailScoreForm from './InventionTrailScoreForm';
 import './RefereeLayout.css';
 
+const capi = createCachedApi(api);
+
 export default function RefereeScoreForm() {
   const { competitionId, contentId, teamId } = useParams();
+  const location = useLocation();
+  // memberNames được truyền từ RefereeTeams qua navigation state — tránh gọi getStudents() lại
   const [team, setTeam] = useState(null);
   const [content, setContent] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [memberNames, setMemberNames] = useState('');
+  const [memberNames, setMemberNames] = useState(location.state?.memberNames || '');
   const [existing, setExisting] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      api.getContents(competitionId).then(list => list.find(c => c.id === contentId)),
-      api.getTeams(contentId).then(list => list.find(t => t.id === teamId)),
-      api.getActiveTasks(contentId).catch(() => []),
+      capi.getContents(competitionId).then(list => list.find(c => c.id === contentId)),
+      capi.getTeams(contentId).then(list => list.find(t => t.id === teamId)),
+      capi.getActiveTasks(contentId).catch(() => []),
       api.getTeamScores(teamId).catch(() => []),
-      api.getStudents().catch(() => []),
-    ]).then(([contentData, teamData, tasksData, scores, students]) => {
+    ]).then(([contentData, teamData, tasksData, scores]) => {
       if (!contentData || !teamData) {
         setNotFound(true);
         return;
@@ -31,13 +35,16 @@ export default function RefereeScoreForm() {
       setTeam(teamData);
       setTasks(tasksData);
       setExisting(scores);
-      if (teamData?.student_ids?.length) {
-        const names = teamData.student_ids
-          .map(id => students.find(s => s.id === id))
-          .filter(Boolean)
-          .map(s => s.full_name)
-          .join(', ');
-        setMemberNames(names);
+      // Nếu chưa có memberNames từ navigation state, fetch students lần này thôi
+      if (!location.state?.memberNames && teamData?.student_ids?.length) {
+        capi.getStudents().then(students => {
+          const names = teamData.student_ids
+            .map(id => students.find(s => s.id === id))
+            .filter(Boolean)
+            .map(s => s.full_name)
+            .join(', ');
+          setMemberNames(names);
+        }).catch(() => {});
       }
     }).catch((e) => {
       console.error(e);

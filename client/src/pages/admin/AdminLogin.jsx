@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
-import { signIn, getUserProfile } from '../../lib/supabase';
+import { signIn, signOut } from '../../lib/http';
 import './AdminLogin.css';
 
 export default function AdminLogin() {
@@ -20,9 +20,9 @@ export default function AdminLogin() {
     try {
       const cleanEmail = email.trim();
       const cleanPassword = password.trim();
-      const { user } = await signIn(cleanEmail, cleanPassword);
-      const profile = await getUserProfile(user);
+      const profile = await signIn(cleanEmail, cleanPassword);
       if (profile.role !== 'admin') {
+        signOut();
         setError('Chỉ tài khoản Admin được đăng nhập tại đây.');
         setLoading(false);
         return;

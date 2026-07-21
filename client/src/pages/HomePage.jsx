@@ -19,7 +19,7 @@ export default function HomePage() {
     async function load() {
       try {
         const comps = await api.getCompetitions();
-        const active = comps.filter(c => c.isActive !== false);
+        const active = comps.filter(c => c.is_active !== false);
         setCompetitions(active);
         const boards = {};
         for (const comp of active) {
@@ -321,7 +321,7 @@ export default function HomePage() {
               )}
               {competitions.map((comp) => {
                 const compEntries = entries
-                  .filter(e => e.content.competitionId === comp.id)
+                  .filter(e => e.content.competition_id === comp.id)
                   .sort((a, b) => (a.content.order || 0) - (b.content.order || 0));
                 return (
                   <div key={comp.id} className="comp-block">
@@ -345,7 +345,7 @@ export default function HomePage() {
                                 {comp.location}
                               </span>
                             )}
-                            {(comp.startDate || comp.endDate) && (
+                            {(comp.start_date || comp.end_date) && (
                               <span className="comp-chip">
                                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                                   <rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1"/>
@@ -353,7 +353,7 @@ export default function HomePage() {
                                   <line x1="3.5" y1="1" x2="3.5" y2="3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
                                   <line x1="6.5" y1="1" x2="6.5" y2="3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
                                 </svg>
-                                {comp.startDate}{comp.endDate ? ` – ${comp.endDate}` : ''}
+                                {comp.start_date}{comp.end_date ? ` – ${comp.end_date}` : ''}
                               </span>
                             )}
                           </div>
@@ -400,7 +400,7 @@ export default function HomePage() {
                                   {list.slice(0, 10).map((row, i) => (
                                     <tr key={row.id} className={i < 3 ? `top-row top-${i + 1}` : ''}>
                                       <td className="rank-cell">{rankBadge(i)}</td>
-                                      <td className="team-cell">{row.team?.name || '—'}</td>
+                                      <td className="team-cell">{row.teams?.name || row.team?.name || '—'}</td>
                                       <td className="time-cell">{row.time || '—'}</td>
                                       <td className="score-cell">
                                         <span className={`score-badge${i === 0 ? ' score-gold' : i === 1 ? ' score-silver' : i === 2 ? ' score-bronze' : ''}`}>

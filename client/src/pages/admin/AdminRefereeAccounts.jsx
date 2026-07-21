@@ -3,7 +3,6 @@ import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { useAuth } from '../../App';
-import { supabase } from '../../lib/supabase';
 import './AdminLayout.css';
 
 export default function AdminRefereeAccounts() {
@@ -65,17 +64,17 @@ export default function AdminRefereeAccounts() {
     setError('');
     try {
       if (modal === 'add') {
-        // Lấy access token từ session hiện tại
-        const { data: { session } } = await supabase.auth.getSession();
+        // Token JWT tự động gắn từ localStorage (lib/http.js)
         await api.createRefereeUser({
           email: form.email.trim(),
           password: form.password,
           username: form.email.trim().split('@')[0],
           full_name: form.full_name?.trim() || form.email.trim().split('@')[0],
-        }, session?.access_token);
+        });
       } else {
-        // putUser chỉ chấp nhận full_name, area_id, role — KHÔNG truyền email
+        // Sửa: full_name + (tùy chọn) mật khẩu mới
         const body = { full_name: form.full_name?.trim() || form.email.split('@')[0] };
+        if (form.password) body.password = form.password;
         await api.putUser(modal.id, body);
       }
       setModal(null);

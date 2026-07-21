@@ -1,11 +1,11 @@
 services:
   - type: web
     name: hethongchamdiem
-    env: static
-    buildCommand: cd client && npm install && npm run build
-    staticPublishPath: client/dist
+    env: node
+    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    startCommand: node server/index.cjs
     envVars:
-      - key: VITE_SUPABASE_URL
+      - key: DATABASE_URL
         sync: false
-      - key: VITE_SUPABASE_ANON_KEY
+      - key: JWT_SECRET
         sync: false
