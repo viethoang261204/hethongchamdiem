@@ -583,6 +583,12 @@ router.delete('/users/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Bảng đấu mà TÔI (trọng tài đang đăng nhập) được phân quyền — rỗng = chưa giới hạn
+router.get('/me/boards', requireAuth, h(async (req, res) => {
+  const { rows } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
+  res.json(rows.map((r) => r.board_id));
+}));
+
 // Phân quyền trọng tài theo bảng đấu (referee_boards) — rỗng = chưa giới hạn
 router.get('/users/:id/boards', requireAdmin, h(async (req, res) => {
   const { rows } = await query('select board_id from referee_boards where referee_id = $1', [req.params.id]);

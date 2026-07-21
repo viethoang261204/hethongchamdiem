@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { formatSecondsAsMinutes } from '../../lib/time';
 import './AdminLayout.css';
 
 const UNASSIGNED = '__unassigned__';
@@ -134,7 +135,7 @@ export default function AdminScoreboard() {
                           <span className={`rank-badge rank-${i + 1}`}>{i + 1}</span>
                         </td>
                         <td>{s.team?.name || '-'}</td>
-                        <td>{s.time || '-'}</td>
+                        <td>{formatSecondsAsMinutes(s.time) || '-'}</td>
                         <td><strong>{s.score}</strong></td>
                         <td>{s.submitted_at ? new Date(s.submitted_at).toLocaleString('vi-VN') : '-'}</td>
                       </tr>

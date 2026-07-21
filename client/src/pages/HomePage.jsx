@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import { formatSecondsAsMinutes } from '../lib/time';
 import './HomePage.css';
 
 export default function HomePage() {
@@ -401,7 +402,7 @@ export default function HomePage() {
                                     <tr key={row.id} className={i < 3 ? `top-row top-${i + 1}` : ''}>
                                       <td className="rank-cell">{rankBadge(i)}</td>
                                       <td className="team-cell">{row.teams?.name || row.team?.name || '—'}</td>
-                                      <td className="time-cell">{row.time || '—'}</td>
+                                      <td className="time-cell">{formatSecondsAsMinutes(row.time) || '—'}</td>
                                       <td className="score-cell">
                                         <span className={`score-badge${i === 0 ? ' score-gold' : i === 1 ? ' score-silver' : i === 2 ? ' score-bronze' : ''}`}>
                                           {row.score ?? '—'}

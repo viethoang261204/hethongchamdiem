@@ -9,7 +9,7 @@ import './RefereeLayout.css';
 const capi = createCachedApi(api);
 
 export default function RefereeScoreForm() {
-  const { competitionId, contentId, teamId } = useParams();
+  const { competitionId, contentId, teamId, region } = useParams();
   const location = useLocation();
   // memberNames được truyền từ RefereeTeams qua navigation state — tránh gọi getStudents() lại
   const [team, setTeam] = useState(null);
@@ -65,14 +65,12 @@ export default function RefereeScoreForm() {
     <div className="ts-wrapper">
       <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
         <p style={{ color: '#f87171' }}>Không tìm thấy đội hoặc nội dung thi.</p>
-        <a href={`/referee/competition/${competitionId}/content/${contentId}/region/all/teams`} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>
+        <a href={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>
           ← Quay lại
         </a>
       </div>
     </div>
   );
-
-  const region = 'all';
 
   // Legacy: Invention Trail vẫn dùng form cũ (vì có logic riêng)
   if (content?.templateType === 'invention_trail') {

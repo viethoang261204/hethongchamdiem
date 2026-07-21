@@ -4,6 +4,7 @@ import { api, taskImageUrl } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
 import SignatureBox from '../../components/SignaturePad';
+import { formatSecondsAsMinutes } from '../../lib/time';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
@@ -109,13 +110,14 @@ export default function TaskScoringWizard({
 
   // Format giới hạn thời gian mm:ss
   const timeLimitText = content?.time_limit_seconds
-    ? `${String(Math.floor(content.time_limit_seconds / 60)).padStart(2, '0')}:${String(content.time_limit_seconds % 60).padStart(2, '0')}`
+    ? formatSecondsAsMinutes(content.time_limit_seconds)
     : null;
 
   // ── Gửi ──
   const handleSubmit = async () => {
-    if (!timeSpent.trim()) {
-      showAlert('Vui lòng nhập Thời gian thi.', 'error');
+    const timeSeconds = Number(timeSpent);
+    if (!timeSpent || Number.isNaN(timeSeconds) || timeSeconds < 0) {
+      showAlert('Vui lòng nhập Thời gian thi (tính bằng giây).', 'error');
       return;
     }
     setSubmitting(true);
@@ -130,7 +132,7 @@ export default function TaskScoringWizard({
         team_id: team.id,
         contest_content_id: contentId,
         referee_id: user?.id,
-        time: timeSpent.trim(),
+        time: String(Math.round(timeSeconds)),
         score: totalScore,
         round: 1,
         retry_count: retryCount,
@@ -466,16 +468,22 @@ export default function TaskScoringWizard({
           <div className="ts-form-grid" style={{ marginTop: 16 }}>
             <div className="ts-form-row ts-full">
               <label className="ts-label">
-                Thời gian thi <span className="ts-req">*</span>
+                Thời gian thi (giây) <span className="ts-req">*</span>
                 {timeLimitText && <span className="ts-hint-inline"> (tối đa {timeLimitText})</span>}
               </label>
               <input
-                type="text"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
                 className="ts-input ts-input-lg"
                 value={timeSpent}
                 onChange={(e) => setTimeSpent(e.target.value)}
-                placeholder="mm:ss — VD: 02:35"
+                placeholder="VD: 155"
               />
+              {timeSpent !== '' && !Number.isNaN(Number(timeSpent)) && (
+                <div className="ts-hint">≈ {formatSecondsAsMinutes(timeSpent)} phút</div>
+              )}
             </div>
             <div className="ts-form-row">
               <label className="ts-label">Tên học sinh / đội trưởng</label>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { createCachedApi } from '../../apiCache';
+import { formatSecondsAsMinutes } from '../../lib/time';
 import './RefereeLayout.css';
 
 const capi = createCachedApi(api);
@@ -10,6 +11,7 @@ export default function RefereeTeams() {
   const { competitionId, contentId, region } = useParams();
   const navigate = useNavigate();
   const [teams, setTeams] = useState([]);
+  const [boards, setBoards] = useState([]);
   const [students, setStudents] = useState([]);
   const [scores, setScores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,12 +23,22 @@ export default function RefereeTeams() {
       capi.getTeams(contentId).catch(() => []),
       capi.getStudents().catch(() => []),
       api.getScores({ contestContentId: contentId }).catch(() => []), // scores không cache vì cần fresh
-    ]).then(([teamsList, st, sc]) => {
+      capi.getBoards(contentId).catch(() => []),
+    ]).then(([teamsList, st, sc, bd]) => {
       setTeams(teamsList);
       setStudents(st);
       setScores(sc);
+      setBoards(bd);
     }).catch(console.error).finally(() => setLoading(false));
   }, [contentId, region]);
+
+  // Đang xem 1 bảng đấu cụ thể (region = board id) hay tất cả (region = 'all')
+  const currentBoard = region && region !== 'all' ? boards.find(b => b.id === region) : null;
+
+  const teamsInBoard = useMemo(() => {
+    if (!region || region === 'all') return teams;
+    return teams.filter(t => t.board_id === region);
+  }, [teams, region]);
 
   // Map team_id -> scores
   const scoresByTeam = useMemo(() => {
@@ -36,7 +48,7 @@ export default function RefereeTeams() {
   }, [scores]);
 
   const filtered = useMemo(() => {
-    let l = teams;
+    let l = teamsInBoard;
     if (filter === 'done') l = l.filter(t => (scoresByTeam[t.id] || []).length > 0);
     if (filter === 'pending') l = l.filter(t => !(scoresByTeam[t.id] || []).length);
     if (search.trim()) {
@@ -44,12 +56,12 @@ export default function RefereeTeams() {
       l = l.filter(t => (t.name || '').toLowerCase().includes(s));
     }
     return l;
-  }, [teams, filter, search, scoresByTeam]);
+  }, [teamsInBoard, filter, search, scoresByTeam]);
 
   const stats = useMemo(() => {
-    const done = teams.filter(t => (scoresByTeam[t.id] || []).length > 0).length;
-    return { total: teams.length, done, pending: teams.length - done };
-  }, [teams, scoresByTeam]);
+    const done = teamsInBoard.filter(t => (scoresByTeam[t.id] || []).length > 0).length;
+    return { total: teamsInBoard.length, done, pending: teamsInBoard.length - done };
+  }, [teamsInBoard, scoresByTeam]);
 
   if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Đang tải...</p>;
 
@@ -58,7 +70,9 @@ export default function RefereeTeams() {
       <div className="breadcrumb" style={{ marginBottom: 14 }}>
         <Link to="/referee">Chấm điểm</Link>
       </div>
-      <h1 className="referee-page-title">Danh sách đội</h1>
+      <h1 className="referee-page-title">
+        Danh sách đội{currentBoard ? ` — ${currentBoard.name}${currentBoard.age_group ? ` (${currentBoard.age_group})` : ''}` : ''}
+      </h1>
       <p style={{ color: '#64748b', marginBottom: 20 }}>Ấn vào từng đội để chấm điểm.</p>
 
       {/* Stats */}
@@ -97,7 +111,7 @@ export default function RefereeTeams() {
       {/* Team grid */}
       {filtered.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-          {teams.length === 0 ? 'Chưa có đội nào trong nội dung này.' : 'Không tìm thấy đội phù hợp.'}
+          {teamsInBoard.length === 0 ? `Chưa có đội nào trong ${currentBoard ? 'bảng đấu' : 'nội dung'} này.` : 'Không tìm thấy đội phù hợp.'}
         </div>
       ) : (
         <div className="referee-grid">
@@ -130,7 +144,7 @@ export default function RefereeTeams() {
                 {isDone && lastScore && (
                   <div className="referee-card-foot">
                     <span>Điểm: <strong>{lastScore.score ?? '-'}</strong> · Ấn để sửa phiếu</span>
-                    {lastScore.time && <span>· {lastScore.time}</span>}
+                    {lastScore.time && <span>· {formatSecondsAsMinutes(lastScore.time)}</span>}
                   </div>
                 )}
               </Link>

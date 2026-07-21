@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { exportToPdf } from '../referee/exportPdf';
+import { formatSecondsAsMinutes } from '../../lib/time';
 import '../referee/InventionTrailScoreForm.css';
 
 const IT_TASKS = [
@@ -115,7 +116,7 @@ function InventionTrailSheet({ score, sheetRef }) {
           <tr className="it-row-time">
             <td colSpan={3} className="it-total-label">Thời gian (Time Spent)</td>
             <td></td>
-            <td className="it-total-value"><strong>{score.time || ''}</strong></td>
+            <td className="it-total-value"><strong>{formatSecondsAsMinutes(score.time)}</strong></td>
           </tr>
         </tbody>
       </table>
@@ -168,7 +169,7 @@ function GenericSheet({ score, content, sheetRef }) {
     { id: 'diem', label: 'Điểm' },
   ];
   const getValue = (field) => {
-    if (field.id === 'thoi_gian') return score.time;
+    if (field.id === 'thoi_gian') return formatSecondsAsMinutes(score.time);
     if (field.id === 'diem') return score.score;
     // Đọc từ criteria_scores trước, fallback extraFields cũ
     return score.criteria_scores?.[field.id] ?? score.extraFields?.[field.id];

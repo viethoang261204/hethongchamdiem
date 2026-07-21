@@ -328,6 +328,9 @@ export const api = {
   // Phân quyền trọng tài theo bảng đấu — trả về mảng board_id (rỗng = chưa giới hạn)
   getUserBoards: (userId) => withRetry(() => request(`/users/${userId}/boards`), 'getUserBoards'),
 
+  // Bảng đấu của chính trọng tài đang đăng nhập (dùng ở bước chọn bảng đấu)
+  getMyBoards: () => withRetry(() => request('/me/boards'), 'getMyBoards'),
+
   putUserBoards: (userId, boardIds) => withRetry(() => request(`/users/${userId}/boards`, {
     method: 'PUT',
     body: { board_ids: boardIds },

@@ -70,8 +70,9 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!timeSpent) {
-      showAlert('Vui lòng nhập Thời gian hoàn thành.', 'error');
+    const timeSeconds = Number(timeSpent);
+    if (!timeSpent || Number.isNaN(timeSeconds) || timeSeconds < 0) {
+      showAlert('Vui lòng nhập Thời gian hoàn thành (tính bằng giây).', 'error');
       return;
     }
     setSubmitting(true);
@@ -80,7 +81,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
         team_id: team.id,
         contest_content_id: contentId,
         referee_id: user?.id,
-        time: timeSpent,
+        time: String(Math.round(timeSeconds)),
         score: totalScore,
         // scores schema không có round/extraFields/studentSignature/refereeSignature
         // Lưu tất cả vào criteria_scores (jsonb) để giữ chi tiết
@@ -264,11 +265,12 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
                 <td></td>
                 <td className="it-total-value">
                   <input
-                    type="text"
+                    type="number"
+                    min={0}
                     className="it-score-input"
                     value={timeSpent}
                     onChange={e => setTimeSpent(e.target.value)}
-                    placeholder="mm:ss"
+                    placeholder="Số giây"
                     required
                     style={{ width: '100%' }}
                   />

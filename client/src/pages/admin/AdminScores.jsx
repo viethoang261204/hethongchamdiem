@@ -4,6 +4,7 @@ import { api } from '../../api';
 import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { formatSecondsAsMinutes } from '../../lib/time';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
@@ -298,7 +299,7 @@ export default function AdminScores() {
                     </td>
                     <td>{s.boards?.name || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                     <td>{s.team?.name || teamName(s.team_id) || '-'}</td>
-                    <td>{s.time || '-'}</td>
+                    <td>{formatSecondsAsMinutes(s.time) || '-'}</td>
                     <td><strong>{s.score ?? '-'}</strong></td>
                     <td>
                       {imgs.length > 0 ? (
@@ -398,14 +399,18 @@ export default function AdminScores() {
                   {errors.score && <div className="form-error-text">{errors.score}</div>}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Thời gian</label>
+                  <label className="form-label">Thời gian (giây)</label>
                   <input
-                    type="text"
+                    type="number"
+                    min="0"
                     className="form-input"
                     value={form.time}
                     onChange={(e) => setForm({ ...form, time: e.target.value })}
-                    placeholder="VD: 02:35"
+                    placeholder="VD: 155"
                   />
+                  {form.time !== '' && !Number.isNaN(Number(form.time)) && (
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>≈ {formatSecondsAsMinutes(form.time)} phút</div>
+                  )}
                 </div>
               </div>
 
