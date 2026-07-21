@@ -41,7 +41,9 @@ export async function request(path, { method = 'GET', body, formData } = {}) {
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || `Lỗi máy chủ (HTTP ${res.status})`);
+    const err = new Error(data?.error || `Lỗi máy chủ (HTTP ${res.status})`);
+    err.status = res.status;
+    throw err;
   }
   if (data === null) {
     // 200 nhưng body không phải JSON → thường do deploy sai (static site
@@ -68,15 +70,21 @@ export async function signIn(email, password) {
   return normalizeUser(user);
 }
 
-// Kiểm tra token còn hạn không, trả profile mới nhất (null nếu hết hạn)
+// Kiểm tra token còn hạn không, trả profile mới nhất (null nếu hết hạn).
+// QUAN TRỌNG: chỉ coi là "hết hạn" khi server trả 401 rõ ràng — lỗi mạng/máy
+// chủ tạm thời (mất mạng, cold start Neon, redeploy...) không được xóa token,
+// nếu không người dùng sẽ bị đăng xuất oan mỗi khi mở lại app lúc mạng chập chờn.
 export async function getMe() {
   if (!getToken()) return null;
   try {
     const { user } = await request('/auth/me');
     return normalizeUser(user);
-  } catch (_) {
-    setToken(null);
-    return null;
+  } catch (err) {
+    if (err?.status === 401) {
+      setToken(null);
+      return null;
+    }
+    throw err;
   }
 }
 

@@ -9,7 +9,7 @@ if (!JWT_SECRET) {
   console.error('[auth] Thiếu JWT_SECRET trong .env');
   process.exit(1);
 }
-const TOKEN_TTL = '7d';
+const TOKEN_TTL = '30d';
 
 const PROFILE_FIELDS = 'id, email, username, full_name, role, area_id';
 
