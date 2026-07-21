@@ -325,6 +325,14 @@ export const api = {
 
   deleteUser: (id) => withRetry(() => request(`/users/${id}`, { method: 'DELETE' }), 'deleteUser'),
 
+  // Phân quyền trọng tài theo bảng đấu — trả về mảng board_id (rỗng = chưa giới hạn)
+  getUserBoards: (userId) => withRetry(() => request(`/users/${userId}/boards`), 'getUserBoards'),
+
+  putUserBoards: (userId, boardIds) => withRetry(() => request(`/users/${userId}/boards`, {
+    method: 'PUT',
+    body: { board_ids: boardIds },
+  }), 'putUserBoards'),
+
   // ============================================================
   // Tasks
   // ============================================================

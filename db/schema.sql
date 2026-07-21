@@ -219,6 +219,17 @@ alter table scores add column if not exists round integer default 1;
 alter table scores add column if not exists retry_count integer default 0;
 alter table scores add column if not exists bonus_points numeric(10,2) default 0;
 
+-- Phân quyền trọng tài theo bảng đấu — trọng tài chỉ thấy/chấm được đội thuộc
+-- bảng đã được gán (rỗng = chưa giới hạn, thấy tất cả — tương thích ngược cho
+-- các tài khoản tạo trước khi có tính năng này)
+create table if not exists referee_boards (
+  referee_id  uuid not null references users(id) on delete cascade,
+  board_id    uuid not null references boards(id) on delete cascade,
+  created_at  timestamptz default now(),
+  primary key (referee_id, board_id)
+);
+create index if not exists idx_referee_boards_board on referee_boards(board_id);
+
 -- Mỗi đội 1 phiếu duy nhất / nội dung
 create unique index if not exists uq_scores_team_content
   on scores(team_id, contest_content_id);

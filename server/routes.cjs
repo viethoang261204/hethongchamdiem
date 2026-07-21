@@ -333,14 +333,22 @@ const BOARDS_JSON = `case when bd.id is null then null
   else json_build_object('id', bd.id, 'name', bd.name, 'age_group', bd.age_group) end`;
 
 router.get('/contents/:contentId/teams', h(async (req, res) => {
+  // Trọng tài đã được gán bảng đấu cụ thể → chỉ thấy đội thuộc các bảng đó.
+  // Chưa được gán bảng nào (mảng rỗng) → coi như chưa giới hạn, thấy tất cả.
+  let assignedBoardIds = null;
+  if (req.user?.role === 'referee') {
+    const { rows: rb } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
+    if (rb.length) assignedBoardIds = rb.map((r) => r.board_id);
+  }
   const { rows } = await query(
     `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards
      from teams t
      left join schools sch on sch.id = t.school_id
      left join boards bd on bd.id = t.board_id
      where t.contest_content_id = $1
+       ${assignedBoardIds ? 'and t.board_id = any($2::uuid[])' : ''}
      order by t.order_index`,
-    [req.params.contentId]
+    assignedBoardIds ? [req.params.contentId, assignedBoardIds] : [req.params.contentId]
   );
   res.json(rows);
 }));
@@ -458,6 +466,19 @@ router.post('/scores', requireAuth, h(async (req, res) => {
   // Referee chỉ được chấm dưới tên chính mình; admin được chỉ định referee_id bất kỳ
   const refereeId = req.user.role === 'admin' ? (b.referee_id ?? null) : req.user.id;
 
+  // Nếu referee đã được gán bảng đấu cụ thể, chỉ cho chấm đội thuộc bảng đó
+  if (req.user.role !== 'admin') {
+    const { rows: assigned } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
+    if (assigned.length) {
+      const { rows: teamRows } = await query('select board_id from teams where id = $1', [b.team_id]);
+      const teamBoardId = teamRows[0]?.board_id;
+      const allowed = teamBoardId && assigned.some((a) => a.board_id === teamBoardId);
+      if (!allowed) {
+        return res.status(403).json({ error: 'Bạn không được phân quyền chấm điểm đội thuộc bảng đấu này.' });
+      }
+    }
+  }
+
   // Mỗi đội chỉ có 1 phiếu duy nhất / nội dung — nếu đã có, trả 409 kèm id
   // để client chuyển sang chế độ sửa phiếu (PUT /scores/:id)
   const { rows: dup } = await query(
@@ -560,6 +581,24 @@ router.put('/users/:id', requireAdmin, h(async (req, res) => {
 router.delete('/users/:id', requireAdmin, h(async (req, res) => {
   await query('delete from users where id = $1', [req.params.id]);
   res.json({ ok: true });
+}));
+
+// Phân quyền trọng tài theo bảng đấu (referee_boards) — rỗng = chưa giới hạn
+router.get('/users/:id/boards', requireAdmin, h(async (req, res) => {
+  const { rows } = await query('select board_id from referee_boards where referee_id = $1', [req.params.id]);
+  res.json(rows.map((r) => r.board_id));
+}));
+
+router.put('/users/:id/boards', requireAdmin, h(async (req, res) => {
+  const boardIds = Array.isArray(req.body?.board_ids) ? [...new Set(req.body.board_ids)] : [];
+  await query('delete from referee_boards where referee_id = $1', [req.params.id]);
+  if (boardIds.length) {
+    await query(
+      'insert into referee_boards (referee_id, board_id) select $1, unnest($2::uuid[])',
+      [req.params.id, boardIds]
+    );
+  }
+  res.json({ ok: true, board_ids: boardIds });
 }));
 
 // ============================================================

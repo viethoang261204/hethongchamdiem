@@ -9,6 +9,8 @@ export default function AdminRefereeAccounts() {
   const { showConfirm, showAlert } = useNotify();
   const { user } = useAuth();
   const { data, loading, error, reload, setData } = useApiLoader(() => api.getUsers('referee'), []);
+  const { data: boardsData } = useApiLoader(() => api.getAllBoards(), []);
+  const allBoards = boardsData || [];
   const list = data || [];
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
@@ -17,7 +19,56 @@ export default function AdminRefereeAccounts() {
   const [errorMsg, setError] = useState('');
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [boardsModal, setBoardsModal] = useState(null); // { user, selected: Set, loading, saving }
   const SECURITY_CODE = '26122004';
+
+  // Nhóm bảng đấu theo cuộc thi > nội dung thi để hiển thị checklist dễ nhìn
+  const boardGroups = useMemo(() => {
+    const byCompetition = new Map();
+    for (const b of allBoards) {
+      const compName = b.contest_contents?.competitions?.name || 'Khác';
+      const contentName = b.contest_contents?.name || 'Khác';
+      if (!byCompetition.has(compName)) byCompetition.set(compName, new Map());
+      const byContent = byCompetition.get(compName);
+      if (!byContent.has(contentName)) byContent.set(contentName, []);
+      byContent.get(contentName).push(b);
+    }
+    return Array.from(byCompetition.entries()).map(([competition, contents]) => ({
+      competition,
+      contents: Array.from(contents.entries()).map(([content, boards]) => ({ content, boards })),
+    }));
+  }, [allBoards]);
+
+  const openBoards = async (u) => {
+    setBoardsModal({ user: u, selected: new Set(), loading: true, saving: false });
+    try {
+      const ids = await api.getUserBoards(u.id);
+      setBoardsModal({ user: u, selected: new Set(ids), loading: false, saving: false });
+    } catch (e) {
+      showAlert(e.message || 'Không tải được danh sách phân quyền.', 'error');
+      setBoardsModal(null);
+    }
+  };
+
+  const toggleBoard = (boardId) => {
+    setBoardsModal((m) => {
+      const selected = new Set(m.selected);
+      if (selected.has(boardId)) selected.delete(boardId); else selected.add(boardId);
+      return { ...m, selected };
+    });
+  };
+
+  const saveBoards = async () => {
+    setBoardsModal((m) => ({ ...m, saving: true }));
+    try {
+      await api.putUserBoards(boardsModal.user.id, [...boardsModal.selected]);
+      setBoardsModal(null);
+      showAlert('Đã lưu phân quyền bảng đấu.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi khi lưu phân quyền.', 'error');
+      setBoardsModal((m) => ({ ...m, saving: false }));
+    }
+  };
 
   const load = async () => reload();
 
@@ -154,6 +205,7 @@ export default function AdminRefereeAccounts() {
                     <td><span className="badge badge-blue">{u.role}</span></td>
                     <td>
                       <button type="button" className="btn btn-secondary" onClick={() => openEdit(u)}>Sửa</button>
+                      <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={() => openBoards(u)}>Phân quyền bảng đấu</button>
                       <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(u.id)}>Xóa</button>
                     </td>
                   </tr>
@@ -209,6 +261,56 @@ export default function AdminRefereeAccounts() {
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Hủy</button>
               <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Đang lưu...' : modal === 'add' ? 'Lưu tài khoản' : 'Lưu thay đổi'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {boardsModal && (
+        <div className="modal-overlay" onClick={() => !boardsModal.saving && setBoardsModal(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">Phân quyền bảng đấu — {boardsModal.user.full_name || boardsModal.user.username}</h3>
+              <button type="button" className="form-modal-close" onClick={() => setBoardsModal(null)} aria-label="Đóng">×</button>
+            </div>
+            <div className="form-modal-body">
+              <p style={{ marginBottom: 16, color: '#374151' }}>
+                Chọn các bảng đấu mà trọng tài này được phép chấm điểm. Nếu không chọn bảng nào, trọng tài sẽ thấy và chấm được <strong>tất cả</strong> các đội (chưa giới hạn).
+              </p>
+              {boardsModal.loading ? (
+                <p style={{ textAlign: 'center', padding: 24 }}>Đang tải...</p>
+              ) : boardGroups.length === 0 ? (
+                <p style={{ color: '#888' }}>Chưa có bảng đấu nào trong hệ thống.</p>
+              ) : (
+                boardGroups.map((g) => (
+                  <div key={g.competition} style={{ marginBottom: 16 }}>
+                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>{g.competition}</div>
+                    {g.contents.map((c) => (
+                      <div key={c.content} style={{ marginBottom: 8, paddingLeft: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 4 }}>{c.content}</div>
+                        <div className="checkbox-list">
+                          {c.boards.map((b) => (
+                            <label key={b.id}>
+                              <input
+                                type="checkbox"
+                                checked={boardsModal.selected.has(b.id)}
+                                onChange={() => toggleBoard(b.id)}
+                              />
+                              {' '}{b.name}{b.age_group ? ` — ${b.age_group}` : ''}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setBoardsModal(null)} disabled={boardsModal.saving}>Hủy</button>
+              <button type="button" className="btn btn-primary" onClick={saveBoards} disabled={boardsModal.loading || boardsModal.saving}>
+                {boardsModal.saving ? 'Đang lưu...' : 'Lưu phân quyền'}
+              </button>
             </div>
           </div>
         </div>
