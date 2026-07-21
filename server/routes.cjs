@@ -161,15 +161,16 @@ router.get('/contents', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const CONTENT_FIELDS = ['name', 'name_en', 'description', 'criteria', 'order_index', 'scoring_method'];
+const CONTENT_FIELDS = ['name', 'name_en', 'description', 'criteria', 'order_index', 'scoring_method', 'time_limit_seconds', 'bonus_config'];
 
 router.post('/competitions/:competitionId/contents', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, CONTENT_FIELDS);
   const { rows } = await query(
-    `insert into contest_contents (competition_id, name, name_en, description, criteria, order_index, scoring_method)
-     values ($1, $2, $3, $4, coalesce($5::jsonb, '[]'::jsonb), coalesce($6, 0), $7) returning *`,
+    `insert into contest_contents (competition_id, name, name_en, description, criteria, order_index, scoring_method, time_limit_seconds, bonus_config)
+     values ($1, $2, $3, $4, coalesce($5::jsonb, '[]'::jsonb), coalesce($6, 0), $7, $8, $9::jsonb) returning *`,
     [req.params.competitionId, b.name, b.name_en ?? null, b.description ?? null,
-     b.criteria ? JSON.stringify(b.criteria) : null, b.order_index, b.scoring_method ?? null]
+     b.criteria ? JSON.stringify(b.criteria) : null, b.order_index, b.scoring_method ?? null,
+     b.time_limit_seconds ?? null, b.bonus_config ? JSON.stringify(b.bonus_config) : null]
   );
   res.json(rows[0]);
 }));
@@ -177,6 +178,7 @@ router.post('/competitions/:competitionId/contents', requireAdmin, h(async (req,
 router.put('/contents/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, CONTENT_FIELDS);
   if (data.criteria !== undefined) data.criteria = JSON.stringify(data.criteria);
+  if (data.bonus_config !== undefined) data.bonus_config = data.bonus_config === null ? null : JSON.stringify(data.bonus_config);
   const q = buildUpdate('contest_contents', req.params.id, data);
   if (!q) return res.json({});
   const { rows } = await query(q.text, q.values);
@@ -242,6 +244,52 @@ router.delete('/areas/:id', requireAdmin, h(async (req, res) => {
 }));
 
 // ============================================================
+// Boards (bảng đấu theo độ tuổi — 1 nội dung có nhiều bảng)
+// ============================================================
+router.get('/contents/:contentId/boards', h(async (req, res) => {
+  const { rows } = await query(
+    'select * from boards where contest_content_id = $1 order by order_index, name',
+    [req.params.contentId]
+  );
+  res.json(rows);
+}));
+
+router.get('/boards', h(async (_req, res) => {
+  const { rows } = await query(
+    `select b.*,
+       json_build_object('name', cc.name, 'competitions', json_build_object('id', comp.id, 'name', comp.name)) as contest_contents
+     from boards b
+     left join contest_contents cc on cc.id = b.contest_content_id
+     left join competitions comp on comp.id = cc.competition_id
+     order by b.order_index, b.name`
+  );
+  res.json(rows);
+}));
+
+router.post('/contents/:contentId/boards', requireAdmin, h(async (req, res) => {
+  const b = req.body;
+  const { rows } = await query(
+    `insert into boards (contest_content_id, name, age_group, order_index)
+     values ($1, $2, $3, coalesce($4, 0)) returning *`,
+    [req.params.contentId, b.name, b.age_group ?? null, b.order_index]
+  );
+  res.json(rows[0]);
+}));
+
+router.put('/boards/:id', requireAdmin, h(async (req, res) => {
+  const data = pick(req.body, ['name', 'age_group', 'order_index']);
+  const q = buildUpdate('boards', req.params.id, data);
+  if (!q) return res.json({});
+  const { rows } = await query(q.text, q.values);
+  res.json(rows[0]);
+}));
+
+router.delete('/boards/:id', requireAdmin, h(async (req, res) => {
+  await query('delete from boards where id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ============================================================
 // Students (cần đăng nhập — chứa thông tin cá nhân)
 // ============================================================
 router.get('/students', requireAuth, h(async (_req, res) => {
@@ -280,11 +328,16 @@ router.delete('/students/:id', requireAdmin, h(async (req, res) => {
 // ============================================================
 // Teams
 // ============================================================
+// SQL fragment: nested boards {id, name, age_group}
+const BOARDS_JSON = `case when bd.id is null then null
+  else json_build_object('id', bd.id, 'name', bd.name, 'age_group', bd.age_group) end`;
+
 router.get('/contents/:contentId/teams', h(async (req, res) => {
   const { rows } = await query(
-    `select t.*, ${SCHOOLS_JSON} as schools
+    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards
      from teams t
      left join schools sch on sch.id = t.school_id
+     left join boards bd on bd.id = t.board_id
      where t.contest_content_id = $1
      order by t.order_index`,
     [req.params.contentId]
@@ -294,10 +347,11 @@ router.get('/contents/:contentId/teams', h(async (req, res) => {
 
 router.get('/teams', h(async (_req, res) => {
   const { rows } = await query(
-    `select t.*, ${SCHOOLS_JSON} as schools,
+    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards,
        json_build_object('name', cc.name, 'competitions', json_build_object('name', comp.name)) as contest_contents
      from teams t
      left join schools sch on sch.id = t.school_id
+     left join boards bd on bd.id = t.board_id
      left join contest_contents cc on cc.id = t.contest_content_id
      left join competitions comp on comp.id = cc.competition_id
      order by t.order_index`
@@ -305,14 +359,14 @@ router.get('/teams', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'region', 'order_index'];
+const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'region', 'order_index'];
 
 router.post('/contents/:contentId/teams', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TEAM_FIELDS);
   const { rows } = await query(
-    `insert into teams (contest_content_id, name, student_ids, school_id, area_id, region, order_index)
-     values ($1, $2, coalesce($3, '{}'), $4, $5, coalesce($6, 'bac'), coalesce($7, 0)) returning *`,
-    [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.region, b.order_index]
+    `insert into teams (contest_content_id, name, student_ids, school_id, area_id, board_id, region, order_index)
+     values ($1, $2, coalesce($3, '{}'), $4, $5, $6, coalesce($7, 'bac'), coalesce($8, 0)) returning *`,
+    [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.board_id ?? null, b.region, b.order_index]
   );
   res.json(rows[0]);
 }));
@@ -339,10 +393,12 @@ const SCORE_NESTED = `
   select s.*,
     (to_jsonb(t.*) || jsonb_build_object('schools', ${SCHOOLS_JSON.replace(/\n/g, ' ')})) as teams,
     case when u.id is null then null else json_build_object('full_name', u.full_name) end as users,
-    case when cc.id is null then null else json_build_object('name', cc.name) end as contest_contents
+    case when cc.id is null then null else json_build_object('name', cc.name) end as contest_contents,
+    case when bd.id is null then null else json_build_object('id', bd.id, 'name', bd.name, 'age_group', bd.age_group) end as boards
   from scores s
   left join teams t on t.id = s.team_id
   left join schools sch on sch.id = t.school_id
+  left join boards bd on bd.id = t.board_id
   left join users u on u.id = s.referee_id
   left join contest_contents cc on cc.id = s.contest_content_id
 `;
@@ -401,10 +457,25 @@ router.post('/scores', requireAuth, h(async (req, res) => {
   const b = req.body;
   // Referee chỉ được chấm dưới tên chính mình; admin được chỉ định referee_id bất kỳ
   const refereeId = req.user.role === 'admin' ? (b.referee_id ?? null) : req.user.id;
+
+  // Mỗi đội chỉ có 1 phiếu duy nhất / nội dung — nếu đã có, trả 409 kèm id
+  // để client chuyển sang chế độ sửa phiếu (PUT /scores/:id)
+  const { rows: dup } = await query(
+    'select id, referee_id from scores where team_id = $1 and contest_content_id = $2',
+    [b.team_id, b.contest_content_id]
+  );
+  if (dup[0]) {
+    return res.status(409).json({
+      error: 'Đội này đã có phiếu điểm cho nội dung này. Mở phiếu cũ để sửa.',
+      existing_id: dup[0].id,
+    });
+  }
+
   const { rows } = await query(
-    `insert into scores (team_id, contest_content_id, referee_id, score, time, criteria_scores, notes)
-     values ($1, $2, $3, coalesce($4, 0), $5, coalesce($6::jsonb, '{}'::jsonb), $7) returning *`,
+    `insert into scores (team_id, contest_content_id, referee_id, score, time, round, retry_count, bonus_points, criteria_scores, notes)
+     values ($1, $2, $3, coalesce($4, 0), $5, coalesce($6, 1), coalesce($7, 0), coalesce($8, 0), coalesce($9::jsonb, '{}'::jsonb), $10) returning *`,
     [b.team_id, b.contest_content_id, refereeId, Number(b.score) || 0, b.time ?? null,
+     b.round ?? null, b.retry_count ?? null, b.bonus_points ?? null,
      b.criteria_scores ? JSON.stringify(b.criteria_scores) : null, b.notes ?? null]
   );
   res.json(rows[0]);
@@ -417,7 +488,7 @@ router.put('/scores/:id', requireAuth, h(async (req, res) => {
   if (req.user.role !== 'admin' && existing[0].referee_id !== req.user.id) {
     return res.status(403).json({ error: 'Bạn chỉ được sửa phiếu chấm của chính mình.' });
   }
-  const data = pick(req.body, ['team_id', 'contest_content_id', 'referee_id', 'score', 'time', 'criteria_scores', 'notes']);
+  const data = pick(req.body, ['team_id', 'contest_content_id', 'referee_id', 'score', 'time', 'round', 'retry_count', 'bonus_points', 'criteria_scores', 'notes']);
   if (req.user.role !== 'admin') delete data.referee_id;
   if (data.criteria_scores !== undefined) data.criteria_scores = JSON.stringify(data.criteria_scores);
   if (data.score !== undefined) data.score = Number(data.score) || 0;
@@ -494,9 +565,16 @@ router.delete('/users/:id', requireAdmin, h(async (req, res) => {
 // ============================================================
 // Tasks
 // ============================================================
+// Cột tasks KHÔNG kèm bytea image_data (nặng) — thay bằng cờ has_image,
+// client tự build URL /api/tasks/:id/image/raw khi has_image = true
+const taskCols = (p = '') => `${p}id, ${p}contest_content_id, ${p}name, ${p}name_en, ${p}description, ${p}image_url,
+  (${p}image_data is not null) as has_image, ${p}image_mime,
+  ${p}max_score, ${p}max_count, ${p}scoring_type, ${p}order_index, ${p}is_active, ${p}created_at, ${p}updated_at`;
+const TASK_COLS = taskCols();
+
 router.get('/tasks/all', h(async (_req, res) => {
   const { rows } = await query(
-    `select tk.*,
+    `select ${taskCols('tk.')},
        json_build_object('name', cc.name, 'competitions', json_build_object('name', comp.name)) as contest_contents
      from tasks tk
      left join contest_contents cc on cc.id = tk.contest_content_id
@@ -512,25 +590,26 @@ router.get('/tasks', h(async (req, res) => {
   if (req.query.contestContentId) { vals.push(req.query.contestContentId); cond.push(`contest_content_id = $${vals.length}`); }
   if (req.query.activeOnly === '1') cond.push('is_active = true');
   const where = cond.length ? `where ${cond.join(' and ')}` : '';
-  const { rows } = await query(`select * from tasks ${where} order by order_index, created_at`, vals);
+  const { rows } = await query(`select ${TASK_COLS} from tasks ${where} order by order_index, created_at`, vals);
   res.json(rows);
 }));
 
 router.get('/tasks/:id', h(async (req, res) => {
-  const { rows } = await query('select * from tasks where id = $1', [req.params.id]);
+  const { rows } = await query(`select ${TASK_COLS} from tasks where id = $1`, [req.params.id]);
   if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy nhiệm vụ.' });
   res.json(rows[0]);
 }));
 
-const TASK_FIELDS = ['contest_content_id', 'name', 'name_en', 'description', 'image_url', 'max_score', 'scoring_type', 'order_index', 'is_active'];
+const TASK_FIELDS = ['contest_content_id', 'name', 'name_en', 'description', 'image_url', 'max_score', 'max_count', 'scoring_type', 'order_index', 'is_active'];
 
 router.post('/tasks', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TASK_FIELDS);
   const { rows } = await query(
-    `insert into tasks (contest_content_id, name, name_en, description, image_url, max_score, scoring_type, order_index, is_active)
-     values ($1, $2, $3, $4, $5, coalesce($6, 0), coalesce($7, 'binary'), coalesce($8, 0), coalesce($9, true)) returning *`,
+    `insert into tasks (contest_content_id, name, name_en, description, image_url, max_score, max_count, scoring_type, order_index, is_active)
+     values ($1, $2, $3, $4, $5, coalesce($6, 0), $7, coalesce($8, 'binary'), coalesce($9, 0), coalesce($10, true))
+     returning ${TASK_COLS}`,
     [b.contest_content_id, b.name, b.name_en ?? null, b.description ?? null, b.image_url ?? null,
-     b.max_score, b.scoring_type, b.order_index, b.is_active]
+     b.max_score, b.max_count ?? null, b.scoring_type, b.order_index, b.is_active]
   );
   res.json(rows[0]);
 }));
@@ -539,12 +618,36 @@ router.put('/tasks/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, TASK_FIELDS);
   const q = buildUpdate('tasks', req.params.id, data);
   if (!q) return res.json({});
-  const { rows } = await query(q.text, q.values);
+  const { rows } = await query(q.text.replace('returning *', `returning ${TASK_COLS}`), q.values);
   res.json(rows[0]);
 }));
 
 router.delete('/tasks/:id', requireAdmin, h(async (req, res) => {
   await query('delete from tasks where id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// Ảnh minh hoạ nhiệm vụ — admin upload (multipart field "file"), public xem
+router.post('/tasks/:id/image', requireAdmin, (req, res, next) => uploadImage(req, res, next), h(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Chưa chọn file ảnh.' });
+  const { rows } = await query(
+    `update tasks set image_data = $1, image_mime = $2 where id = $3 returning ${TASK_COLS}`,
+    [req.file.buffer, req.file.mimetype, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy nhiệm vụ.' });
+  res.json(rows[0]);
+}));
+
+router.get('/tasks/:id/image/raw', h(async (req, res) => {
+  const { rows } = await query('select image_mime, image_data from tasks where id = $1', [req.params.id]);
+  if (!rows[0] || !rows[0].image_data) return res.status(404).send('Not found');
+  res.set('Content-Type', rows[0].image_mime || 'application/octet-stream');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(rows[0].image_data);
+}));
+
+router.delete('/tasks/:id/image', requireAdmin, h(async (req, res) => {
+  await query('update tasks set image_data = null, image_mime = null where id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
@@ -559,6 +662,8 @@ const upload = multer({
     cb(ok ? null : new Error('Chỉ chấp nhận JPG/PNG/WEBP/GIF.'), ok);
   },
 });
+// Dùng chung cho upload ảnh nhiệm vụ (khai báo phía trên, chạy lúc request nên không TDZ)
+const uploadImage = upload.single('file');
 
 // Danh sách ảnh của 1 phiếu (không trả bytea — chỉ metadata + url)
 router.get('/scores/:scoreId/images', h(async (req, res) => {

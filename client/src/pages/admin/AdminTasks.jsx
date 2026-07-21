@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
-import { api } from '../../api';
+import { api, taskImageUrl } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
 
 const SCORING_TYPES = [
-  { value: 'binary',  label: 'Nhị phân (Có / Không)' },
-  { value: 'tier',    label: 'Phân hạng (1 / 2 / 3)' },
-  { value: 'numeric', label: 'Số (nhập điểm)' },
+  { value: 'binary',  label: 'Tick đạt / không đạt' },
+  { value: 'count',   label: 'Đếm số lượng (điểm × số lượng)' },
+  { value: 'numeric', label: 'Nhập điểm tay' },
+  { value: 'tier',    label: 'Phân hạng (legacy)' },
 ];
 
 const emptyForm = {
@@ -16,6 +17,7 @@ const emptyForm = {
   name_en: '',
   description: '',
   max_score: 0,
+  max_count: '',
   scoring_type: 'binary',
   order_index: 0,
   is_active: true,
@@ -42,6 +44,10 @@ export default function AdminTasks() {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  // Ảnh nhiệm vụ: chọn file → preview local, upload sau khi lưu task
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [removeImage, setRemoveImage] = useState(false);
   const SECURITY_CODE = '26122004';
 
   const load = async () => reload();
@@ -72,25 +78,44 @@ export default function AdminTasks() {
     return c.competitions?.name ? `${c.competitions.name} → ${c.name}` : c.name;
   };
 
+  const resetImageState = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+    setRemoveImage(false);
+  };
+
   const openAdd = () => {
     setModal('add');
     setForm({ ...emptyForm, contest_content_id: filterContent || (contents[0]?.id || '') });
     setErrors({});
+    resetImageState();
   };
 
   const openEdit = (t) => {
-    setModal({ id: t.id });
+    setModal({ id: t.id, task: t });
     setForm({
       contest_content_id: t.contest_content_id,
       name: t.name || '',
       name_en: t.name_en || '',
       description: t.description || '',
       max_score: t.max_score ?? 0,
+      max_count: t.max_count ?? '',
       scoring_type: t.scoring_type || 'binary',
       order_index: t.order_index ?? 0,
       is_active: t.is_active !== false,
     });
     setErrors({});
+    resetImageState();
+  };
+
+  const onPickImage = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setRemoveImage(false);
   };
 
   const validate = () => {
@@ -116,15 +141,24 @@ export default function AdminTasks() {
         name_en: form.name_en?.trim() || null,
         description: form.description?.trim() || null,
         max_score: Number(form.max_score) || 0,
+        max_count: form.scoring_type === 'count' && form.max_count !== '' ? Number(form.max_count) : null,
         scoring_type: form.scoring_type,
         order_index: Number(form.order_index) || 0,
         is_active: !!form.is_active,
       };
+      let saved;
       if (modal === 'add') {
-        await api.postTask(body);
+        saved = await api.postTask(body);
       } else if (modal?.id) {
-        await api.putTask(modal.id, body);
+        saved = await api.putTask(modal.id, body);
       }
+      const taskId = saved?.id || modal?.id;
+      if (taskId && imageFile) {
+        await api.uploadTaskImage({ taskId, file: imageFile });
+      } else if (taskId && removeImage) {
+        await api.deleteTaskImage(taskId);
+      }
+      resetImageState();
       setModal(null);
       setData(null);
       const updated = await api.getAllTasks();
@@ -234,7 +268,11 @@ export default function AdminTasks() {
                   </td>
                   <td style={{ fontSize: 13 }}>{contentName(t.contest_content_id)}</td>
                   <td>{SCORING_TYPES.find(s => s.value === t.scoring_type)?.label || t.scoring_type}</td>
-                  <td><strong>{t.max_score ?? 0}</strong></td>
+                  <td>
+                    {t.scoring_type === 'count'
+                      ? <strong>{t.max_score ?? 0} × SL{t.max_count ? ` (tối đa ${t.max_count})` : ''}</strong>
+                      : <strong>{t.max_score ?? 0}</strong>}
+                  </td>
                   <td>
                     {t.is_active
                       ? <span className="badge badge-green">Hoạt động</span>
@@ -310,7 +348,19 @@ export default function AdminTasks() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Điểm tối đa</label>
+                  <label className="form-label">Loại chấm</label>
+                  <select
+                    className="form-input form-select"
+                    value={form.scoring_type}
+                    onChange={(e) => setForm({ ...form, scoring_type: e.target.value })}
+                  >
+                    {SCORING_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    {form.scoring_type === 'count' ? 'Điểm mỗi đơn vị' : 'Điểm tối đa'}
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -321,15 +371,41 @@ export default function AdminTasks() {
                   />
                   {errors.max_score && <div className="form-error-text">{errors.max_score}</div>}
                 </div>
+              </div>
+
+              {form.scoring_type === 'count' && (
                 <div className="form-group">
-                  <label className="form-label">Loại chấm</label>
-                  <select
-                    className="form-input form-select"
-                    value={form.scoring_type}
-                    onChange={(e) => setForm({ ...form, scoring_type: e.target.value })}
-                  >
-                    {SCORING_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
+                  <label className="form-label">Số lượng tối đa</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={form.max_count}
+                    onChange={(e) => setForm({ ...form, max_count: e.target.value })}
+                    placeholder="Để trống = không giới hạn"
+                  />
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                    Điểm nhiệm vụ = số lượng × {Number(form.max_score) || 0} điểm
+                  </div>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label">Ảnh minh hoạ (hiện cho trọng tài khi chấm)</label>
+                {(imagePreview || (!removeImage && modal?.task && taskImageUrl(modal.task))) && (
+                  <div style={{ marginBottom: 8 }}>
+                    <img
+                      src={imagePreview || taskImageUrl(modal.task)}
+                      alt="Ảnh nhiệm vụ"
+                      style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                    />
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={onPickImage} />
+                  {modal?.task?.has_image && !removeImage && !imageFile && (
+                    <button type="button" className="btn btn-danger" onClick={() => setRemoveImage(true)}>Xóa ảnh</button>
+                  )}
                 </div>
               </div>
 

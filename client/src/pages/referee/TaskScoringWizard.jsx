@@ -1,26 +1,22 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+import { api, taskImageUrl } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
 /**
- * Wizard chấm điểm theo từng nhiệm vụ.
+ * Wizard chấm điểm theo từng nhiệm vụ — tối ưu cho trọng tài không chuyên trên iPad.
  *
- * Props:
- *   - team: object đội
- *   - content: object nội dung thi
- *   - tasks: array task (đã filter is_active, sắp theo order_index)
- *   - competitionId, contentId, region: route params
- *   - memberNames: string tên các thành viên
- *   - existing: array score đã chấm trước đó (nếu có)
+ * Flow 2 bước:
+ *   1) Chấm  — mỗi nhiệm vụ 1 màn hình: ảnh to + điểm, nút bấm lớn
+ *              (binary: Đạt/Không đạt · count: đếm số lượng · numeric: nhập điểm)
+ *              + màn điểm thưởng nếu nội dung có bonus_config
+ *   2) Gửi   — bảng tổng kết giống phiếu giấy để học sinh check, nhập thời gian,
+ *              ký tên rồi gửi
  *
- * Flow 3 bước:
- *   1) Info  — round, bangThi, timeSpent
- *   2) Tasks — chấm từng task, có ảnh minh hoạ
- *   3) Confirm — ký tên, ghi chú, gửi
+ * Mỗi đội chỉ có 1 phiếu / nội dung: nếu đã có phiếu (existing) → sửa phiếu đó (PUT).
  */
 export default function TaskScoringWizard({
   team,
@@ -36,86 +32,130 @@ export default function TaskScoringWizard({
   const { user } = useAuth();
   const { showAlert } = useNotify();
 
-  const [step, setStep] = useState(1); // 1: info, 2: tasks, 3: confirm
-  const [round, setRound] = useState('1');
-  const [bangThi, setBangThi] = useState('');
-  const [timeSpent, setTimeSpent] = useState('');
-  const [scores, setScores] = useState(() => Object.fromEntries(tasks.map(t => [t.id, ''])));
-  const [rerunCount, setRerunCount] = useState('0');
-  const [extraReward, setExtraReward] = useState(0);
-  const [teamMembers, setTeamMembers] = useState(memberNames || '');
-  const [refereeSignature, setRefereeSignature] = useState(user?.fullName || user?.username || '');
-  const [remarks, setRemarks] = useState('');
+  // Phiếu đã có của đội cho nội dung này (unique) → chế độ sửa
+  const existingScore = useMemo(
+    () => existing.find(s => s.contest_content_id === contentId) || null,
+    [existing, contentId]
+  );
+  const prevCS = existingScore?.criteria_scores || {};
+
+  const bonusCfg = content?.bonus_config || null;
+
+  // ── State chấm điểm ──
+  // taskState[taskId] = { qty, points, done }
+  const [taskState, setTaskState] = useState(() => {
+    const init = {};
+    for (const t of tasks) {
+      const prevPts = prevCS.taskScores?.[t.id];
+      const prevQty = prevCS.taskQty?.[t.id];
+      const has = prevPts !== undefined && prevPts !== '';
+      init[t.id] = {
+        qty: prevQty !== undefined ? Number(prevQty) : 0,
+        points: has ? Number(prevPts) || 0 : null, // null = chưa chấm
+      };
+    }
+    return init;
+  });
+  const [retryCount, setRetryCount] = useState(() => Number(prevCS.rerunCount) || existingScore?.retry_count || 0);
+  const [step, setStep] = useState(1);
+  // các "màn": mỗi task 1 màn + 1 màn bonus (nếu có)
+  const screenCount = tasks.length + (bonusCfg ? 1 : 0);
+  const [screenIdx, setScreenIdx] = useState(0);
+
+  // ── State xác nhận ──
+  const [timeSpent, setTimeSpent] = useState(existingScore?.time || '');
+  const [teamMembers, setTeamMembers] = useState(prevCS.teamMembers || memberNames || '');
+  const [refereeSignature, setRefereeSignature] = useState(
+    prevCS.refereeSignature || user?.fullName || user?.username || ''
+  );
+  const [remarks, setRemarks] = useState(prevCS.remarks || existingScore?.notes || '');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [taskIdx, setTaskIdx] = useState(0);
-  const [showAllTasks, setShowAllTasks] = useState(false);
-  const taskListRef = useRef(null);
-
-  useEffect(() => {
-    if (memberNames) setTeamMembers(memberNames);
-  }, [memberNames]);
-
-  useEffect(() => {
-    const r = parseInt(rerunCount, 10);
-    if (!isNaN(r) && r > 0) setExtraReward(Math.max(0, 40 - 10 * r));
-    else setExtraReward(0);
-  }, [rerunCount]);
-
-  const totalScore = useMemo(() => {
-    return tasks.reduce((sum, t) => {
-      const v = parseFloat(scores[t.id]);
-      return sum + (isNaN(v) ? 0 : v);
-    }, 0) + extraReward;
-  }, [scores, tasks, extraReward]);
-
-  const filledCount = useMemo(() => {
-    return tasks.filter(t => scores[t.id] !== '' && scores[t.id] !== undefined && !isNaN(parseFloat(scores[t.id]))).length;
-  }, [scores, tasks]);
 
   const backUrl = `/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`;
 
-  const setScore = (id, val) => setScores(s => ({ ...s, [id]: val }));
+  // ── Tính điểm ──
+  const bonusPoints = bonusCfg
+    ? Math.max(0, (Number(bonusCfg.base) || 0) - (Number(bonusCfg.per_retry) || 0) * retryCount)
+    : 0;
 
-  const handleNext = () => {
-    if (step === 1) {
-      if (!timeSpent) {
-        showAlert('Vui lòng nhập Thời gian hoàn thành.', 'error');
-        return;
-      }
-      setStep(2);
-    } else if (step === 2) {
-      if (filledCount === 0) {
-        showAlert('Vui lòng nhập điểm cho ít nhất 1 nhiệm vụ.', 'error');
-        return;
-      }
-      setStep(3);
-    }
+  const taskPoints = (t) => {
+    const st = taskState[t.id];
+    if (!st) return 0;
+    if (t.scoring_type === 'count') return (st.qty || 0) * (Number(t.max_score) || 0);
+    return st.points ?? 0;
   };
 
+  const totalScore = useMemo(
+    () => tasks.reduce((sum, t) => sum + taskPoints(t), 0) + bonusPoints,
+    [taskState, tasks, bonusPoints] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const scoredCount = useMemo(
+    () => tasks.filter(t => t.scoring_type === 'count' ? true : taskState[t.id]?.points !== null).length,
+    [taskState, tasks]
+  );
+
+  const setTask = (id, patch) => setTaskState(s => ({ ...s, [id]: { ...s[id], ...patch } }));
+
+  const gotoNextScreen = () => {
+    if (screenIdx < screenCount - 1) setScreenIdx(i => i + 1);
+    else setStep(2);
+  };
+
+  // Format giới hạn thời gian mm:ss
+  const timeLimitText = content?.time_limit_seconds
+    ? `${String(Math.floor(content.time_limit_seconds / 60)).padStart(2, '0')}:${String(content.time_limit_seconds % 60).padStart(2, '0')}`
+    : null;
+
+  // ── Gửi ──
   const handleSubmit = async () => {
+    if (!timeSpent.trim()) {
+      showAlert('Vui lòng nhập Thời gian thi.', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
-      await api.postScore({
+      const taskScores = {};
+      const taskQty = {};
+      for (const t of tasks) {
+        taskScores[t.id] = taskPoints(t);
+        if (t.scoring_type === 'count') taskQty[t.id] = taskState[t.id]?.qty || 0;
+      }
+      const payload = {
         team_id: team.id,
         contest_content_id: contentId,
         referee_id: user?.id,
-        time: timeSpent,
+        time: timeSpent.trim(),
         score: totalScore,
-        // scores table không có round, extra_fields, student_signature, referee_signature
-        // Lưu chi tiết taskScores + extra vào criteria_scores (jsonb) để không mất data
+        round: 1,
+        retry_count: retryCount,
+        bonus_points: bonusPoints,
         criteria_scores: {
-          taskScores: scores,
-          bangThi,
-          rerunCount: rerunCount || '0',
-          extraReward,
+          taskScores,
+          taskQty,
+          bangThi: team?.boards?.name || '',
+          rerunCount: String(retryCount),
+          extraReward: bonusPoints,
           teamMembers,
           remarks,
           refereeSignature: refereeSignature || user?.full_name || user?.username,
           studentSignature: teamMembers,
         },
         notes: remarks || null,
-      });
+      };
+      if (existingScore) {
+        await api.putScore(existingScore.id, payload);
+      } else {
+        try {
+          await api.postScore(payload);
+        } catch (err) {
+          // Đội đã có phiếu (tạo từ nơi khác) → server trả 409 kèm existing_id
+          const m = /Đội này đã có phiếu điểm/.test(err.message || '');
+          if (m) throw new Error('Đội này đã có phiếu điểm. Quay lại danh sách và mở lại đội để sửa phiếu.');
+          throw err;
+        }
+      }
       setSuccess(true);
       setTimeout(() => navigate(backUrl), 2000);
     } catch (err) {
@@ -130,7 +170,7 @@ export default function TaskScoringWizard({
     return (
       <div className="ts-success">
         <div className="ts-success-icon">✓</div>
-        <strong>Gửi điểm thành công!</strong>
+        <strong>{existingScore ? 'Đã cập nhật phiếu điểm!' : 'Gửi điểm thành công!'}</strong>
         <p>Đang quay lại danh sách đội...</p>
       </div>
     );
@@ -149,17 +189,23 @@ export default function TaskScoringWizard({
     );
   }
 
-  const currentTask = tasks[taskIdx];
+  const isBonusScreen = bonusCfg && screenIdx === tasks.length;
+  const currentTask = !isBonusScreen ? tasks[screenIdx] : null;
+  const curImg = currentTask ? taskImageUrl(currentTask) : null;
 
   return (
     <div className="ts-wrapper">
-      {/* ── Sticky header (luôn hiện trên tablet) ── */}
+      {/* ── Sticky header ── */}
       <header className="ts-header">
         <a href={backUrl} className="ts-back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </a>
         <div className="ts-header-info">
-          <div className="ts-team-name">{team?.name}</div>
+          <div className="ts-team-name">
+            {team?.name}
+            {team?.boards?.name && <span className="ts-board-chip">{team.boards.name}</span>}
+            {existingScore && <span className="ts-edit-chip">Sửa phiếu</span>}
+          </div>
           <div className="ts-content-name">{content?.name}</div>
         </div>
         <div className="ts-header-score">
@@ -170,275 +216,261 @@ export default function TaskScoringWizard({
 
       {/* ── Stepper ── */}
       <div className="ts-stepper">
-        <div className={`ts-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}`} onClick={() => step > 1 && setStep(1)}>
+        <div className={`ts-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}`} onClick={() => setStep(1)}>
           <span className="ts-step-num">1</span>
-          <span className="ts-step-label">Thông tin</span>
-        </div>
-        <div className="ts-step-line" />
-        <div className={`ts-step ${step >= 2 ? 'active' : ''} ${step > 2 ? 'done' : ''}`} onClick={() => step > 2 && setStep(2)}>
-          <span className="ts-step-num">2</span>
           <span className="ts-step-label">Chấm điểm</span>
         </div>
         <div className="ts-step-line" />
-        <div className={`ts-step ${step >= 3 ? 'active' : ''}`}>
-          <span className="ts-step-num">3</span>
-          <span className="ts-step-label">Xác nhận</span>
+        <div className={`ts-step ${step >= 2 ? 'active' : ''}`}>
+          <span className="ts-step-num">2</span>
+          <span className="ts-step-label">Xác nhận & gửi</span>
         </div>
       </div>
 
-      {/* ── Step 1: Info ── */}
+      {/* ── Step 1: chấm từng nhiệm vụ ── */}
       {step === 1 && (
         <div className="ts-card ts-fade-in">
-          <h2 className="ts-card-title">Thông tin lượt thi</h2>
-          <div className="ts-form-grid">
-            <div className="ts-form-row">
-              <label className="ts-label">Lượt thi <span className="ts-req">*</span></label>
-              <div className="ts-input-stepper">
-                <button type="button" onClick={() => setRound(String(Math.max(1, (parseInt(round, 10) || 1) - 1)))}>−</button>
-                <input type="number" min="1" value={round} onChange={(e) => setRound(e.target.value)} />
-                <button type="button" onClick={() => setRound(String((parseInt(round, 10) || 0) + 1))}>+</button>
+          {/* Progress */}
+          <div className="ts-progress">
+            <div className="ts-progress-bar" style={{ width: `${((screenIdx + 1) / screenCount) * 100}%` }} />
+            <span className="ts-progress-text">
+              {isBonusScreen ? 'Điểm thưởng' : `Nhiệm vụ ${screenIdx + 1} / ${tasks.length}`}
+            </span>
+          </div>
+
+          {/* ── Màn nhiệm vụ ── */}
+          {currentTask && (
+            <div className="ts-task-focus">
+              <h3 className="ts-task-name">{currentTask.name}</h3>
+              {currentTask.name_en && <div className="ts-task-name-en">{currentTask.name_en}</div>}
+
+              {curImg && (
+                <div className="ts-task-image-wrap">
+                  <img src={curImg} alt={currentTask.name} className="ts-task-image" />
+                </div>
+              )}
+
+              {currentTask.description && (
+                <p className="ts-task-desc">{currentTask.description}</p>
+              )}
+
+              {/* binary: 2 nút to */}
+              {currentTask.scoring_type === 'binary' && (
+                <div className="ts-bigbtns">
+                  <button
+                    type="button"
+                    className={`ts-bigbtn ts-bigbtn-fail ${taskState[currentTask.id]?.points === 0 ? 'selected' : ''}`}
+                    onClick={() => { setTask(currentTask.id, { points: 0 }); gotoNextScreen(); }}
+                  >
+                    ✗ Không đạt
+                    <span className="ts-bigbtn-pts">0 điểm</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`ts-bigbtn ts-bigbtn-pass ${taskState[currentTask.id]?.points > 0 ? 'selected' : ''}`}
+                    onClick={() => { setTask(currentTask.id, { points: Number(currentTask.max_score) || 0 }); gotoNextScreen(); }}
+                  >
+                    ✓ Đạt
+                    <span className="ts-bigbtn-pts">+{currentTask.max_score} điểm</span>
+                  </button>
+                </div>
+              )}
+
+              {/* count: đếm số lượng */}
+              {currentTask.scoring_type === 'count' && (
+                <div className="ts-count-box">
+                  <div className="ts-count-label">Số lượng đạt được</div>
+                  <div className="ts-input-stepper ts-input-stepper-xl">
+                    <button type="button" onClick={() => setTask(currentTask.id, { qty: Math.max(0, (taskState[currentTask.id]?.qty || 0) - 1) })}>−</button>
+                    <input
+                      type="number"
+                      min="0"
+                      max={currentTask.max_count || undefined}
+                      value={taskState[currentTask.id]?.qty ?? 0}
+                      onChange={(e) => {
+                        let v = parseInt(e.target.value, 10);
+                        if (isNaN(v) || v < 0) v = 0;
+                        if (currentTask.max_count && v > currentTask.max_count) v = currentTask.max_count;
+                        setTask(currentTask.id, { qty: v });
+                      }}
+                      inputMode="numeric"
+                    />
+                    <button type="button" onClick={() => {
+                      const cur = taskState[currentTask.id]?.qty || 0;
+                      const next = currentTask.max_count ? Math.min(currentTask.max_count, cur + 1) : cur + 1;
+                      setTask(currentTask.id, { qty: next });
+                    }}>+</button>
+                  </div>
+                  <div className="ts-count-calc">
+                    {taskState[currentTask.id]?.qty || 0} × {currentTask.max_score} = <strong>{taskPoints(currentTask)} điểm</strong>
+                    {currentTask.max_count ? <span className="ts-count-max"> (tối đa {currentTask.max_count})</span> : null}
+                  </div>
+                </div>
+              )}
+
+              {/* numeric / tier: nhập điểm */}
+              {(currentTask.scoring_type === 'numeric' || currentTask.scoring_type === 'tier') && (
+                <div className="ts-count-box">
+                  <div className="ts-count-label">Điểm đạt (tối đa {currentTask.max_score})</div>
+                  <div className="ts-input-stepper ts-input-stepper-xl">
+                    <button type="button" onClick={() => {
+                      const v = taskState[currentTask.id]?.points ?? 0;
+                      setTask(currentTask.id, { points: Math.max(0, v - 1) });
+                    }}>−</button>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={taskState[currentTask.id]?.points ?? ''}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        setTask(currentTask.id, { points: isNaN(v) ? null : Math.min(Number(currentTask.max_score) || 999, Math.max(0, v)) });
+                      }}
+                      placeholder="0"
+                      inputMode="decimal"
+                    />
+                    <button type="button" onClick={() => {
+                      const v = taskState[currentTask.id]?.points ?? 0;
+                      setTask(currentTask.id, { points: Math.min(Number(currentTask.max_score) || 999, v + 1) });
+                    }}>+</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Màn điểm thưởng ── */}
+          {isBonusScreen && (
+            <div className="ts-task-focus">
+              <h3 className="ts-task-name">{bonusCfg.label || 'Điểm thưởng'}</h3>
+              <p className="ts-task-desc">
+                Công thức: {bonusCfg.base} − {bonusCfg.per_retry} × số lần chạy lại (tối thiểu 0)
+              </p>
+              <div className="ts-count-box">
+                <div className="ts-count-label">Số lần chạy lại</div>
+                <div className="ts-input-stepper ts-input-stepper-xl">
+                  <button type="button" onClick={() => setRetryCount(c => Math.max(0, c - 1))}>−</button>
+                  <input
+                    type="number"
+                    min="0"
+                    value={retryCount}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setRetryCount(isNaN(v) || v < 0 ? 0 : v);
+                    }}
+                    inputMode="numeric"
+                  />
+                  <button type="button" onClick={() => setRetryCount(c => c + 1)}>+</button>
+                </div>
+                <div className="ts-count-calc">
+                  Điểm thưởng: <strong>{bonusPoints} điểm</strong>
+                </div>
               </div>
             </div>
-            <div className="ts-form-row">
-              <label className="ts-label">Bảng thi</label>
-              <input
-                type="text"
-                className="ts-input"
-                value={bangThi}
-                onChange={(e) => setBangThi(e.target.value)}
-                placeholder="VD: Bảng A"
-              />
-            </div>
+          )}
+
+          {/* Điều hướng màn */}
+          <div className="ts-task-nav">
+            <button
+              type="button"
+              className="ts-btn ts-btn-secondary"
+              onClick={() => setScreenIdx(i => Math.max(0, i - 1))}
+              disabled={screenIdx === 0}
+            >
+              ← Trước
+            </button>
+            <button type="button" className="ts-btn ts-btn-primary" onClick={gotoNextScreen}>
+              {screenIdx < screenCount - 1 ? 'Sau →' : 'Xong — Xác nhận →'}
+            </button>
+          </div>
+
+          {/* Side index */}
+          <div className="ts-task-index">
+            {tasks.map((t, i) => (
+              <button
+                type="button"
+                key={t.id}
+                className={`ts-task-pill ${i === screenIdx ? 'active' : ''} ${t.scoring_type === 'count' ? (taskState[t.id]?.qty > 0 ? 'filled' : '') : (taskState[t.id]?.points !== null ? 'filled' : '')}`}
+                onClick={() => setScreenIdx(i)}
+                title={t.name}
+              >
+                {i + 1}
+              </button>
+            ))}
+            {bonusCfg && (
+              <button
+                type="button"
+                className={`ts-task-pill ${isBonusScreen ? 'active' : ''} ${retryCount >= 0 && screenIdx > tasks.length - 1 ? '' : ''}`}
+                onClick={() => setScreenIdx(tasks.length)}
+                title={bonusCfg.label || 'Điểm thưởng'}
+              >
+                ★
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: xác nhận — trình bày như phiếu giấy để học sinh check ── */}
+      {step === 2 && (
+        <div className="ts-card ts-fade-in">
+          <h2 className="ts-card-title">Phiếu chấm điểm</h2>
+          <div className="ts-sheet-sub">
+            {team?.name}
+            {team?.boards?.name ? ` · ${team.boards.name}` : ''} · {content?.name}
+          </div>
+
+          <table className="ts-detail-table ts-sheet-table">
+            <thead>
+              <tr>
+                <th>Nhiệm vụ</th>
+                <th className="ts-col-qty">Số lượng</th>
+                <th className="ts-col-pts">Điểm</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((t) => (
+                <tr key={t.id}>
+                  <td>
+                    {t.name}
+                    {taskState[t.id]?.points === null && t.scoring_type !== 'count' && (
+                      <span className="ts-not-scored"> (chưa chấm)</span>
+                    )}
+                  </td>
+                  <td className="ts-col-qty">{t.scoring_type === 'count' ? (taskState[t.id]?.qty || 0) : '—'}</td>
+                  <td className="ts-col-pts"><strong>{taskPoints(t)}</strong></td>
+                </tr>
+              ))}
+              {bonusCfg && (
+                <tr>
+                  <td>{bonusCfg.label || 'Điểm thưởng'} <span className="ts-not-scored">({retryCount} lần chạy lại)</span></td>
+                  <td className="ts-col-qty">—</td>
+                  <td className="ts-col-pts"><strong>{bonusPoints}</strong></td>
+                </tr>
+              )}
+            </tbody>
+            <tfoot>
+              <tr className="ts-sheet-total">
+                <td colSpan={2}>TỔNG ĐIỂM</td>
+                <td className="ts-col-pts"><strong>{totalScore}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div className="ts-form-grid" style={{ marginTop: 16 }}>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Thời gian hoàn thành <span className="ts-req">*</span></label>
+              <label className="ts-label">
+                Thời gian thi <span className="ts-req">*</span>
+                {timeLimitText && <span className="ts-hint-inline"> (tối đa {timeLimitText})</span>}
+              </label>
               <input
                 type="text"
                 className="ts-input ts-input-lg"
                 value={timeSpent}
                 onChange={(e) => setTimeSpent(e.target.value)}
                 placeholder="mm:ss — VD: 02:35"
-                autoFocus
               />
             </div>
-            <div className="ts-form-row ts-full">
-              <label className="ts-label">Thành viên đội</label>
-              <input
-                type="text"
-                className="ts-input"
-                value={teamMembers}
-                onChange={(e) => setTeamMembers(e.target.value)}
-                placeholder="Tự điền nếu trống"
-              />
-            </div>
-            <div className="ts-form-row ts-full">
-              <label className="ts-label">Số lần chạy lại (tính điểm thưởng)</label>
-              <div className="ts-input-stepper">
-                <button type="button" onClick={() => setRerunCount(String(Math.max(0, (parseInt(rerunCount, 10) || 0) - 1)))}>−</button>
-                <input type="number" min="0" value={rerunCount} onChange={(e) => setRerunCount(e.target.value)} />
-                <button type="button" onClick={() => setRerunCount(String((parseInt(rerunCount, 10) || 0) + 1))}>+</button>
-              </div>
-              <div className="ts-hint">Điểm thưởng: <strong>{extraReward}</strong> (công thức: 40 − 10 × số lần, &gt; 0)</div>
-            </div>
-          </div>
-          <div className="ts-footer">
-            <a href={backUrl} className="ts-btn ts-btn-ghost">Hủy</a>
-            <button type="button" className="ts-btn ts-btn-primary" onClick={handleNext}>
-              Tiếp tục →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 2: Tasks ── */}
-      {step === 2 && (
-        <div className="ts-card ts-fade-in" ref={taskListRef}>
-          <div className="ts-task-header">
-            <h2 className="ts-card-title">Chấm từng nhiệm vụ</h2>
-            <button
-              type="button"
-              className="ts-btn ts-btn-ghost ts-btn-sm"
-              onClick={() => setShowAllTasks(s => !s)}
-            >
-              {showAllTasks ? 'Chấm từng cái' : 'Xem tất cả'}
-            </button>
-          </div>
-
-          {/* Progress */}
-          <div className="ts-progress">
-            <div className="ts-progress-bar" style={{ width: `${(filledCount / tasks.length) * 100}%` }} />
-            <span className="ts-progress-text">{filledCount}/{tasks.length} nhiệm vụ đã chấm</span>
-          </div>
-
-          {/* One task focus mode */}
-          {!showAllTasks && currentTask && (
-            <div className="ts-task-focus">
-              <div className="ts-task-counter">Nhiệm vụ {taskIdx + 1} / {tasks.length}</div>
-              <h3 className="ts-task-name">{currentTask.name}</h3>
-              {currentTask.name_en && <div className="ts-task-name-en">{currentTask.name_en}</div>}
-              {currentTask.description && (
-                <p className="ts-task-desc">{currentTask.description}</p>
-              )}
-              <div className="ts-task-input-row">
-                <label className="ts-label">Điểm đạt (tối đa {currentTask.max_score})</label>
-                <div className="ts-input-stepper ts-input-stepper-lg">
-                  <button type="button" onClick={() => {
-                    const v = parseFloat(scores[currentTask.id] || 0);
-                    setScore(currentTask.id, String(Math.max(0, v - 1)));
-                  }}>−</button>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    value={scores[currentTask.id] ?? ''}
-                    onChange={(e) => setScore(currentTask.id, e.target.value)}
-                    autoFocus
-                    inputMode="decimal"
-                  />
-                  <button type="button" onClick={() => {
-                    const v = parseFloat(scores[currentTask.id] || 0);
-                    setScore(currentTask.id, String(Math.min(parseFloat(currentTask.max_score || 999), v + 1)));
-                  }}>+</button>
-                </div>
-                {currentTask.scoring_type === 'binary' && (
-                  <div className="ts-quick-btns">
-                    <button type="button" onClick={() => setScore(currentTask.id, '0')}>0</button>
-                    <button type="button" className="ts-quick-full" onClick={() => setScore(currentTask.id, String(currentTask.max_score))}>{currentTask.max_score} (đạt)</button>
-                  </div>
-                )}
-              </div>
-
-              <div className="ts-task-nav">
-                <button
-                  type="button"
-                  className="ts-btn ts-btn-secondary"
-                  onClick={() => setTaskIdx(i => Math.max(0, i - 1))}
-                  disabled={taskIdx === 0}
-                >
-                  ← Trước
-                </button>
-                {taskIdx < tasks.length - 1 ? (
-                  <button
-                    type="button"
-                    className="ts-btn ts-btn-primary"
-                    onClick={() => setTaskIdx(i => i + 1)}
-                  >
-                    Sau →
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="ts-btn ts-btn-primary"
-                    onClick={() => setStep(3)}
-                  >
-                    Tiếp tục →
-                  </button>
-                )}
-              </div>
-
-              {/* Side index */}
-              <div className="ts-task-index">
-                {tasks.map((t, i) => (
-                  <button
-                    type="button"
-                    key={t.id}
-                    className={`ts-task-pill ${i === taskIdx ? 'active' : ''} ${scores[t.id] !== '' ? 'filled' : ''}`}
-                    onClick={() => setTaskIdx(i)}
-                    title={t.name}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* All tasks list */}
-          {showAllTasks && (
-            <div className="ts-task-list">
-              {tasks.map((t, i) => (
-                <div key={t.id} className="ts-task-row">
-                  <div className="ts-task-row-num">{i + 1}</div>
-                  <div className="ts-task-row-body">
-                    <div className="ts-task-row-name">{t.name}</div>
-                    {t.description && <div className="ts-task-row-desc">{t.description}</div>}
-                    <div className="ts-task-row-meta">Tối đa: <strong>{t.max_score}</strong></div>
-                  </div>
-                  <div className="ts-task-row-input">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      value={scores[t.id] ?? ''}
-                      onChange={(e) => setScore(t.id, e.target.value)}
-                      placeholder="0"
-                      inputMode="decimal"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="ts-footer">
-            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Quay lại</button>
-            <button type="button" className="ts-btn ts-btn-primary" onClick={handleNext}>
-              Tiếp tục →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 3: Confirm ── */}
-      {step === 3 && (
-        <div className="ts-card ts-fade-in">
-          <h2 className="ts-card-title">Xác nhận & gửi</h2>
-
-          <div className="ts-summary">
-            <div className="ts-summary-row">
-              <span>Lượt thi</span>
-              <strong>{round || '-'}</strong>
-            </div>
-            <div className="ts-summary-row">
-              <span>Thời gian</span>
-              <strong>{timeSpent || '-'}</strong>
-            </div>
-            <div className="ts-summary-row">
-              <span>Số nhiệm vụ đã chấm</span>
-              <strong>{filledCount}/{tasks.length}</strong>
-            </div>
-            <div className="ts-summary-row">
-              <span>Điểm thưởng</span>
-              <strong>{extraReward}</strong>
-            </div>
-            <div className="ts-summary-row ts-summary-total">
-              <span>Tổng điểm</span>
-              <strong>{totalScore}</strong>
-            </div>
-          </div>
-
-          <details className="ts-detail">
-            <summary>Xem chi tiết điểm đã chấm ({filledCount})</summary>
-            <table className="ts-detail-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Nhiệm vụ</th>
-                  <th>Điểm</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((t, i) => (
-                  <tr key={t.id}>
-                    <td>{i + 1}</td>
-                    <td>{t.name}</td>
-                    <td><strong>{scores[t.id] || '-'}</strong> / {t.max_score}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-
-          <div className="ts-form-grid">
             <div className="ts-form-row">
               <label className="ts-label">Học sinh / Đội trưởng ký</label>
               <input
@@ -471,14 +503,14 @@ export default function TaskScoringWizard({
           </div>
 
           <div className="ts-footer">
-            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(2)}>← Quay lại</button>
+            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Chấm lại</button>
             <button
               type="button"
               className="ts-btn ts-btn-primary ts-btn-lg"
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? 'Đang gửi...' : `✓ Gửi điểm (${totalScore})`}
+              {submitting ? 'Đang gửi...' : `✓ ${existingScore ? 'Cập nhật phiếu' : 'Gửi điểm'} (${totalScore})`}
             </button>
           </div>
         </div>

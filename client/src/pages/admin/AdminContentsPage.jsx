@@ -43,7 +43,10 @@ export default function AdminContentsPage() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ name: '', description: '', scoring_method: '', order_index: contents.length + 1, criteria: [] });
+    setForm({
+      name: '', description: '', scoring_method: '', order_index: contents.length + 1, criteria: [],
+      time_limit_seconds: '', bonus_enabled: false, bonus_base: 40, bonus_per_retry: 10, bonus_label: '',
+    });
     setErrors({});
   };
 
@@ -55,6 +58,11 @@ export default function AdminContentsPage() {
       scoring_method: c.scoring_method || '',
       order_index: c.order_index ?? contents.length + 1,
       criteria: c.criteria || [],
+      time_limit_seconds: c.time_limit_seconds ?? '',
+      bonus_enabled: !!c.bonus_config,
+      bonus_base: c.bonus_config?.base ?? 40,
+      bonus_per_retry: c.bonus_config?.per_retry ?? 10,
+      bonus_label: c.bonus_config?.label || '',
     });
     setErrors({});
   };
@@ -79,6 +87,14 @@ export default function AdminContentsPage() {
         scoring_method: form.scoring_method?.trim() || null,
         order_index: Number(form.order_index) || 1,
         criteria: form.criteria || [],
+        time_limit_seconds: form.time_limit_seconds !== '' ? Number(form.time_limit_seconds) : null,
+        bonus_config: form.bonus_enabled
+          ? {
+              label: form.bonus_label?.trim() || 'Điểm thưởng',
+              base: Number(form.bonus_base) || 0,
+              per_retry: Number(form.bonus_per_retry) || 0,
+            }
+          : null,
       };
       if (modal === 'add') {
         await api.postContent(selectedComp, body);
@@ -251,6 +267,53 @@ export default function AdminContentsPage() {
                   value={form.order_index}
                   onChange={(e) => setForm({ ...form, order_index: parseInt(e.target.value, 10) || 1 })}
                 />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Thời gian trận đấu (giây)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="0"
+                  value={form.time_limit_seconds}
+                  onChange={(e) => setForm({ ...form, time_limit_seconds: e.target.value })}
+                  placeholder="VD: 150 — để trống nếu không giới hạn"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!!form.bonus_enabled}
+                    onChange={(e) => setForm({ ...form, bonus_enabled: e.target.checked })}
+                    style={{ width: 'auto' }}
+                  />
+                  Có điểm thưởng (theo số lần chạy lại)
+                </label>
+                {form.bonus_enabled && (
+                  <div style={{ marginTop: 8, padding: 12, background: '#f8fafc', borderRadius: 8, display: 'grid', gap: 8 }}>
+                    <input
+                      className="form-input"
+                      value={form.bonus_label}
+                      onChange={(e) => setForm({ ...form, bonus_label: e.target.value })}
+                      placeholder="Tên điểm thưởng — VD: Điểm thưởng vận hành mượt mà"
+                    />
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13 }}>Điểm thưởng =</span>
+                      <input
+                        type="number" className="form-input" style={{ width: 80 }}
+                        value={form.bonus_base}
+                        onChange={(e) => setForm({ ...form, bonus_base: e.target.value })}
+                      />
+                      <span style={{ fontSize: 13 }}>−</span>
+                      <input
+                        type="number" className="form-input" style={{ width: 80 }}
+                        value={form.bonus_per_retry}
+                        onChange={(e) => setForm({ ...form, bonus_per_retry: e.target.value })}
+                      />
+                      <span style={{ fontSize: 13 }}>× số lần chạy lại (tối thiểu 0)</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="form-actions">

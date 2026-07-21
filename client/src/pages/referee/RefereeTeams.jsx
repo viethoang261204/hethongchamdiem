@@ -119,12 +119,17 @@ export default function RefereeTeams() {
                   <h3>{t.name}</h3>
                   {isDone && <span className="rt-badge rt-badge-done">✓ Đã chấm</span>}
                 </div>
+                {t.boards?.name && (
+                  <p className="referee-card-members" style={{ color: '#60a5fa', fontWeight: 600 }}>
+                    {t.boards.name}{t.boards.age_group ? ` — ${t.boards.age_group}` : ''}
+                  </p>
+                )}
                 <p className="referee-card-members">
                   {mems.length > 0 ? memberNames : <em style={{ color: '#475569' }}>Chưa có thành viên</em>}
                 </p>
                 {isDone && lastScore && (
                   <div className="referee-card-foot">
-                    <span>Điểm: <strong>{lastScore.score ?? '-'}</strong></span>
+                    <span>Điểm: <strong>{lastScore.score ?? '-'}</strong> · Ấn để sửa phiếu</span>
                     {lastScore.time && <span>· {lastScore.time}</span>}
                   </div>
                 )}

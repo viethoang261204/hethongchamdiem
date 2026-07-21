@@ -39,6 +39,13 @@ async function withRetry(fn, label = 'query') {
   throw lastError;
 }
 
+// URL ảnh minh hoạ nhiệm vụ — ưu tiên ảnh upload trong DB, fallback image_url
+export function taskImageUrl(task) {
+  if (!task) return null;
+  if (task.has_image) return `/api/tasks/${task.id}/image/raw?v=${Date.parse(task.updated_at) || ''}`;
+  return task.image_url || null;
+}
+
 // Gắn alias `team` (số ít) từ nested key `teams` — các trang cũ đọc `score.team`
 // theo alias Supabase `team:teams(...)`. Không ghi đè nếu server đã trả `team`.
 function aliasTeams(data) {
@@ -151,6 +158,32 @@ export const api = {
   deleteArea: (id) => withRetry(() => request(`/areas/${id}`, { method: 'DELETE' }), 'deleteArea'),
 
   // ============================================================
+  // Boards (bảng đấu theo độ tuổi)
+  // ============================================================
+  getBoards: (contestContentId) => withRetry(() => request(`/contents/${contestContentId}/boards`), 'getBoards'),
+
+  getAllBoards: () => withRetry(() => request('/boards'), 'getAllBoards'),
+
+  postBoard: (contestContentId, body) => withRetry(() => request(`/contents/${contestContentId}/boards`, {
+    method: 'POST',
+    body: {
+      name: body.name,
+      age_group: body.age_group ?? body.ageGroup ?? null,
+      order_index: body.order_index ?? body.order ?? 0,
+    },
+  }), 'postBoard'),
+
+  putBoard: (id, body) => {
+    const update = {};
+    if (body.name !== undefined) update.name = body.name;
+    if (body.age_group !== undefined || body.ageGroup !== undefined) update.age_group = body.age_group ?? body.ageGroup;
+    if (body.order_index !== undefined || body.order !== undefined) update.order_index = body.order_index ?? body.order;
+    return withRetry(() => request(`/boards/${id}`, { method: 'PUT', body: update }), 'putBoard');
+  },
+
+  deleteBoard: (id) => withRetry(() => request(`/boards/${id}`, { method: 'DELETE' }), 'deleteBoard'),
+
+  // ============================================================
   // Students
   // ============================================================
   getStudents: () => withRetry(() => request('/students'), 'getStudents'),
@@ -192,6 +225,7 @@ export const api = {
       student_ids: body.studentIds ?? body.student_ids ?? [],
       school_id: body.schoolId ?? body.school_id ?? null,
       area_id: body.areaId ?? body.area_id ?? null,
+      board_id: body.boardId ?? body.board_id ?? null,
       region: body.region ?? 'bac',
       order_index: body.order ?? body.order_index ?? 0,
     },
@@ -203,6 +237,7 @@ export const api = {
     if (body.studentIds !== undefined || body.student_ids !== undefined) update.student_ids = body.studentIds ?? body.student_ids;
     if (body.schoolId !== undefined || body.school_id !== undefined) update.school_id = body.schoolId ?? body.school_id;
     if (body.areaId !== undefined || body.area_id !== undefined) update.area_id = body.areaId ?? body.area_id;
+    if (body.boardId !== undefined || body.board_id !== undefined) update.board_id = body.boardId ?? body.board_id;
     if (body.region !== undefined) update.region = body.region;
     if (body.order !== undefined || body.order_index !== undefined) update.order_index = body.order ?? body.order_index;
     return withRetry(() => request(`/teams/${id}`, { method: 'PUT', body: update }), 'putTeam');
@@ -229,6 +264,9 @@ export const api = {
       referee_id: body.referee_id ?? body.refereeId ?? null,
       score: Number(body.score) || 0,
       time: body.time ?? null,
+      round: body.round ?? 1,
+      retry_count: body.retry_count ?? body.retryCount ?? 0,
+      bonus_points: body.bonus_points ?? body.bonusPoints ?? 0,
       criteria_scores: body.criteria_scores ?? body.criteriaScores ?? {},
       notes: body.notes ?? null,
     },
@@ -252,6 +290,9 @@ export const api = {
     if (body.referee_id !== undefined || body.refereeId !== undefined) update.referee_id = body.referee_id ?? body.refereeId;
     if (body.score !== undefined) update.score = Number(body.score) || 0;
     if (body.time !== undefined) update.time = body.time;
+    if (body.round !== undefined) update.round = body.round;
+    if (body.retry_count !== undefined || body.retryCount !== undefined) update.retry_count = body.retry_count ?? body.retryCount;
+    if (body.bonus_points !== undefined || body.bonusPoints !== undefined) update.bonus_points = body.bonus_points ?? body.bonusPoints;
     if (body.criteria_scores !== undefined || body.criteriaScores !== undefined) update.criteria_scores = body.criteria_scores ?? body.criteriaScores;
     if (body.notes !== undefined) update.notes = body.notes;
     return withRetry(() => request(`/scores/${id}`, { method: 'PUT', body: update }), 'putScore');
@@ -304,6 +345,19 @@ export const api = {
   putTask: (id, body) => withRetry(() => request(`/tasks/${id}`, { method: 'PUT', body }), 'putTask'),
 
   deleteTask: (id) => withRetry(() => request(`/tasks/${id}`, { method: 'DELETE' }), 'deleteTask'),
+
+  // Ảnh minh hoạ nhiệm vụ (bytea trong Neon) — URL xem: taskImageUrl(task)
+  uploadTaskImage: async ({ taskId, file }) => {
+    if (!file) throw new Error('Chưa chọn file ảnh.');
+    if (file.size > 5 * 1024 * 1024) throw new Error('Ảnh tối đa 5MB.');
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) throw new Error('Chỉ chấp nhận JPG/PNG/WEBP/GIF.');
+    const formData = new FormData();
+    formData.append('file', file);
+    return request(`/tasks/${taskId}/image`, { method: 'POST', formData });
+  },
+
+  deleteTaskImage: (taskId) => withRetry(() => request(`/tasks/${taskId}/image`, { method: 'DELETE' }), 'deleteTaskImage'),
 
   // ============================================================
   // Score Images (bytes lưu trong Neon, serve qua /api/score-images/:id/raw)

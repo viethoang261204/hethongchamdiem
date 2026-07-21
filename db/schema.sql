@@ -61,17 +61,22 @@ create table if not exists users (
 );
 
 -- Nội dung thi
+-- time_limit_seconds: thời gian trận đấu (mỗi nội dung khác nhau), null = không giới hạn
+-- bonus_config: cấu hình điểm thưởng, vd {"label":"Vận hành mượt mà","base":40,"per_retry":10}
+--               (điểm thưởng = base − per_retry × số lần chạy lại, tối thiểu 0); null = không có
 create table if not exists contest_contents (
-  id              uuid primary key default gen_random_uuid(),
-  competition_id  uuid not null references competitions(id) on delete cascade,
-  name            text not null,
-  name_en         text,
-  description     text,
-  criteria        jsonb default '[]',
-  order_index     integer default 0,
-  scoring_method  text,
-  created_at      timestamptz default now(),
-  updated_at      timestamptz default now()
+  id                 uuid primary key default gen_random_uuid(),
+  competition_id     uuid not null references competitions(id) on delete cascade,
+  name               text not null,
+  name_en            text,
+  description        text,
+  criteria           jsonb default '[]',
+  order_index        integer default 0,
+  scoring_method     text,
+  time_limit_seconds integer,
+  bonus_config       jsonb,
+  created_at         timestamptz default now(),
+  updated_at         timestamptz default now()
 );
 
 -- Khu vực thi (Bắc / Trung / Nam)
@@ -103,11 +108,23 @@ create table if not exists students (
   updated_at  timestamptz default now()
 );
 
--- Đội thi
+-- Bảng đấu (theo độ tuổi) — 1 nội dung thi có nhiều bảng đấu, 1 bảng có nhiều đội
+create table if not exists boards (
+  id                 uuid primary key default gen_random_uuid(),
+  contest_content_id uuid not null references contest_contents(id) on delete cascade,
+  name               text not null,
+  age_group          text,
+  order_index        integer default 0,
+  created_at         timestamptz default now(),
+  updated_at         timestamptz default now()
+);
+
+-- Đội thi (1 đội chỉ thuộc 1 nội dung thi của cuộc thi, thuộc 1 bảng đấu)
 create table if not exists teams (
   id                 uuid primary key default gen_random_uuid(),
   contest_content_id uuid not null references contest_contents(id) on delete cascade,
   area_id            uuid references areas(id) on delete set null,
+  board_id           uuid references boards(id) on delete set null,
   name               text not null,
   student_ids        uuid[] default '{}',
   school_id          uuid references schools(id) on delete set null,
@@ -118,6 +135,13 @@ create table if not exists teams (
 );
 
 -- Nhiệm vụ (gắn vào contest_contents)
+-- scoring_type:
+--   binary  = tick đạt/không đạt → được max_score
+--   count   = đếm số lượng → điểm = số lượng × max_score (max_score là điểm MỖI đơn vị,
+--             max_count = số lượng tối đa, null = không giới hạn)
+--   numeric = trọng tài nhập điểm tay (0..max_score)
+--   tier    = legacy, giữ để tương thích
+-- Ảnh nhiệm vụ lưu bytea (image_data + image_mime), serve GET /api/tasks/:id/image/raw
 create table if not exists tasks (
   id                 uuid primary key default gen_random_uuid(),
   contest_content_id uuid not null references contest_contents(id) on delete cascade,
@@ -125,15 +149,20 @@ create table if not exists tasks (
   name_en            text,
   description        text,
   image_url          text,
+  image_data         bytea,
+  image_mime         text,
   max_score          numeric(10,2) default 0,
-  scoring_type       text default 'binary' check (scoring_type in ('binary', 'tier', 'numeric')),
+  max_count          integer,
+  scoring_type       text default 'binary' check (scoring_type in ('binary', 'tier', 'numeric', 'count')),
   order_index        integer default 0,
   is_active          boolean default true,
   created_at         timestamptz default now(),
   updated_at         timestamptz default now()
 );
 
--- Bảng điểm
+-- Bảng điểm — mỗi đội chỉ có 1 phiếu duy nhất cho nội dung nó thi
+-- (chấm lại = UPDATE phiếu cũ; unique index bên dưới đảm bảo)
+-- criteria_scores lưu chi tiết từng nhiệm vụ: { taskScores: {taskId: {qty, points}}, ... }
 create table if not exists scores (
   id                 uuid primary key default gen_random_uuid(),
   team_id            uuid not null references teams(id) on delete cascade,
@@ -142,6 +171,9 @@ create table if not exists scores (
   referee_id         uuid references users(id) on delete set null,
   score              numeric(10,2) not null default 0,
   time               text,
+  round              integer default 1,
+  retry_count        integer default 0,
+  bonus_points       numeric(10,2) default 0,
   criteria_scores    jsonb default '{}',
   notes              text,
   signature_data     text,
@@ -169,6 +201,30 @@ alter table score_images add column if not exists image_data bytea;
 
 
 -- ============================================================
+-- 1b. MIGRATIONS — nâng cấp DB đã tồn tại (idempotent, chạy lại vô hại)
+-- ============================================================
+alter table contest_contents add column if not exists time_limit_seconds integer;
+alter table contest_contents add column if not exists bonus_config jsonb;
+
+alter table teams add column if not exists board_id uuid references boards(id) on delete set null;
+
+alter table tasks add column if not exists image_data bytea;
+alter table tasks add column if not exists image_mime text;
+alter table tasks add column if not exists max_count integer;
+alter table tasks drop constraint if exists tasks_scoring_type_check;
+alter table tasks add constraint tasks_scoring_type_check
+  check (scoring_type in ('binary', 'tier', 'numeric', 'count'));
+
+alter table scores add column if not exists round integer default 1;
+alter table scores add column if not exists retry_count integer default 0;
+alter table scores add column if not exists bonus_points numeric(10,2) default 0;
+
+-- Mỗi đội 1 phiếu duy nhất / nội dung
+create unique index if not exists uq_scores_team_content
+  on scores(team_id, contest_content_id);
+
+
+-- ============================================================
 -- 2. INDEXES
 -- ============================================================
 create index if not exists idx_schools_level        on schools(level);
@@ -180,8 +236,10 @@ create index if not exists idx_contents_competition on contest_contents(competit
 create index if not exists idx_areas_content        on areas(contest_content_id);
 create index if not exists idx_areas_region         on areas(region);
 create index if not exists idx_students_school      on students(school_id);
+create index if not exists idx_boards_content       on boards(contest_content_id);
 create index if not exists idx_teams_content        on teams(contest_content_id);
 create index if not exists idx_teams_area           on teams(area_id);
+create index if not exists idx_teams_board          on teams(board_id);
 create index if not exists idx_teams_region         on teams(region);
 create index if not exists idx_tasks_content        on tasks(contest_content_id);
 create index if not exists idx_tasks_active         on tasks(is_active);
@@ -239,6 +297,8 @@ create or replace trigger trg_areas_updated
   before update on areas for each row execute function set_updated_at();
 create or replace trigger trg_students_updated
   before update on students for each row execute function set_updated_at();
+create or replace trigger trg_boards_updated
+  before update on boards for each row execute function set_updated_at();
 create or replace trigger trg_teams_updated
   before update on teams for each row execute function set_updated_at();
 create or replace trigger trg_tasks_updated
@@ -277,14 +337,18 @@ select
   comp.name           as competition_name,
   u.full_name         as referee_name,
   area.name           as area_name,
-  area.region         as area_region
+  area.region         as area_region,
+  b.id                as board_id,
+  b.name              as board_name,
+  b.age_group         as board_age_group
 from scores s
 join teams t on t.id = s.team_id
 join contest_contents cc on cc.id = s.contest_content_id
 join competitions comp on comp.id = coalesce(s.competition_id, cc.competition_id)
 left join schools sch on sch.id = t.school_id
 left join users u on u.id = s.referee_id
-left join areas area on area.id = t.area_id;
+left join areas area on area.id = t.area_id
+left join boards b on b.id = t.board_id;
 
 -- Đội được phân cho từng referee.
 -- Khác bản Supabase: không filter auth.uid() (Neon không có),
@@ -308,9 +372,12 @@ select
   a.name              as area_name,
   a.region            as area_region,
   sch.name            as school_name,
-  sch.level           as school_level
+  sch.level           as school_level,
+  b.id                as board_id,
+  b.name              as board_name
 from teams t
 join contest_contents cc on cc.id = t.contest_content_id
 join areas a on a.id = t.area_id
 join users u on u.area_id = a.id and u.role = 'referee'
-left join schools sch on sch.id = t.school_id;
+left join schools sch on sch.id = t.school_id
+left join boards b on b.id = t.board_id;

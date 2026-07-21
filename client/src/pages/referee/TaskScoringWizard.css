@@ -827,3 +827,97 @@
   .referee-panel .filter-select { min-height: 48px; }
   .referee-panel .referee-card { padding: 18px; }
 }
+
+/* ─── Wizard v2: nút chấm to + màn đếm số lượng + phiếu xác nhận ── */
+.ts-board-chip, .ts-edit-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.ts-board-chip { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.ts-edit-chip { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+
+.ts-task-image-wrap {
+  margin: 12px 0;
+  text-align: center;
+  background: rgba(148, 163, 184, 0.06);
+  border-radius: 12px;
+  padding: 8px;
+}
+.ts-task-image-wrap .ts-task-image {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.ts-bigbtns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 18px 0 8px;
+}
+.ts-bigbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  border-radius: 14px;
+  border: 2px solid rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.06);
+  color: inherit;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.08s, border-color 0.15s, background 0.15s;
+}
+.ts-bigbtn:active { transform: scale(0.97); }
+.ts-bigbtn-pts { font-size: 14px; font-weight: 600; opacity: 0.75; }
+.ts-bigbtn-pass.selected,
+.ts-bigbtn-pass:hover { border-color: #22c55e; background: rgba(34, 197, 94, 0.12); color: #22c55e; }
+.ts-bigbtn-fail.selected,
+.ts-bigbtn-fail:hover { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+
+.ts-count-box { text-align: center; margin: 18px 0 8px; }
+.ts-count-label { font-size: 14px; font-weight: 600; margin-bottom: 10px; opacity: 0.85; }
+.ts-count-calc { margin-top: 10px; font-size: 16px; }
+.ts-count-calc strong { font-size: 20px; }
+.ts-count-max { font-size: 12px; opacity: 0.6; }
+
+.ts-input-stepper-xl { justify-content: center; }
+.ts-input-stepper-xl button {
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
+  border-radius: 14px;
+}
+.ts-input-stepper-xl input {
+  width: 90px;
+  height: 64px;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.ts-sheet-sub { font-size: 13px; opacity: 0.7; margin: -6px 0 12px; }
+.ts-sheet-table { width: 100%; }
+.ts-sheet-table .ts-col-qty { text-align: center; width: 90px; }
+.ts-sheet-table .ts-col-pts { text-align: right; width: 80px; }
+.ts-sheet-total td {
+  font-weight: 800;
+  font-size: 16px;
+  border-top: 2px solid rgba(148, 163, 184, 0.4);
+  padding-top: 10px;
+}
+.ts-not-scored { font-size: 12px; color: #f59e0b; }
+.ts-hint-inline { font-size: 12px; opacity: 0.65; font-weight: 400; }
+
+@media (pointer: coarse) {
+  .referee-panel .ts-bigbtn { min-height: 110px; font-size: 22px; }
+}
