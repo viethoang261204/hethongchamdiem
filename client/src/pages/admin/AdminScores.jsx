@@ -16,7 +16,8 @@ export default function AdminScores() {
   const [competitions, setCompetitions] = useState([]);
   const [contents, setContents] = useState([]);
   const [teams, setTeams] = useState([]);
-  const [boards, setBoards] = useState([]); // tất cả bảng đấu (mọi nội dung) — dùng để lọc + hiển thị
+  const [boardsForFilter, setBoardsForFilter] = useState([]); // bảng đấu của nội dung đang lọc
+  const [boardsInForm, setBoardsInForm] = useState([]); // bảng đấu của nội dung đang chọn trong form
   const [images, setImages] = useState({}); // scoreId -> [image,...]
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -49,18 +50,16 @@ export default function AdminScores() {
   const load = async () => {
     setLoadError(null);
     try {
-      const [compList, scoreList, allContents, allTeams, allBoards] = await Promise.all([
+      const [compList, scoreList, allContents, allTeams] = await Promise.all([
         capi.getCompetitions(),
         capi.getScores(),
         capi.getAllContents(),
         capi.getAllTeams(),
-        capi.getAllBoards(),
       ]);
       setCompetitions(compList);
       setScores(scoreList);
       setContents(allContents);
       setTeams(allTeams);
-      setBoards(allBoards);
       setLoading(false);
     } catch (e) {
       console.error(e);
@@ -90,16 +89,16 @@ export default function AdminScores() {
   const compName = (id) => competitions.find(c => c.id === id)?.name || id;
   const teamName = (id) => teams.find(t => t.id === id)?.name || '-';
 
-  // Bảng đấu thuộc nội dung đang lọc — nếu chưa chọn nội dung thì hiện tất cả
-  const boardsForFilter = useMemo(() => {
-    if (!filterContent) return boards;
-    return boards.filter(b => b.contest_content_id === filterContent);
-  }, [boards, filterContent]);
+  // Bảng đấu đã được thêm vào nội dung đang lọc/đang chọn trong form
+  useEffect(() => {
+    if (!filterContent) { setBoardsForFilter([]); return; }
+    api.getBoards(filterContent).then(setBoardsForFilter).catch(() => setBoardsForFilter([]));
+  }, [filterContent]);
 
-  const boardsInForm = useMemo(() => {
-    if (!form.contest_content_id) return [];
-    return boards.filter(b => b.contest_content_id === form.contest_content_id);
-  }, [boards, form.contest_content_id]);
+  useEffect(() => {
+    if (!form.contest_content_id) { setBoardsInForm([]); return; }
+    api.getBoards(form.contest_content_id).then(setBoardsInForm).catch(() => setBoardsInForm([]));
+  }, [form.contest_content_id]);
 
   const openAdd = () => {
     setModal('add');

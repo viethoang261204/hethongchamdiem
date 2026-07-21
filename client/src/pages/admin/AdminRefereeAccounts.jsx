@@ -22,23 +22,6 @@ export default function AdminRefereeAccounts() {
   const [boardsModal, setBoardsModal] = useState(null); // { user, selected: Set, loading, saving }
   const SECURITY_CODE = '26122004';
 
-  // Nhóm bảng đấu theo cuộc thi > nội dung thi để hiển thị checklist dễ nhìn
-  const boardGroups = useMemo(() => {
-    const byCompetition = new Map();
-    for (const b of allBoards) {
-      const compName = b.contest_contents?.competitions?.name || 'Khác';
-      const contentName = b.contest_contents?.name || 'Khác';
-      if (!byCompetition.has(compName)) byCompetition.set(compName, new Map());
-      const byContent = byCompetition.get(compName);
-      if (!byContent.has(contentName)) byContent.set(contentName, []);
-      byContent.get(contentName).push(b);
-    }
-    return Array.from(byCompetition.entries()).map(([competition, contents]) => ({
-      competition,
-      contents: Array.from(contents.entries()).map(([content, boards]) => ({ content, boards })),
-    }));
-  }, [allBoards]);
-
   const openBoards = async (u) => {
     setBoardsModal({ user: u, selected: new Set(), loading: true, saving: false });
     try {
@@ -279,31 +262,21 @@ export default function AdminRefereeAccounts() {
               </p>
               {boardsModal.loading ? (
                 <p style={{ textAlign: 'center', padding: 24 }}>Đang tải...</p>
-              ) : boardGroups.length === 0 ? (
+              ) : allBoards.length === 0 ? (
                 <p style={{ color: '#888' }}>Chưa có bảng đấu nào trong hệ thống.</p>
               ) : (
-                boardGroups.map((g) => (
-                  <div key={g.competition} style={{ marginBottom: 16 }}>
-                    <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>{g.competition}</div>
-                    {g.contents.map((c) => (
-                      <div key={c.content} style={{ marginBottom: 8, paddingLeft: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 4 }}>{c.content}</div>
-                        <div className="checkbox-list">
-                          {c.boards.map((b) => (
-                            <label key={b.id}>
-                              <input
-                                type="checkbox"
-                                checked={boardsModal.selected.has(b.id)}
-                                onChange={() => toggleBoard(b.id)}
-                              />
-                              {' '}{b.name}{b.age_group ? ` — ${b.age_group}` : ''}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))
+                <div className="checkbox-list">
+                  {allBoards.map((b) => (
+                    <label key={b.id}>
+                      <input
+                        type="checkbox"
+                        checked={boardsModal.selected.has(b.id)}
+                        onChange={() => toggleBoard(b.id)}
+                      />
+                      {' '}{b.name}{b.age_group ? ` — ${b.age_group}` : ''}
+                    </label>
+                  ))}
+                </div>
               )}
             </div>
             <div className="form-actions">

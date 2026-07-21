@@ -108,7 +108,8 @@ create table if not exists students (
   updated_at  timestamptz default now()
 );
 
--- Bảng đấu (theo độ tuổi) — 1 nội dung thi có nhiều bảng đấu, 1 bảng có nhiều đội
+-- Bảng đấu (theo độ tuổi) — định nghĩa gốc (lịch sử); cấu trúc thật sự hiện tại
+-- (5 bảng cố định toàn hệ thống + content_boards) nằm ở migration bên dưới.
 create table if not exists boards (
   id                 uuid primary key default gen_random_uuid(),
   contest_content_id uuid not null references contest_contents(id) on delete cascade,
@@ -219,6 +220,33 @@ alter table scores add column if not exists round integer default 1;
 alter table scores add column if not exists retry_count integer default 0;
 alter table scores add column if not exists bonus_points numeric(10,2) default 0;
 
+-- Bảng đấu (boards) đổi từ "mỗi bảng thuộc riêng 1 nội dung thi" sang
+-- "5 bảng cố định theo độ tuổi, dùng chung cho toàn bộ hệ thống, không đổi".
+-- Nội dung thi nào cần bảng nào thì "thêm" bảng đó vào qua content_boards —
+-- không tự tạo bảng mới tùy ý theo từng nội dung nữa.
+alter table boards drop column if exists contest_content_id;
+alter table boards drop constraint if exists boards_name_key;
+alter table boards add constraint boards_name_key unique (name);
+
+insert into boards (name, age_group, order_index) values
+  ('Bảng A', 'Mầm non và Tiền tiểu học (4-6 tuổi)', 1),
+  ('Bảng B', 'Lớp 1 đến lớp 3', 2),
+  ('Bảng C', 'Lớp 4 đến lớp 6', 3),
+  ('Bảng D', 'Lớp 7 đến lớp 9', 4),
+  ('Bảng E', 'Lớp 10 đến lớp 12', 5)
+on conflict (name) do nothing;
+
+-- Bảng đấu nào được áp dụng cho nội dung thi nào
+create table if not exists content_boards (
+  contest_content_id uuid not null references contest_contents(id) on delete cascade,
+  board_id           uuid not null references boards(id) on delete cascade,
+  order_index        integer default 0,
+  created_at         timestamptz default now(),
+  primary key (contest_content_id, board_id)
+);
+create index if not exists idx_content_boards_content on content_boards(contest_content_id);
+create index if not exists idx_content_boards_board    on content_boards(board_id);
+
 -- Phân quyền trọng tài theo bảng đấu — trọng tài chỉ thấy/chấm được đội thuộc
 -- bảng đã được gán (rỗng = chưa giới hạn, thấy tất cả — tương thích ngược cho
 -- các tài khoản tạo trước khi có tính năng này)
@@ -247,7 +275,6 @@ create index if not exists idx_contents_competition on contest_contents(competit
 create index if not exists idx_areas_content        on areas(contest_content_id);
 create index if not exists idx_areas_region         on areas(region);
 create index if not exists idx_students_school      on students(school_id);
-create index if not exists idx_boards_content       on boards(contest_content_id);
 create index if not exists idx_teams_content        on teams(contest_content_id);
 create index if not exists idx_teams_area           on teams(area_id);
 create index if not exists idx_teams_board          on teams(board_id);

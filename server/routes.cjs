@@ -244,48 +244,46 @@ router.delete('/areas/:id', requireAdmin, h(async (req, res) => {
 }));
 
 // ============================================================
-// Boards (bảng đấu theo độ tuổi — 1 nội dung có nhiều bảng)
+// Boards — 5 bảng cố định toàn hệ thống (Bảng A-E theo độ tuổi, xem
+// db/schema.sql). KHÔNG tạo/sửa/xóa bảng ở đây — nội dung thi chỉ "thêm"
+// (content_boards) các bảng có sẵn vào nội dung của mình.
 // ============================================================
+router.get('/boards', h(async (_req, res) => {
+  const { rows } = await query('select * from boards order by order_index, name');
+  res.json(rows);
+}));
+
+// Các bảng đã được thêm vào 1 nội dung thi cụ thể
 router.get('/contents/:contentId/boards', h(async (req, res) => {
   const { rows } = await query(
-    'select * from boards where contest_content_id = $1 order by order_index, name',
+    `select b.* from content_boards cb
+     join boards b on b.id = cb.board_id
+     where cb.contest_content_id = $1
+     order by b.order_index, b.name`,
     [req.params.contentId]
   );
   res.json(rows);
 }));
 
-router.get('/boards', h(async (_req, res) => {
-  const { rows } = await query(
-    `select b.*,
-       json_build_object('name', cc.name, 'competitions', json_build_object('id', comp.id, 'name', comp.name)) as contest_contents
-     from boards b
-     left join contest_contents cc on cc.id = b.contest_content_id
-     left join competitions comp on comp.id = cc.competition_id
-     order by b.order_index, b.name`
-  );
-  res.json(rows);
-}));
-
+// Thêm 1 bảng (có sẵn) vào nội dung thi
 router.post('/contents/:contentId/boards', requireAdmin, h(async (req, res) => {
-  const b = req.body;
-  const { rows } = await query(
-    `insert into boards (contest_content_id, name, age_group, order_index)
-     values ($1, $2, $3, coalesce($4, 0)) returning *`,
-    [req.params.contentId, b.name, b.age_group ?? null, b.order_index]
+  const { board_id } = req.body || {};
+  if (!board_id) return res.status(400).json({ error: 'Thiếu board_id.' });
+  await query(
+    `insert into content_boards (contest_content_id, board_id) values ($1, $2)
+     on conflict (contest_content_id, board_id) do nothing`,
+    [req.params.contentId, board_id]
   );
+  const { rows } = await query('select * from boards where id = $1', [board_id]);
   res.json(rows[0]);
 }));
 
-router.put('/boards/:id', requireAdmin, h(async (req, res) => {
-  const data = pick(req.body, ['name', 'age_group', 'order_index']);
-  const q = buildUpdate('boards', req.params.id, data);
-  if (!q) return res.json({});
-  const { rows } = await query(q.text, q.values);
-  res.json(rows[0]);
-}));
-
-router.delete('/boards/:id', requireAdmin, h(async (req, res) => {
-  await query('delete from boards where id = $1', [req.params.id]);
+// Bỏ 1 bảng khỏi nội dung thi (không xóa bảng gốc)
+router.delete('/contents/:contentId/boards/:boardId', requireAdmin, h(async (req, res) => {
+  await query(
+    'delete from content_boards where contest_content_id = $1 and board_id = $2',
+    [req.params.contentId, req.params.boardId]
+  );
   res.json({ ok: true });
 }));
 

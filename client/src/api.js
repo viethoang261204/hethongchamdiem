@@ -158,30 +158,23 @@ export const api = {
   deleteArea: (id) => withRetry(() => request(`/areas/${id}`, { method: 'DELETE' }), 'deleteArea'),
 
   // ============================================================
-  // Boards (bảng đấu theo độ tuổi)
+  // Boards — 5 bảng cố định toàn hệ thống (Bảng A-E). Nội dung thi chỉ
+  // "thêm/bớt" bảng có sẵn vào nội dung của mình, không tạo/sửa/xóa bảng gốc.
   // ============================================================
   getBoards: (contestContentId) => withRetry(() => request(`/contents/${contestContentId}/boards`), 'getBoards'),
 
   getAllBoards: () => withRetry(() => request('/boards'), 'getAllBoards'),
 
-  postBoard: (contestContentId, body) => withRetry(() => request(`/contents/${contestContentId}/boards`, {
+  // Thêm 1 bảng (đã có sẵn, chọn theo boardId) vào nội dung thi
+  postBoard: (contestContentId, boardId) => withRetry(() => request(`/contents/${contestContentId}/boards`, {
     method: 'POST',
-    body: {
-      name: body.name,
-      age_group: body.age_group ?? body.ageGroup ?? null,
-      order_index: body.order_index ?? body.order ?? 0,
-    },
+    body: { board_id: boardId },
   }), 'postBoard'),
 
-  putBoard: (id, body) => {
-    const update = {};
-    if (body.name !== undefined) update.name = body.name;
-    if (body.age_group !== undefined || body.ageGroup !== undefined) update.age_group = body.age_group ?? body.ageGroup;
-    if (body.order_index !== undefined || body.order !== undefined) update.order_index = body.order_index ?? body.order;
-    return withRetry(() => request(`/boards/${id}`, { method: 'PUT', body: update }), 'putBoard');
-  },
-
-  deleteBoard: (id) => withRetry(() => request(`/boards/${id}`, { method: 'DELETE' }), 'deleteBoard'),
+  // Bỏ 1 bảng khỏi nội dung thi (không xóa bảng gốc)
+  deleteBoard: (contestContentId, boardId) => withRetry(() => request(`/contents/${contestContentId}/boards/${boardId}`, {
+    method: 'DELETE',
+  }), 'deleteBoard'),
 
   // ============================================================
   // Students
