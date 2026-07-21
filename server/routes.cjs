@@ -373,7 +373,7 @@ router.post('/contents/:contentId/teams', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TEAM_FIELDS);
   const { rows } = await query(
     `insert into teams (contest_content_id, name, student_ids, school_id, area_id, board_id, region, order_index)
-     values ($1, $2, coalesce($3, '{}'), $4, $5, $6, coalesce($7, 'bac'), coalesce($8, 0)) returning *`,
+     values ($1, $2, coalesce($3::uuid[], '{}'::uuid[]), $4, $5, $6, coalesce($7, 'bac'), coalesce($8, 0)) returning *`,
     [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.board_id ?? null, b.region, b.order_index]
   );
   res.json(rows[0]);
