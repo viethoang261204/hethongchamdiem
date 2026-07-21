@@ -7,6 +7,7 @@ import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
+const UNASSIGNED = '__unassigned__';
 
 export default function AdminScores() {
   const { showConfirm, showAlert } = useNotify();
@@ -14,12 +15,14 @@ export default function AdminScores() {
   const [competitions, setCompetitions] = useState([]);
   const [contents, setContents] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [boards, setBoards] = useState([]); // tất cả bảng đấu (mọi nội dung) — dùng để lọc + hiển thị
   const [images, setImages] = useState({}); // scoreId -> [image,...]
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [search, setSearch] = useState('');
   const [filterComp, setFilterComp] = useState('');
   const [filterContent, setFilterContent] = useState('');
+  const [filterBoard, setFilterBoard] = useState('');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState(emptyForm());
   const [errors, setErrors] = useState({});
@@ -33,6 +36,7 @@ export default function AdminScores() {
     return {
       team_id: '',
       contest_content_id: '',
+      board_id: '', // chỉ dùng để lọc dropdown đội — không gửi lên server
       referee_id: null,
       score: 0,
       time: '',
@@ -44,16 +48,18 @@ export default function AdminScores() {
   const load = async () => {
     setLoadError(null);
     try {
-      const [compList, scoreList, allContents, allTeams] = await Promise.all([
+      const [compList, scoreList, allContents, allTeams, allBoards] = await Promise.all([
         capi.getCompetitions(),
         capi.getScores(),
         capi.getAllContents(),
         capi.getAllTeams(),
+        capi.getAllBoards(),
       ]);
       setCompetitions(compList);
       setScores(scoreList);
       setContents(allContents);
       setTeams(allTeams);
+      setBoards(allBoards);
       setLoading(false);
     } catch (e) {
       console.error(e);
@@ -71,16 +77,28 @@ export default function AdminScores() {
       list = list.filter(s => contentIdsInComp.has(s.contest_content_id));
     }
     if (filterContent) list = list.filter(s => s.contest_content_id === filterContent);
+    if (filterBoard) list = list.filter(s => (s.boards?.id || UNASSIGNED) === filterBoard);
     if (search.trim()) {
       const s = search.toLowerCase().trim();
       list = list.filter(x => (x.team?.name || '').toLowerCase().includes(s));
     }
     return list;
-  }, [scores, filterComp, filterContent, search, contents]);
+  }, [scores, filterComp, filterContent, filterBoard, search, contents]);
 
   const contentName = (id) => contents.find(c => c.id === id)?.name || id;
   const compName = (id) => competitions.find(c => c.id === id)?.name || id;
   const teamName = (id) => teams.find(t => t.id === id)?.name || '-';
+
+  // Bảng đấu thuộc nội dung đang lọc — nếu chưa chọn nội dung thì hiện tất cả
+  const boardsForFilter = useMemo(() => {
+    if (!filterContent) return boards;
+    return boards.filter(b => b.contest_content_id === filterContent);
+  }, [boards, filterContent]);
+
+  const boardsInForm = useMemo(() => {
+    if (!form.contest_content_id) return [];
+    return boards.filter(b => b.contest_content_id === form.contest_content_id);
+  }, [boards, form.contest_content_id]);
 
   const openAdd = () => {
     setModal('add');
@@ -93,6 +111,7 @@ export default function AdminScores() {
     setForm({
       team_id: s.team_id,
       contest_content_id: s.contest_content_id,
+      board_id: s.boards?.id || '',
       referee_id: s.referee_id || null,
       score: s.score ?? 0,
       time: s.time || '',
@@ -168,8 +187,12 @@ export default function AdminScores() {
 
   const teamsInContent = useMemo(() => {
     if (!form.contest_content_id) return [];
-    return teams.filter(t => t.contest_content_id === form.contest_content_id);
-  }, [form.contest_content_id, teams]);
+    let list = teams.filter(t => t.contest_content_id === form.contest_content_id);
+    if (form.board_id) {
+      list = list.filter(t => (t.board_id || UNASSIGNED) === form.board_id);
+    }
+    return list;
+  }, [form.contest_content_id, form.board_id, teams]);
 
   const loadImagesFor = async (scoreId) => {
     try {
@@ -228,15 +251,20 @@ export default function AdminScores() {
         <div className="search-box">
           <input type="text" placeholder="Tìm theo tên đội..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select className="filter-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterContent(''); }}>
+        <select className="filter-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterContent(''); setFilterBoard(''); }}>
           <option value="">Tất cả cuộc thi</option>
           {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select className="filter-select" value={filterContent} onChange={(e) => setFilterContent(e.target.value)} disabled={!filterComp}>
+        <select className="filter-select" value={filterContent} onChange={(e) => { setFilterContent(e.target.value); setFilterBoard(''); }} disabled={!filterComp}>
           <option value="">Tất cả nội dung</option>
           {contents.filter(c => !filterComp || c.competition_id === filterComp).map(c => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
+        </select>
+        <select className="filter-select" value={filterBoard} onChange={(e) => setFilterBoard(e.target.value)} disabled={!filterContent}>
+          <option value="">Tất cả bảng đấu</option>
+          {boardsForFilter.map(b => <option key={b.id} value={b.id}>{b.name}{b.age_group ? ` — ${b.age_group}` : ''}</option>)}
+          <option value={UNASSIGNED}>Chưa phân bảng</option>
         </select>
       </div>
 
@@ -246,6 +274,7 @@ export default function AdminScores() {
             <thead>
               <tr>
                 <th>Cuộc thi / Nội dung</th>
+                <th>Bảng đấu</th>
                 <th>Đội</th>
                 <th>Thời gian</th>
                 <th>Điểm</th>
@@ -256,9 +285,9 @@ export default function AdminScores() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có phiếu điểm</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có phiếu điểm</td></tr>
               ) : filtered.map((s) => {
                 const imgs = images[s.id] || [];
                 return (
@@ -267,6 +296,7 @@ export default function AdminScores() {
                       <div style={{ fontWeight: 600 }}>{compName(contents.find(c => c.id === s.contest_content_id)?.competition_id)}</div>
                       <div style={{ fontSize: 12, color: '#94a3b8' }}>{contentName(s.contest_content_id)}</div>
                     </td>
+                    <td>{s.boards?.name || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                     <td>{s.team?.name || teamName(s.team_id) || '-'}</td>
                     <td>{s.time || '-'}</td>
                     <td><strong>{s.score ?? '-'}</strong></td>
@@ -318,12 +348,27 @@ export default function AdminScores() {
                 <select
                   className={`form-input form-select ${errors.contest_content_id ? 'form-input-error' : ''}`}
                   value={form.contest_content_id}
-                  onChange={(e) => { setForm({ ...form, contest_content_id: e.target.value, team_id: '' }); setErrors({ ...errors, contest_content_id: '' }); }}
+                  onChange={(e) => { setForm({ ...form, contest_content_id: e.target.value, board_id: '', team_id: '' }); setErrors({ ...errors, contest_content_id: '' }); }}
                 >
                   <option value="">-- Chọn nội dung --</option>
                   {contents.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 {errors.contest_content_id && <div className="form-error-text">{errors.contest_content_id}</div>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Bảng đấu</label>
+                <select
+                  className="form-input form-select"
+                  value={form.board_id}
+                  onChange={(e) => setForm({ ...form, board_id: e.target.value, team_id: '' })}
+                  disabled={!form.contest_content_id}
+                >
+                  <option value="">-- Tất cả bảng --</option>
+                  {boardsInForm.map(b => <option key={b.id} value={b.id}>{b.name}{b.age_group ? ` — ${b.age_group}` : ''}</option>)}
+                  <option value={UNASSIGNED}>Chưa phân bảng</option>
+                </select>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>Chọn bảng đấu để thu hẹp danh sách đội bên dưới.</div>
               </div>
 
               <div className="form-group">

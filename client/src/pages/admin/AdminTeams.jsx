@@ -7,6 +7,7 @@ import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
+const UNASSIGNED = '__unassigned__';
 
 export default function AdminTeams() {
   const { showConfirm, showAlert } = useNotify();
@@ -34,6 +35,7 @@ export default function AdminTeams() {
   useEffect(() => { if (data?.schools) setSchools(data.schools); }, [data]);
   const [schoolFilter, setSchoolFilter] = useState('');
   const [filterComp, setFilterComp] = useState('');
+  const [filterBoard, setFilterBoard] = useState('');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '' });
   const [contents, setContents] = useState([]);
@@ -80,11 +82,26 @@ export default function AdminTeams() {
       .catch(() => setBoards([]));
   }, [form.contestContentId]);
 
-  const teamsFiltered = useMemo(() => {
+  const compFiltered = useMemo(() => {
     if (!filterComp) return teams;
     const contentIds = allContents.filter(c => c.competition_id === filterComp).map(c => c.id);
     return teams.filter(t => contentIds.includes(t.contest_content_id));
   }, [teams, filterComp, allContents]);
+
+  // Bảng đấu có mặt trong tập đội đang lọc theo giải đấu — không cần gọi API riêng
+  const boardOptions = useMemo(() => {
+    const map = new Map();
+    for (const t of compFiltered) {
+      if (t.boards?.id && !map.has(t.boards.id)) map.set(t.boards.id, t.boards);
+    }
+    return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [compFiltered]);
+
+  const teamsFiltered = useMemo(() => {
+    if (!filterBoard) return compFiltered;
+    if (filterBoard === UNASSIGNED) return compFiltered.filter(t => !t.board_id);
+    return compFiltered.filter(t => t.board_id === filterBoard);
+  }, [compFiltered, filterBoard]);
 
   const studentsFiltered = useMemo(() => {
     if (!schoolFilter) return students;
@@ -294,9 +311,17 @@ export default function AdminTeams() {
         <div className="filters-bar" style={{ marginBottom: 0 }}>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 250 }}>
             <label className="form-label">Lọc theo giải đấu</label>
-            <select className="form-input form-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
+            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterBoard(''); }}>
               <option value="">Tất cả giải đấu</option>
               {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
+            <label className="form-label">Lọc theo bảng đấu</label>
+            <select className="form-input form-select" value={filterBoard} onChange={(e) => setFilterBoard(e.target.value)}>
+              <option value="">Tất cả bảng đấu</option>
+              {boardOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.age_group ? ` — ${b.age_group}` : ''}</option>)}
+              <option value={UNASSIGNED}>Chưa phân bảng</option>
             </select>
           </div>
         </div>
