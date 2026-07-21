@@ -43,6 +43,11 @@ export async function request(path, { method = 'GET', body, formData } = {}) {
   if (!res.ok) {
     throw new Error(data?.error || `Lỗi máy chủ (HTTP ${res.status})`);
   }
+  if (data === null) {
+    // 200 nhưng body không phải JSON → thường do deploy sai (static site
+    // không có backend /api) hoặc proxy trả HTML
+    throw new Error('Máy chủ không trả dữ liệu hợp lệ — kiểm tra backend API đã được deploy chưa.');
+  }
   return data;
 }
 
