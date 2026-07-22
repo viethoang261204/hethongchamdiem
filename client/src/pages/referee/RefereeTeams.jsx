@@ -143,7 +143,7 @@ export default function RefereeTeams() {
                 </p>
                 {isDone && lastScore && (
                   <div className="referee-card-foot">
-                    <span>Điểm: <strong>{lastScore.score ?? '-'}</strong> · Ấn để sửa phiếu</span>
+                    <span>Điểm: <strong>{lastScore.score ?? '-'}</strong> · Ấn để xem phiếu</span>
                     {lastScore.time && <span>· {formatSecondsAsMinutes(lastScore.time)}</span>}
                   </div>
                 )}

@@ -8,6 +8,9 @@ import { formatSecondsAsMinutes } from '../../lib/time';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
+// Điểm thưởng mặc định khi nội dung thi chưa tự cấu hình bonus_config riêng
+const DEFAULT_BONUS_CONFIG = { label: 'Điểm thưởng', base: 40, per_retry: 10 };
+
 /**
  * Wizard chấm điểm theo từng nhiệm vụ — tối ưu cho trọng tài không chuyên trên iPad.
  *
@@ -41,7 +44,10 @@ export default function TaskScoringWizard({
   );
   const prevCS = existingScore?.criteria_scores || {};
 
-  const bonusCfg = content?.bonus_config || null;
+  // Mặc định điểm thưởng cho MỌI nội dung thi: 40 điểm, trừ 10/lượt chạy lại
+  // (tối đa 4 lượt thì về 0) — admin có thể cấu hình khác riêng cho từng nội
+  // dung thi qua bonus_config, nếu không cấu hình thì dùng mặc định này.
+  const bonusCfg = content?.bonus_config || DEFAULT_BONUS_CONFIG;
 
   // ── State chấm điểm ──
   // taskState[taskId] = { qty, points, done }

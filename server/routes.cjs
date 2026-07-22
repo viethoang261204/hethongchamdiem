@@ -478,14 +478,14 @@ router.post('/scores', requireAuth, h(async (req, res) => {
   }
 
   // Mỗi đội chỉ có 1 phiếu duy nhất / nội dung — nếu đã có, trả 409 kèm id
-  // để client chuyển sang chế độ sửa phiếu (PUT /scores/:id)
+  // (trọng tài không được sửa lại sau khi gửi; chỉ admin mới sửa được)
   const { rows: dup } = await query(
     'select id, referee_id from scores where team_id = $1 and contest_content_id = $2',
     [b.team_id, b.contest_content_id]
   );
   if (dup[0]) {
     return res.status(409).json({
-      error: 'Đội này đã có phiếu điểm cho nội dung này. Mở phiếu cũ để sửa.',
+      error: 'Đội này đã có phiếu điểm cho nội dung này.',
       existing_id: dup[0].id,
     });
   }
@@ -500,15 +500,12 @@ router.post('/scores', requireAuth, h(async (req, res) => {
   res.json(rows[0]);
 }));
 
-router.put('/scores/:id', requireAuth, h(async (req, res) => {
-  // Chỉ chủ phiếu (referee) hoặc admin được sửa
-  const { rows: existing } = await query('select referee_id from scores where id = $1', [req.params.id]);
+// Chỉ admin được sửa phiếu chấm — trọng tài KHÔNG được sửa sau khi đã gửi
+// (tránh chỉnh sửa điểm sau khi phiếu đã nộp, cần admin can thiệp nếu chấm nhầm)
+router.put('/scores/:id', requireAdmin, h(async (req, res) => {
+  const { rows: existing } = await query('select id from scores where id = $1', [req.params.id]);
   if (!existing[0]) return res.status(404).json({ error: 'Không tìm thấy phiếu chấm.' });
-  if (req.user.role !== 'admin' && existing[0].referee_id !== req.user.id) {
-    return res.status(403).json({ error: 'Bạn chỉ được sửa phiếu chấm của chính mình.' });
-  }
   const data = pick(req.body, ['team_id', 'contest_content_id', 'referee_id', 'score', 'time', 'round', 'retry_count', 'bonus_points', 'criteria_scores', 'notes']);
-  if (req.user.role !== 'admin') delete data.referee_id;
   if (data.criteria_scores !== undefined) data.criteria_scores = JSON.stringify(data.criteria_scores);
   if (data.score !== undefined) data.score = Number(data.score) || 0;
   const q = buildUpdate('scores', req.params.id, data);

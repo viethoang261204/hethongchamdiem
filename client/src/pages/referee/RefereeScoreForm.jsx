@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { createCachedApi } from '../../apiCache';
 import TaskScoringWizard from './TaskScoringWizard';
@@ -71,6 +71,26 @@ export default function RefereeScoreForm() {
       </div>
     </div>
   );
+
+  // Trọng tài không được sửa phiếu sau khi đã gửi — chỉ admin mới sửa được
+  // (xem server/routes.cjs PUT /scores/:id). Đội đã có phiếu → chỉ cho xem lại.
+  const existingScore = existing.find((s) => s.contest_content_id === contentId) || null;
+  if (existingScore) {
+    return (
+      <div className="ts-wrapper">
+        <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Đội này đã có phiếu điểm.</p>
+          <p style={{ color: '#94a3b8', marginBottom: 20 }}>
+            Sau khi gửi, trọng tài không thể sửa lại phiếu. Nếu chấm nhầm, vui lòng liên hệ admin.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link to={`/referee/history/${existingScore.id}`} className="ts-btn ts-btn-secondary">Xem phiếu đã chấm</Link>
+            <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost">← Quay lại danh sách đội</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Legacy: Invention Trail vẫn dùng form cũ (vì có logic riêng)
   if (content?.templateType === 'invention_trail') {
