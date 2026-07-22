@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
+import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import './AdminLayout.css';
@@ -53,6 +54,9 @@ export default function AdminBoards() {
         await api.deleteBoard(filterContent, boardId);
         setAttached((prev) => prev.filter((id) => id !== boardId));
       }
+      // Các trang khác (VD: Quản lý đội thi) cache getBoards 2 phút — xoá ngay
+      // để dropdown chọn bảng ở đó thấy bảng vừa thêm/bớt mà không phải chờ.
+      clearApiCache('getBoards');
     } catch (e) {
       showAlert(e.message || 'Lỗi khi cập nhật bảng đấu.', 'error');
     } finally {
