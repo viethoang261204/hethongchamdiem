@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { api } from '../../api';
 import { exportToPdf } from '../referee/exportPdf';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import '../referee/InventionTrailScoreForm.css';
@@ -162,6 +163,124 @@ function InventionTrailSheet({ score, sheetRef }) {
   );
 }
 
+// Phiếu chi tiết cho các phiếu chấm bằng TaskScoringWizard (đa số phiếu hiện nay) —
+// đọc lại từng nhiệm vụ + điểm/số lượng từ criteria_scores, đối chiếu tên nhiệm vụ
+// hiện tại từ bảng tasks (nếu nhiệm vụ đã bị xóa thì vẫn hiện điểm, chỉ mất tên).
+function TaskWizardSheet({ score, content, sheetRef }) {
+  const { ef, signatures } = getScoreDetails(score);
+  const [tasks, setTasks] = useState([]);
+  const contentId = score?.contest_content_id || content?.id;
+
+  useEffect(() => {
+    if (!contentId) return;
+    api.getTasks(contentId).then(setTasks).catch(() => setTasks([]));
+  }, [contentId]);
+
+  const taskScores = ef.taskScores || {};
+  const taskQty = ef.taskQty || {};
+  const bonusPoints = Number(score.bonus_points ?? ef.extraReward) || 0;
+  const retryCount = score.retry_count ?? ef.rerunCount ?? 0;
+
+  const rows = Object.keys(taskScores)
+    .map((taskId) => {
+      const task = tasks.find((t) => t.id === taskId);
+      return {
+        id: taskId,
+        name: task?.name || 'Nhiệm vụ (đã xóa)',
+        scoringType: task?.scoring_type,
+        orderIndex: task?.order_index ?? 999,
+        qty: taskQty[taskId],
+        points: taskScores[taskId],
+      };
+    })
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+
+  return (
+    <div className="it-sheet" ref={sheetRef}>
+      <div className="it-header">
+        <div className="it-header-title">
+          <div className="it-title-main">PHIẾU CHẤM ĐIỂM</div>
+          <div className="it-title-sub">{content?.name || ''}</div>
+        </div>
+      </div>
+
+      <table className="it-info-table">
+        <tbody>
+          <tr>
+            <td className="it-info-label">Đội</td>
+            <td className="it-info-value" style={{ flex: 2, fontWeight: 700 }}>{score.team?.name || '-'}</td>
+            <td className="it-info-label">Bảng thi</td>
+            <td className="it-info-value"><strong>{ef.bangThi || score.team?.boards?.name || '___'}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table className="it-score-table">
+        <thead>
+          <tr>
+            <th className="it-col-task">Nhiệm vụ</th>
+            <th className="it-col-max">Số lượng</th>
+            <th className="it-col-achieved">Điểm</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td className="it-task-name">{r.name}</td>
+              <td className="it-task-max">{r.scoringType === 'count' ? (r.qty ?? 0) : '—'}</td>
+              <td className="it-task-achieved"><strong>{r.points ?? 0}</strong></td>
+            </tr>
+          ))}
+          <tr className="it-row-extra">
+            <td className="it-task-name">
+              Điểm thưởng
+              <div style={{ fontSize: 12, marginTop: 3 }}>Số lần chạy lại: <strong>{retryCount}</strong></div>
+            </td>
+            <td className="it-task-max"></td>
+            <td className="it-task-achieved"><strong>{bonusPoints}</strong></td>
+          </tr>
+          <tr className="it-row-total">
+            <td colSpan={2} className="it-total-label">TỔNG ĐIỂM</td>
+            <td className="it-total-value"><strong>{score.score ?? ''}</strong></td>
+          </tr>
+          <tr className="it-row-time">
+            <td colSpan={2} className="it-total-label">Thời gian thi</td>
+            <td className="it-total-value"><strong>{formatSecondsAsMinutes(score.time)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="it-confirm-section">
+        <div className="it-confirm-title">Xác nhận điểm</div>
+        <table className="it-sign-table">
+          <tbody>
+            <tr>
+              <td className="it-sign-label">Học sinh / Đội trưởng:</td>
+              <td className="it-sign-value">
+                <strong>{ef.teamMembers || signatures.team || ''}</strong>
+                {ef.studentSignatureImage && (
+                  <div><img src={ef.studentSignatureImage} alt="Chữ ký học sinh" style={{ maxHeight: 60, maxWidth: '100%' }} /></div>
+                )}
+              </td>
+              <td className="it-sign-label">Trọng tài:</td>
+              <td className="it-sign-value">
+                <strong>{signatures.referee || ''}</strong>
+                {ef.refereeSignatureImage && (
+                  <div><img src={ef.refereeSignatureImage} alt="Chữ ký trọng tài" style={{ maxHeight: 60, maxWidth: '100%' }} /></div>
+                )}
+              </td>
+            </tr>
+            <tr>
+              <td className="it-sign-label">Ghi chú</td>
+              <td colSpan={3} className="it-sign-value">{score.notes || ef.remarks || ''}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function GenericSheet({ score, content, sheetRef }) {
   const { ef, signatures } = getScoreDetails(score);
   const fields = content?.scoreSheetTemplate?.fields || [
@@ -230,6 +349,7 @@ export default function ScoreDetailView({ score, content, backLink }) {
   const sheetRef = useRef(null);
   const [exporting, setExporting] = useState(false);
   const isInventionTrail = content?.templateType === 'invention_trail';
+  const isTaskWizard = !isInventionTrail && !!score?.criteria_scores?.taskScores;
 
   const handleExportPdf = async () => {
     setExporting(true);
@@ -259,7 +379,9 @@ export default function ScoreDetailView({ score, content, backLink }) {
 
       {isInventionTrail
         ? <InventionTrailSheet score={score} sheetRef={sheetRef} />
-        : <GenericSheet score={score} content={content} sheetRef={sheetRef} />
+        : isTaskWizard
+          ? <TaskWizardSheet score={score} content={content} sheetRef={sheetRef} />
+          : <GenericSheet score={score} content={content} sheetRef={sheetRef} />
       }
     </div>
   );
