@@ -117,6 +117,7 @@ export default function AdminSchools() {
   };
 
   const levelLabel = (l) => {
+    if (l === 'MN') return 'Mầm non';
     if (l === 'TH') return 'Tiểu học';
     if (l === 'THCS') return 'THCS';
     if (l === 'THPT') return 'THPT';
@@ -139,6 +140,7 @@ export default function AdminSchools() {
         </div>
         <select className="filter-select" value={filterLevel} onChange={(e) => setFilterLevel(e.target.value)}>
           <option value="">Tất cả bậc</option>
+          <option value="MN">Mầm non</option>
           <option value="TH">Tiểu học</option>
           <option value="THCS">THCS</option>
           <option value="THPT">THPT</option>
@@ -203,6 +205,7 @@ export default function AdminSchools() {
               <div className="form-group">
                 <label className="form-label">Bậc</label>
                 <select className="form-input form-select" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
+                  <option value="MN">Mầm non</option>
                   <option value="TH">Tiểu học (TH)</option>
                   <option value="THCS">THCS</option>
                   <option value="THPT">THPT</option>

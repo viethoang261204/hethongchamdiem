@@ -25,7 +25,7 @@ create extension if not exists pgcrypto;
 create table if not exists schools (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
-  level       text not null check (level in ('TH', 'THCS', 'THPT')),
+  level       text not null check (level in ('TH', 'THCS', 'THPT')), -- xem migration bên dưới: thêm 'MN'
   province    text,
   district    text,
   source      text default 'manual',
@@ -208,6 +208,11 @@ alter table contest_contents add column if not exists time_limit_seconds integer
 alter table contest_contents add column if not exists bonus_config jsonb;
 
 alter table teams add column if not exists board_id uuid references boards(id) on delete set null;
+
+-- Thêm bậc Mầm non (MN) — trước chỉ có TH/THCS/THPT
+alter table schools drop constraint if exists schools_level_check;
+alter table schools add constraint schools_level_check
+  check (level in ('MN', 'TH', 'THCS', 'THPT'));
 
 alter table tasks add column if not exists image_data bytea;
 alter table tasks add column if not exists image_mime text;

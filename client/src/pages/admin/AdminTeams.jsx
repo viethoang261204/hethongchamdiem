@@ -530,6 +530,7 @@ export default function AdminTeams() {
                 <div className="form-group">
                   <label className="form-label">Bậc</label>
                   <select className="form-input form-select" value={schoolForm.level} onChange={(e) => setSchoolForm({ ...schoolForm, level: e.target.value })}>
+                    <option value="MN">Mầm non</option>
                     <option value="TH">TH</option>
                     <option value="THCS">THCS</option>
                     <option value="THPT">THPT</option>
