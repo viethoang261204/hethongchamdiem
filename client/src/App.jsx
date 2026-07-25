@@ -6,7 +6,6 @@ import HomePage from './pages/HomePage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminCompetitions from './pages/admin/AdminCompetitions';
-import AdminContents from './pages/admin/AdminContents';
 import AdminTeams from './pages/admin/AdminTeams';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminRefereeAccounts from './pages/admin/AdminRefereeAccounts';
@@ -17,11 +16,9 @@ import AdminContentsPage from './pages/admin/AdminContentsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminTasks from './pages/admin/AdminTasks';
 import AdminSchools from './pages/admin/AdminSchools';
-import AdminAreas from './pages/admin/AdminAreas';
 import AdminBoards from './pages/admin/AdminBoards';
 import AdminCoaches from './pages/admin/AdminCoaches';
 import AdminReports from './pages/admin/AdminReports';
-import AdminAreaDetail from './pages/admin/AdminAreaDetail';
 import ServerDiag from './pages/admin/ServerDiag';
 import RefereeLogin from './pages/referee/RefereeLogin';
 import RefereeLayout from './pages/referee/RefereeLayout';
@@ -84,14 +81,11 @@ export default function App() {
             <>
               <Route index element={<AdminDashboard />} />
               <Route path="competitions" element={<AdminCompetitions />} />
-              <Route path="competitions/:competitionId/contents" element={<AdminContents />} />
               <Route path="competitions/:competitionId/contents/:contentId/teams" element={<AdminTeams />} />
               <Route path="competitions/:competitionId/contents/:contentId/scoreboard" element={<AdminScoreboard />} />
-              <Route path="competitions/:competitionId/contents/:contentId/areas" element={<AdminAreaDetail />} />
               <Route path="contents" element={<AdminContentsPage />} />
               <Route path="teams" element={<AdminTeams />} />
               <Route path="schools" element={<AdminSchools />} />
-              <Route path="areas" element={<AdminAreas />} />
               <Route path="boards" element={<AdminBoards />} />
               <Route path="coaches" element={<AdminCoaches />} />
               <Route path="reports" element={<AdminReports />} />

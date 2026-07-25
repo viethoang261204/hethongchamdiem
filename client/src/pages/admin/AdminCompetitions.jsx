@@ -130,7 +130,7 @@ export default function AdminCompetitions() {
               ) : filtered.map((c) => (
               <tr key={c.id}>
                 <td>
-                  <Link to={`/admin/competitions/${c.id}/contents`}>{c.name}</Link>
+                  <Link to={`/admin/contents?competitionId=${c.id}`}>{c.name}</Link>
                 </td>
                 <td>{c.location}</td>
                 <td>{c.start_date} → {c.end_date}</td>

@@ -29,7 +29,6 @@ const NAV_SECTIONS = [
       { to: '/admin/contents', label: 'Nội dung thi', icon: 'content' },
       { to: '/admin/tasks', label: 'Nhiệm vụ', icon: 'file' },
       { to: '/admin/schools', label: 'Trường học', icon: 'school' },
-      { to: '/admin/areas', label: 'Khu vực / Trung tâm', icon: 'map' },
       { to: '/admin/boards', label: 'Bảng đấu', icon: 'ranking' },
       { to: '/admin/coaches', label: 'Huấn luyện viên', icon: 'user' },
       { to: '/admin/students', label: 'Học sinh', icon: 'users' },

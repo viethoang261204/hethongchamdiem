@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
@@ -7,6 +7,7 @@ import './AdminLayout.css';
 
 export default function AdminContentsPage() {
   const { showConfirm, showAlert } = useNotify();
+  const [searchParams] = useSearchParams();
   const { data, loading, error, reload, setData } = useApiLoader(async () => {
     const [comps, allContents] = await Promise.all([
       api.getCompetitions(),
@@ -17,7 +18,8 @@ export default function AdminContentsPage() {
   const competitions = data?.competitions || [];
   const allContents = data?.allContents || [];
 
-  const [selectedComp, setSelectedComp] = useState('');
+  // Cho phép mở thẳng vào 1 cuộc thi qua /admin/contents?competitionId=... (VD: từ trang Cuộc thi)
+  const [selectedComp, setSelectedComp] = useState(searchParams.get('competitionId') || '');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', scoring_method: '', order_index: 1, criteria: [] });
@@ -204,7 +206,6 @@ export default function AdminContentsPage() {
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <Link to={`/admin/competitions/${selectedComp}/contents/${c.id}/teams`} className="btn btn-secondary">Đội thi</Link>
-                        <Link to={`/admin/competitions/${selectedComp}/contents/${c.id}/areas`} className="btn btn-secondary">Khu vực</Link>
                         <button type="button" className="btn btn-secondary" onClick={() => openEdit(c)}>Sửa</button>
                         <button type="button" className="btn btn-danger" onClick={() => remove(c.id)}>Xóa</button>
                       </div>

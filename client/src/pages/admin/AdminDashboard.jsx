@@ -139,7 +139,7 @@ export default function AdminDashboard() {
                   <div className="card-header">
                     <h3 className="card-title">{comp.name}</h3>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <Link to={`/admin/competitions/${comp.id}/contents`} className="card-badge">Quản lý nội dung</Link>
+                      <Link to={`/admin/contents?competitionId=${comp.id}`} className="card-badge">Quản lý nội dung</Link>
                       <Link to={`/admin/teams`} className="card-badge">Quản lý đội</Link>
                     </div>
                   </div>
