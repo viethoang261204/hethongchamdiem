@@ -30,4 +30,23 @@ pool.on('error', (err) => {
 
 const query = (text, params) => pool.query(text, params);
 
-module.exports = { pool, query };
+// Chạy nhiều query trong 1 transaction — dùng khi cần đảm bảo tất cả cùng
+// thành công hoặc cùng rollback (vd: sửa điểm + ghi audit log, hoặc ghi kết
+// quả trận đấu + cascade xóa các trận vòng sau bị ảnh hưởng).
+// fn nhận vào 1 hàm query(text, params) riêng, chạy trên cùng 1 connection.
+async function withTransaction(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn((text, params) => client.query(text, params));
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+module.exports = { pool, query, withTransaction };
