@@ -40,10 +40,15 @@ export default function AdminScores() {
       contest_content_id: '',
       board_id: '', // chỉ dùng để lọc dropdown đội — không gửi lên server
       referee_id: null,
+      round: 1,
       score: 0,
       time: '',
       notes: '',
       criteria_scores: {},
+      arena_entry_time: '',
+      head_referee_name: '',
+      scorekeeper_name: '',
+      objection: '',
     };
   }
 
@@ -113,10 +118,15 @@ export default function AdminScores() {
       contest_content_id: s.contest_content_id,
       board_id: s.boards?.id || '',
       referee_id: s.referee_id || null,
+      round: s.round || 1,
       score: s.score ?? 0,
       time: s.time || '',
       notes: s.notes || '',
       criteria_scores: s.criteria_scores || {},
+      arena_entry_time: s.arena_entry_time || '',
+      head_referee_name: s.head_referee_name || '',
+      scorekeeper_name: s.scorekeeper_name || '',
+      objection: s.objection || '',
     });
     setErrors({});
   };
@@ -142,10 +152,15 @@ export default function AdminScores() {
         team_id: form.team_id,
         contest_content_id: form.contest_content_id,
         referee_id: form.referee_id || null,
+        round: Number(form.round) === 2 ? 2 : 1,
         score: Number(form.score) || 0,
         time: form.time?.toString().trim() || null,
         notes: form.notes?.trim() || null,
         criteria_scores: form.criteria_scores || {},
+        arena_entry_time: form.arena_entry_time?.trim() || null,
+        head_referee_name: form.head_referee_name?.trim() || null,
+        scorekeeper_name: form.scorekeeper_name?.trim() || null,
+        objection: form.objection?.trim() || null,
       };
       if (modal === 'add') {
         await api.postScore(body);
@@ -276,6 +291,7 @@ export default function AdminScores() {
                 <th>Cuộc thi / Nội dung</th>
                 <th>Bảng đấu</th>
                 <th>Đội</th>
+                <th style={{ width: 60 }}>Lượt</th>
                 <th>Thời gian</th>
                 <th>Điểm</th>
                 <th>Ảnh</th>
@@ -285,9 +301,9 @@ export default function AdminScores() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có phiếu điểm</td></tr>
+                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có phiếu điểm</td></tr>
               ) : filtered.map((s) => {
                 const imgs = images[s.id] || [];
                 return (
@@ -298,6 +314,7 @@ export default function AdminScores() {
                     </td>
                     <td>{s.boards?.name || <span style={{ color: '#94a3b8' }}>—</span>}</td>
                     <td>{s.team?.name || teamName(s.team_id) || '-'}</td>
+                    <td>{s.round || 1}</td>
                     <td>{formatSecondsAsMinutes(s.time) || '-'}</td>
                     <td><strong>{s.score ?? '-'}</strong></td>
                     <td>
@@ -387,6 +404,17 @@ export default function AdminScores() {
 
               <div className="form-row">
                 <div className="form-group">
+                  <label className="form-label">Lượt</label>
+                  <select
+                    className="form-input form-select"
+                    value={form.round}
+                    onChange={(e) => setForm({ ...form, round: Number(e.target.value) })}
+                  >
+                    <option value={1}>Lượt 1</option>
+                    <option value={2}>Lượt 2</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Điểm <span style={{ color: '#dc2626' }}>*</span></label>
                   <input
                     type="number"
@@ -397,6 +425,9 @@ export default function AdminScores() {
                   />
                   {errors.score && <div className="form-error-text">{errors.score}</div>}
                 </div>
+              </div>
+
+              <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Thời gian (giây)</label>
                   <input
@@ -411,6 +442,37 @@ export default function AdminScores() {
                     <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>≈ {formatSecondsAsMinutes(form.time)} phút</div>
                   )}
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Thời gian bắt đầu vào sân</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={form.arena_entry_time}
+                    onChange={(e) => setForm({ ...form, arena_entry_time: e.target.value })}
+                    placeholder="VD: 08:30"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Trưởng ban trọng tài</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={form.head_referee_name}
+                    onChange={(e) => setForm({ ...form, head_referee_name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Người ghi điểm</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={form.scorekeeper_name}
+                    onChange={(e) => setForm({ ...form, scorekeeper_name: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -420,6 +482,17 @@ export default function AdminScores() {
                   rows={3}
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Kiến nghị</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  value={form.objection}
+                  onChange={(e) => setForm({ ...form, objection: e.target.value })}
+                  placeholder="Kiến nghị/khiếu nại của đội thi (nếu có)"
                 />
               </div>
             </div>

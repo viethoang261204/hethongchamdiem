@@ -1152,3 +1152,25 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ─── In báo cáo (AdminReports) ─────────────────────────────── */
+@media print {
+  .nhutin-admin .sidebar,
+  .no-print {
+    display: none !important;
+  }
+  .nhutin-admin .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  .nhutin-admin .report-page {
+    color: #000 !important;
+  }
+  .nhutin-admin .report-group {
+    page-break-inside: avoid;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+}

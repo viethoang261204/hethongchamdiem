@@ -18,6 +18,7 @@ export default function AdminScoreDetail() {
   const { data, loading, error, reload } = useApiLoader(async () => {
     const score = await api.getScore(scoreId);
     const imgs = await api.getScoreImages(scoreId);
+    const edits = await api.getScoreEdits(scoreId).catch(() => []);
     const contentId = score?.contest_content_id || score?.team?.contest_content_id;
     let content = null;
     if (contentId) {
@@ -26,11 +27,12 @@ export default function AdminScoreDetail() {
         content = allContents.find(x => x.id === contentId) || null;
       } catch (_) {}
     }
-    return { score, content, images: imgs };
+    return { score, content, images: imgs, edits };
   }, [scoreId]);
   const score = data?.score;
   const content = data?.content;
   const images = data?.images || [];
+  const edits = data?.edits || [];
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -115,6 +117,40 @@ export default function AdminScoreDetail() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header" style={{ marginBottom: 16 }}>
+          <h3 className="card-title">Lịch sử sửa điểm ({edits.length})</h3>
+        </div>
+        {edits.length === 0 ? (
+          <p style={{ color: '#888' }}>Chưa có lần sửa nào.</p>
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Thời gian sửa</th>
+                  <th>Người sửa</th>
+                  <th>Lượt</th>
+                  <th>Điểm (trước → sau)</th>
+                  <th>Thời gian thi (trước → sau)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {edits.map((e) => (
+                  <tr key={e.id}>
+                    <td>{formatDate(e.edited_at)}</td>
+                    <td>{e.users?.full_name || '-'}</td>
+                    <td>{e.round || '-'}</td>
+                    <td>{e.before_data?.score} → <strong>{e.after_data?.score}</strong></td>
+                    <td>{e.before_data?.time || '-'} → <strong>{e.after_data?.time || '-'}</strong></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

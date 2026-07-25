@@ -12,12 +12,13 @@ const UNASSIGNED = '__unassigned__';
 export default function AdminTeams() {
   const { showConfirm, showAlert } = useNotify();
   const { data, loading, error, reload, setData } = useApiLoader(async () => {
-    const [comps, allCont, tm, st, sch] = await Promise.all([
+    const [comps, allCont, tm, st, sch, coa] = await Promise.all([
       capi.getCompetitions(),
       capi.getAllContents(),
       capi.getAllTeams(),
       capi.getStudents(),
       capi.getSchools(),
+      capi.getCoaches(),
     ]);
     return {
       competitions: comps.filter(c => c.is_active !== false),
@@ -25,19 +26,21 @@ export default function AdminTeams() {
       teams: tm,
       students: st,
       schools: sch,
+      coaches: coa,
     };
   }, []);
   const competitions = data?.competitions || [];
   const allContents = data?.allContents || [];
   const teams = data?.teams || [];
   const students = data?.students || [];
+  const coaches = data?.coaches || [];
   const [schools, setSchools] = useState([]);
   useEffect(() => { if (data?.schools) setSchools(data.schools); }, [data]);
   const [schoolFilter, setSchoolFilter] = useState('');
   const [filterComp, setFilterComp] = useState('');
   const [filterBoard, setFilterBoard] = useState('');
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '' });
+  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '' });
   const [contents, setContents] = useState([]);
   const [boards, setBoards] = useState([]);
   const [errors, setErrors] = useState({});
@@ -120,8 +123,10 @@ export default function AdminTeams() {
     return comp ? comp.name : (c.competitions?.name || '');
   };
 
+  const getCompetitionId = (contentId) => allContents.find(x => x.id === contentId)?.competition_id || '';
+
   const openAdd = () => {
-    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '' });
+    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '' });
     setContents([]);
     setErrors({});
     setModal('add');
@@ -136,6 +141,7 @@ export default function AdminTeams() {
       competitionId: content?.competition_id || '',
       contestContentId: team.contest_content_id || '',
       boardId: team.board_id || '',
+      coachId: team.coach_id || '',
     });
     setContents(content ? allContents.filter(c => c.competition_id === content.competition_id) : []);
     setErrors({});
@@ -251,6 +257,7 @@ export default function AdminTeams() {
           name: form.name,
           studentIds: form.studentIds,
           boardId: form.boardId || null,
+          coachId: form.coachId || null,
           order: teams.length + 1,
         });
       } else {
@@ -258,6 +265,7 @@ export default function AdminTeams() {
           name: form.name,
           studentIds: form.studentIds,
           boardId: form.boardId || null,
+          coachId: form.coachId || null,
         });
       }
       clearApiCache();
@@ -336,13 +344,14 @@ export default function AdminTeams() {
                 <th>Giải đấu</th>
                 <th>Nội dung</th>
                 <th>Bảng đấu</th>
+                <th>HLV</th>
                 <th>Học sinh</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {teamsFiltered.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
               ) : teamsFiltered.map((t) => {
                 const compName = getCompetitionName(t.contest_content_id);
                 const mems = (t.student_ids || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
@@ -352,9 +361,10 @@ export default function AdminTeams() {
                     <td>{compName}</td>
                     <td>{getContentName(t.contest_content_id)}</td>
                     <td>{t.boards?.name || '-'}</td>
+                    <td>{t.coaches?.name || '-'}</td>
                     <td>{mems.length > 0 ? mems.map(m => m.full_name).join(', ') : '-'}</td>
                     <td>
-                      <Link to={`/admin/competitions/${t.contest_content_id}/contents/${t.contest_content_id}/scoreboard`} className="btn btn-secondary" style={{ marginRight: 8 }}>Điểm</Link>
+                      <Link to={`/admin/competitions/${getCompetitionId(t.contest_content_id)}/contents/${t.contest_content_id}/scoreboard`} className="btn btn-secondary" style={{ marginRight: 8 }}>Điểm</Link>
                       <button type="button" className="btn btn-secondary" onClick={() => openEdit(t)}>Sửa</button>
                       <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(t.id)}>Xóa</button>
                     </td>
@@ -420,6 +430,17 @@ export default function AdminTeams() {
                     Nội dung này chưa có bảng đấu — tạo ở mục "Bảng đấu".
                   </div>
                 )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Huấn luyện viên</label>
+                <select
+                  className="form-input form-select"
+                  value={form.coachId}
+                  onChange={(e) => setForm({ ...form, coachId: e.target.value })}
+                >
+                  <option value="">-- Chưa có HLV --</option>
+                  {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Tên đội <span style={{ color: '#dc2626' }}>*</span></label>
