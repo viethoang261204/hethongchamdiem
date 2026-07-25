@@ -263,9 +263,80 @@ create table if not exists referee_boards (
 );
 create index if not exists idx_referee_boards_board on referee_boards(board_id);
 
--- Mỗi đội 1 phiếu duy nhất / nội dung
-create unique index if not exists uq_scores_team_content
-  on scores(team_id, contest_content_id);
+-- Mỗi đội thi 2 lượt độc lập / nội dung (lượt 1 + lượt 2), có thể chấm ở 2
+-- thời điểm khác nhau — thay cho "mỗi đội 1 phiếu duy nhất" trước đây.
+drop index if exists uq_scores_team_content;
+alter table scores drop constraint if exists scores_round_check;
+alter table scores add constraint scores_round_check check (round in (1, 2));
+create unique index if not exists uq_scores_team_content_round
+  on scores(team_id, contest_content_id, round);
+
+-- Trường mới theo mẫu phiếu điểm giấy (Bảng điểm Thành phố Công nghệ)
+alter table scores add column if not exists arena_entry_time text;   -- "Thời gian bắt đầu vào sân"
+alter table scores add column if not exists head_referee_name text;  -- "Trưởng ban trọng tài"
+alter table scores add column if not exists scorekeeper_name text;   -- "Người ghi điểm"
+alter table scores add column if not exists objection text;          -- "Kiến nghị"
+
+-- Lịch sử sửa điểm — admin sửa phiếu sau khi đã chấm phải lưu lại ai sửa,
+-- lúc nào, lượt nào, trước/sau (snapshot toàn bộ dòng dạng jsonb cho đơn giản
+-- và đầy đủ, khỏi phải liệt kê từng cột riêng lẻ).
+create table if not exists score_edits (
+  id          uuid primary key default gen_random_uuid(),
+  score_id    uuid not null references scores(id) on delete cascade,
+  round       integer,
+  edited_by   uuid references users(id) on delete set null,
+  edited_at   timestamptz default now(),
+  before_data jsonb,
+  after_data  jsonb,
+  note        text
+);
+
+-- Huấn luyện viên (HLV) — danh mục riêng, gán theo đội
+create table if not exists coaches (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  phone       text,
+  email       text,
+  notes       text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+create or replace trigger trg_coaches_updated
+  before update on coaches for each row execute function set_updated_at();
+alter table teams add column if not exists coach_id uuid references coaches(id) on delete set null;
+
+-- Luật xếp hạng riêng theo từng (nội dung thi × bảng đấu):
+--   measurement = đo lường (điểm/thời gian, mặc định) · combat = đối kháng (thắng/thua/hòa)
+alter table content_boards add column if not exists ranking_format text;
+update content_boards set ranking_format = 'measurement' where ranking_format is null;
+alter table content_boards alter column ranking_format set default 'measurement';
+alter table content_boards alter column ranking_format set not null;
+alter table content_boards drop constraint if exists content_boards_ranking_format_check;
+alter table content_boards add constraint content_boards_ranking_format_check
+  check (ranking_format in ('measurement', 'combat'));
+
+-- Đối kháng: nhánh đấu loại trực tiếp (bốc thăm ngẫu nhiên), theo từng
+-- (nội dung thi × bảng đấu) có ranking_format = 'combat'. round_no tăng dần
+-- theo từng vòng đấu (1 = vòng đầu); bracket_slot = vị trí cặp đấu trong vòng
+-- đó, dùng để tính cặp đấu ở vòng kế tiếp (bracket_slot / 2).
+create table if not exists matches (
+  id                 uuid primary key default gen_random_uuid(),
+  contest_content_id uuid not null references contest_contents(id) on delete cascade,
+  board_id           uuid not null references boards(id) on delete cascade,
+  round_no           integer not null default 1,
+  bracket_slot       integer not null default 0,
+  team_a_id          uuid references teams(id) on delete set null,
+  team_b_id          uuid references teams(id) on delete set null,
+  winner_id          uuid references teams(id) on delete set null,
+  is_draw            boolean default false,
+  played_at          timestamptz,
+  notes              text,
+  created_at         timestamptz default now(),
+  updated_at         timestamptz default now(),
+  unique (contest_content_id, board_id, round_no, bracket_slot)
+);
+create or replace trigger trg_matches_updated
+  before update on matches for each row execute function set_updated_at();
 
 
 -- ============================================================
@@ -292,6 +363,9 @@ create index if not exists idx_scores_competition   on scores(competition_id);
 create index if not exists idx_scores_referee       on scores(referee_id);
 create index if not exists idx_scores_submitted     on scores(submitted_at);
 create index if not exists idx_score_images_score   on score_images(score_id);
+create index if not exists idx_score_edits_score    on score_edits(score_id);
+create index if not exists idx_teams_coach          on teams(coach_id);
+create index if not exists idx_matches_content_board on matches(contest_content_id, board_id);
 
 
 -- ============================================================
