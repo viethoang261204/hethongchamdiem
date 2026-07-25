@@ -253,10 +253,11 @@ router.get('/boards', h(async (_req, res) => {
   res.json(rows);
 }));
 
-// Các bảng đã được thêm vào 1 nội dung thi cụ thể
+// Các bảng đã được thêm vào 1 nội dung thi cụ thể (kèm ranking_format để FE
+// biết bảng nào chấm theo nhiệm vụ, bảng nào là đối kháng)
 router.get('/contents/:contentId/boards', h(async (req, res) => {
   const { rows } = await query(
-    `select b.* from content_boards cb
+    `select b.*, cb.ranking_format from content_boards cb
      join boards b on b.id = cb.board_id
      where cb.contest_content_id = $1
      order by b.order_index, b.name`,

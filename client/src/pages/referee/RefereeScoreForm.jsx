@@ -9,7 +9,8 @@ import './RefereeLayout.css';
 const capi = createCachedApi(api);
 
 export default function RefereeScoreForm() {
-  const { competitionId, contentId, teamId, region } = useParams();
+  const { competitionId, contentId, teamId, region, roundNo } = useParams();
+  const round = Number(roundNo) === 2 ? 2 : 1;
   const location = useLocation();
   // memberNames được truyền từ RefereeTeams qua navigation state — tránh gọi getStudents() lại
   const [team, setTeam] = useState(null);
@@ -73,13 +74,14 @@ export default function RefereeScoreForm() {
   );
 
   // Trọng tài không được sửa phiếu sau khi đã gửi — chỉ admin mới sửa được
-  // (xem server/routes.cjs PUT /scores/:id). Đội đã có phiếu → chỉ cho xem lại.
-  const existingScore = existing.find((s) => s.contest_content_id === contentId) || null;
+  // (xem server/routes.cjs PUT /scores/:id). Lượt này đã có phiếu → chỉ cho xem lại
+  // (lượt còn lại vẫn chấm bình thường vì mỗi lượt là 1 phiếu độc lập).
+  const existingScore = existing.find((s) => s.contest_content_id === contentId && s.round === round) || null;
   if (existingScore) {
     return (
       <div className="ts-wrapper">
         <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
-          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Đội này đã có phiếu điểm.</p>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Đội này đã có phiếu điểm lượt {round}.</p>
           <p style={{ color: '#94a3b8', marginBottom: 20 }}>
             Sau khi gửi, trọng tài không thể sửa lại phiếu. Nếu chấm nhầm, vui lòng liên hệ admin.
           </p>
@@ -115,6 +117,7 @@ export default function RefereeScoreForm() {
       competitionId={competitionId}
       contentId={contentId}
       region={region}
+      round={round}
       memberNames={memberNames}
       existing={existing}
     />

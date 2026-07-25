@@ -28,6 +28,7 @@ import RefereeTeams from './pages/referee/RefereeTeams';
 import RefereeScoreForm from './pages/referee/RefereeScoreForm';
 import RefereeScoreHistory from './pages/referee/RefereeScoreHistory';
 import RefereeScoreDetail from './pages/referee/RefereeScoreDetail';
+import RefereeMatches from './pages/referee/RefereeMatches';
 
 const AuthContext = createContext(null);
 
@@ -105,7 +106,8 @@ export default function App() {
             <>
               <Route index element={<RefereeSelect />} />
               <Route path="competition/:competitionId/content/:contentId/region/:region/teams" element={<RefereeTeams />} />
-              <Route path="competition/:competitionId/content/:contentId/region/:region/team/:teamId/score" element={<RefereeScoreForm />} />
+              <Route path="competition/:competitionId/content/:contentId/region/:region/matches" element={<RefereeMatches />} />
+              <Route path="competition/:competitionId/content/:contentId/region/:region/team/:teamId/round/:roundNo/score" element={<RefereeScoreForm />} />
               <Route path="history" element={<RefereeScoreHistory />} />
               <Route path="history/:scoreId" element={<RefereeScoreDetail />} />
             </>

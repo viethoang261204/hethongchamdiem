@@ -176,6 +176,36 @@ export const api = {
     method: 'DELETE',
   }), 'deleteBoard'),
 
+  // Đặt luật xếp hạng cho 1 (nội dung × bảng): 'measurement' | 'combat'
+  putBoardRankingFormat: (contestContentId, boardId, rankingFormat) => withRetry(() => request(
+    `/contents/${contestContentId}/boards/${boardId}`,
+    { method: 'PUT', body: { ranking_format: rankingFormat } }
+  ), 'putBoardRankingFormat'),
+
+  // Xếp hạng gộp 2 lượt (đo lường) hoặc bảng đấu (đối kháng) của 1 bảng
+  getRanking: (contestContentId, boardId) => withRetry(() => request(
+    `/contents/${contestContentId}/boards/${boardId}/ranking`
+  ), 'getRanking'),
+
+  // ============================================================
+  // Đối kháng — nhánh đấu loại trực tiếp
+  // ============================================================
+  getBracket: (contestContentId, boardId) => withRetry(() => request(
+    `/contents/${contestContentId}/boards/${boardId}/bracket`
+  ), 'getBracket'),
+
+  generateBracket: (contestContentId, boardId) => withRetry(() => request(
+    `/contents/${contestContentId}/boards/${boardId}/bracket/generate`, { method: 'POST' }
+  ), 'generateBracket'),
+
+  deleteBracket: (contestContentId, boardId, force) => withRetry(() => request(
+    `/contents/${contestContentId}/boards/${boardId}/bracket${force ? '?force=1' : ''}`, { method: 'DELETE' }
+  ), 'deleteBracket'),
+
+  putMatchResult: (matchId, { winnerId, isDraw }) => withRetry(() => request(
+    `/matches/${matchId}/result`, { method: 'PUT', body: { winner_id: winnerId ?? null, is_draw: !!isDraw } }
+  ), 'putMatchResult'),
+
   // ============================================================
   // Students
   // ============================================================
@@ -219,6 +249,7 @@ export const api = {
       school_id: body.schoolId ?? body.school_id ?? null,
       area_id: body.areaId ?? body.area_id ?? null,
       board_id: body.boardId ?? body.board_id ?? null,
+      coach_id: body.coachId ?? body.coach_id ?? null,
       region: body.region ?? 'bac',
       order_index: body.order ?? body.order_index ?? 0,
     },
@@ -231,6 +262,7 @@ export const api = {
     if (body.schoolId !== undefined || body.school_id !== undefined) update.school_id = body.schoolId ?? body.school_id;
     if (body.areaId !== undefined || body.area_id !== undefined) update.area_id = body.areaId ?? body.area_id;
     if (body.boardId !== undefined || body.board_id !== undefined) update.board_id = body.boardId ?? body.board_id;
+    if (body.coachId !== undefined || body.coach_id !== undefined) update.coach_id = body.coachId ?? body.coach_id;
     if (body.region !== undefined) update.region = body.region;
     if (body.order !== undefined || body.order_index !== undefined) update.order_index = body.order ?? body.order_index;
     return withRetry(() => request(`/teams/${id}`, { method: 'PUT', body: update }), 'putTeam');
@@ -262,6 +294,10 @@ export const api = {
       bonus_points: body.bonus_points ?? body.bonusPoints ?? 0,
       criteria_scores: body.criteria_scores ?? body.criteriaScores ?? {},
       notes: body.notes ?? null,
+      arena_entry_time: body.arena_entry_time ?? body.arenaEntryTime ?? null,
+      head_referee_name: body.head_referee_name ?? body.headRefereeName ?? null,
+      scorekeeper_name: body.scorekeeper_name ?? body.scorekeeperName ?? null,
+      objection: body.objection ?? null,
     },
   }), 'postScore'),
 
@@ -288,10 +324,17 @@ export const api = {
     if (body.bonus_points !== undefined || body.bonusPoints !== undefined) update.bonus_points = body.bonus_points ?? body.bonusPoints;
     if (body.criteria_scores !== undefined || body.criteriaScores !== undefined) update.criteria_scores = body.criteria_scores ?? body.criteriaScores;
     if (body.notes !== undefined) update.notes = body.notes;
+    if (body.arena_entry_time !== undefined || body.arenaEntryTime !== undefined) update.arena_entry_time = body.arena_entry_time ?? body.arenaEntryTime;
+    if (body.head_referee_name !== undefined || body.headRefereeName !== undefined) update.head_referee_name = body.head_referee_name ?? body.headRefereeName;
+    if (body.scorekeeper_name !== undefined || body.scorekeeperName !== undefined) update.scorekeeper_name = body.scorekeeper_name ?? body.scorekeeperName;
+    if (body.objection !== undefined) update.objection = body.objection;
     return withRetry(() => request(`/scores/${id}`, { method: 'PUT', body: update }), 'putScore');
   },
 
   deleteScore: (id) => withRetry(() => request(`/scores/${id}`, { method: 'DELETE' }), 'deleteScore'),
+
+  // Lịch sử sửa điểm (ai sửa, lúc nào, trước/sau)
+  getScoreEdits: (scoreId) => withRetry(() => request(`/scores/${scoreId}/edits`), 'getScoreEdits'),
 
   // ============================================================
   // Users
@@ -380,6 +423,38 @@ export const api = {
   },
 
   deleteScoreImage: (imageId) => withRetry(() => request(`/score-images/${imageId}`, { method: 'DELETE' }), 'deleteScoreImage'),
+
+  // ============================================================
+  // Huấn luyện viên (HLV)
+  // ============================================================
+  getCoaches: () => withRetry(() => request('/coaches'), 'getCoaches'),
+
+  postCoach: (body) => withRetry(() => request('/coaches', {
+    method: 'POST',
+    body: { name: body.name, phone: body.phone ?? null, email: body.email ?? null, notes: body.notes ?? null },
+  }), 'postCoach'),
+
+  putCoach: (id, body) => {
+    const update = {};
+    if (body.name !== undefined) update.name = body.name;
+    if (body.phone !== undefined) update.phone = body.phone;
+    if (body.email !== undefined) update.email = body.email;
+    if (body.notes !== undefined) update.notes = body.notes;
+    return withRetry(() => request(`/coaches/${id}`, { method: 'PUT', body: update }), 'putCoach');
+  },
+
+  deleteCoach: (id) => withRetry(() => request(`/coaches/${id}`, { method: 'DELETE' }), 'deleteCoach'),
+
+  // ============================================================
+  // Báo cáo
+  // ============================================================
+  getReportScores: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.competitionId) qs.set('competitionId', params.competitionId);
+    if (params.contentId) qs.set('contentId', params.contentId);
+    const q = qs.toString();
+    return withRetry(() => request(`/reports/scores${q ? `?${q}` : ''}`), 'getReportScores');
+  },
 
   // ============================================================
   // Diagnostic

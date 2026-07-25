@@ -34,6 +34,15 @@ export default function RefereeSelect() {
     navigate(`/referee/competition/${selectedComp.id}/content/${selectedContent.id}/region/${boardId}/teams`);
   };
 
+  // Bảng đối kháng không chấm theo nhiệm vụ — dẫn sang màn "Trận đấu" để ghi thắng/thua
+  const goToBoard = (board) => {
+    if (board.ranking_format === 'combat') {
+      navigate(`/referee/competition/${selectedComp.id}/content/${selectedContent.id}/region/${board.id}/matches`);
+    } else {
+      goToTeams(board.id);
+    }
+  };
+
   const selectContent = async (c) => {
     setSelectedContent(c);
     setBoardsLoading(true);
@@ -112,8 +121,8 @@ export default function RefereeSelect() {
             <p>Xem tất cả đội bạn được phân công trong nội dung này</p>
           </button>
           {boards.map((b) => (
-            <button key={b.id} type="button" className="referee-card" onClick={() => goToTeams(b.id)}>
-              <h3>{b.name}</h3>
+            <button key={b.id} type="button" className="referee-card" onClick={() => goToBoard(b)}>
+              <h3>{b.name}{b.ranking_format === 'combat' && <span className="ts-board-chip">Đối kháng</span>}</h3>
               <p>{b.age_group || ''}</p>
             </button>
           ))}

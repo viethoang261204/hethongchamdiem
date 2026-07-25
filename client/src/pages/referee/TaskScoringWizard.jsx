@@ -30,6 +30,7 @@ export default function TaskScoringWizard({
   competitionId,
   contentId,
   region,
+  round = 1,
   memberNames,
   existing = [],
 }) {
@@ -37,10 +38,10 @@ export default function TaskScoringWizard({
   const { user } = useAuth();
   const { showAlert } = useNotify();
 
-  // Phiếu đã có của đội cho nội dung này (unique) → chế độ sửa
+  // Phiếu đã có của đội cho đúng lượt này (mỗi lượt 1 phiếu độc lập) → chế độ sửa
   const existingScore = useMemo(
-    () => existing.find(s => s.contest_content_id === contentId) || null,
-    [existing, contentId]
+    () => existing.find(s => s.contest_content_id === contentId && s.round === round) || null,
+    [existing, contentId, round]
   );
   const prevCS = existingScore?.criteria_scores || {};
 
@@ -80,6 +81,11 @@ export default function TaskScoringWizard({
   // Chữ ký tay (data URL PNG) — học sinh ký trực tiếp trên iPad/điện thoại
   const [studentSigImage, setStudentSigImage] = useState(prevCS.studentSignatureImage || '');
   const [refereeSigImage, setRefereeSigImage] = useState(prevCS.refereeSignatureImage || '');
+  // Các trường theo mẫu phiếu điểm giấy
+  const [arenaEntryTime, setArenaEntryTime] = useState(existingScore?.arena_entry_time || '');
+  const [headRefereeName, setHeadRefereeName] = useState(existingScore?.head_referee_name || '');
+  const [scorekeeperName, setScorekeeperName] = useState(existingScore?.scorekeeper_name || '');
+  const [objection, setObjection] = useState(existingScore?.objection || '');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -140,7 +146,7 @@ export default function TaskScoringWizard({
         referee_id: user?.id,
         time: String(Math.round(timeSeconds)),
         score: totalScore,
-        round: 1,
+        round,
         retry_count: retryCount,
         bonus_points: bonusPoints,
         criteria_scores: {
@@ -157,6 +163,10 @@ export default function TaskScoringWizard({
           refereeSignatureImage: refereeSigImage || null,
         },
         notes: remarks || null,
+        arena_entry_time: arenaEntryTime || null,
+        head_referee_name: headRefereeName || null,
+        scorekeeper_name: scorekeeperName || null,
+        objection: objection || null,
       };
       if (existingScore) {
         await api.putScore(existingScore.id, payload);
@@ -217,6 +227,7 @@ export default function TaskScoringWizard({
         <div className="ts-header-info">
           <div className="ts-team-name">
             {team?.name}
+            <span className="ts-board-chip">Lượt {round}</span>
             {team?.boards?.name && <span className="ts-board-chip">{team.boards.name}</span>}
             {existingScore && <span className="ts-edit-chip">Sửa phiếu</span>}
           </div>
@@ -431,7 +442,7 @@ export default function TaskScoringWizard({
           <h2 className="ts-card-title">Phiếu chấm điểm</h2>
           <div className="ts-sheet-sub">
             {team?.name}
-            {team?.boards?.name ? ` · ${team.boards.name}` : ''} · {content?.name}
+            {team?.boards?.name ? ` · ${team.boards.name}` : ''} · {content?.name} · Lượt {round}
           </div>
 
           <table className="ts-detail-table ts-sheet-table">
@@ -492,6 +503,16 @@ export default function TaskScoringWizard({
               )}
             </div>
             <div className="ts-form-row">
+              <label className="ts-label">Thời gian bắt đầu vào sân</label>
+              <input
+                type="text"
+                className="ts-input"
+                value={arenaEntryTime}
+                onChange={(e) => setArenaEntryTime(e.target.value)}
+                placeholder="VD: 08:30"
+              />
+            </div>
+            <div className="ts-form-row">
               <label className="ts-label">Tên học sinh / đội trưởng</label>
               <input
                 type="text"
@@ -524,6 +545,26 @@ export default function TaskScoringWizard({
                 onChange={setRefereeSigImage}
               />
             </div>
+            <div className="ts-form-row">
+              <label className="ts-label">Trưởng ban trọng tài</label>
+              <input
+                type="text"
+                className="ts-input"
+                value={headRefereeName}
+                onChange={(e) => setHeadRefereeName(e.target.value)}
+                placeholder="Họ tên"
+              />
+            </div>
+            <div className="ts-form-row">
+              <label className="ts-label">Người ghi điểm</label>
+              <input
+                type="text"
+                className="ts-input"
+                value={scorekeeperName}
+                onChange={(e) => setScorekeeperName(e.target.value)}
+                placeholder="Họ tên"
+              />
+            </div>
             <div className="ts-form-row ts-full">
               <label className="ts-label">Ghi chú</label>
               <textarea
@@ -532,6 +573,16 @@ export default function TaskScoringWizard({
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Ghi chú thêm (nếu có)"
+              />
+            </div>
+            <div className="ts-form-row ts-full">
+              <label className="ts-label">Kiến nghị</label>
+              <textarea
+                className="ts-input"
+                rows={2}
+                value={objection}
+                onChange={(e) => setObjection(e.target.value)}
+                placeholder="Kiến nghị/khiếu nại của đội thi (nếu có)"
               />
             </div>
           </div>
