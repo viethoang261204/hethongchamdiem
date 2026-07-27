@@ -456,3 +456,84 @@
 @media screen {
   .print-only { display: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   Score Sheet — English template (matches "Phiếu điểm Mẫu.docx")
+   ══════════════════════════════════════════════════════════ */
+.ss-sheet {
+  width: 100%;
+  max-width: 860px;
+  border-collapse: collapse;
+  border: 2px solid #000;
+  background: #ffffff;
+  color: #000000;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ss-sheet td,
+.ss-sheet th {
+  border: 1px solid #000;
+  padding: 7px 10px;
+  vertical-align: top;
+}
+
+.ss-title {
+  text-align: center;
+  font-weight: bold;
+  font-size: 17px;
+  letter-spacing: 0.3px;
+  padding: 12px 10px;
+}
+
+.ss-label {
+  font-weight: bold;
+}
+
+.ss-center {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.ss-header-row th {
+  background: #f0f0f0;
+  font-weight: bold;
+  text-align: center;
+  font-size: 12.5px;
+}
+
+.ss-small {
+  font-size: 11px;
+  color: #333;
+  margin-top: 3px;
+}
+
+.ss-row-extra td,
+.ss-row-total td {
+  background: #f7f7f7;
+}
+
+.ss-section {
+  text-align: center;
+  font-weight: bold;
+  background: #f0f0f0;
+  font-size: 13.5px;
+  padding: 8px 10px;
+}
+
+.ss-confirm-text {
+  font-style: italic;
+  font-size: 12.5px;
+  background: #fafafa;
+}
+
+@media print {
+  .ss-sheet, .ss-sheet * { visibility: visible; }
+  .ss-sheet td, .ss-sheet th { border-color: #000 !important; }
+  .ss-row-extra td, .ss-row-total td, .ss-header-row th, .ss-section {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

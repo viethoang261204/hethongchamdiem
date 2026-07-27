@@ -338,6 +338,19 @@ create table if not exists matches (
 create or replace trigger trg_matches_updated
   before update on matches for each row execute function set_updated_at();
 
+-- Khu vực/trạm thi đấu vật lý (Field) — danh mục riêng, gán theo đội
+-- (mẫu phiếu điểm giấy có ô "Field: / No.:")
+create table if not exists fields (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  notes       text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);
+create or replace trigger trg_fields_updated
+  before update on fields for each row execute function set_updated_at();
+alter table teams add column if not exists field_id uuid references fields(id) on delete set null;
+
 
 -- ============================================================
 -- 2. INDEXES
@@ -366,6 +379,7 @@ create index if not exists idx_score_images_score   on score_images(score_id);
 create index if not exists idx_score_edits_score    on score_edits(score_id);
 create index if not exists idx_teams_coach          on teams(coach_id);
 create index if not exists idx_matches_content_board on matches(contest_content_id, board_id);
+create index if not exists idx_teams_field          on teams(field_id);
 
 
 -- ============================================================

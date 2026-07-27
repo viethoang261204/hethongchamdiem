@@ -367,6 +367,9 @@ const BOARDS_JSON = `case when bd.id is null then null
 // SQL fragment: nested coaches {id, name, phone}
 const COACHES_JSON = `case when co.id is null then null
   else json_build_object('id', co.id, 'name', co.name, 'phone', co.phone) end`;
+// SQL fragment: nested fields {id, name}
+const FIELDS_JSON = `case when fl.id is null then null
+  else json_build_object('id', fl.id, 'name', fl.name) end`;
 
 router.get('/contents/:contentId/teams', h(async (req, res) => {
   // Trọng tài đã được gán bảng đấu cụ thể → chỉ thấy đội thuộc các bảng đó.
@@ -377,11 +380,12 @@ router.get('/contents/:contentId/teams', h(async (req, res) => {
     if (rb.length) assignedBoardIds = rb.map((r) => r.board_id);
   }
   const { rows } = await query(
-    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches
+    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${FIELDS_JSON} as fields
      from teams t
      left join schools sch on sch.id = t.school_id
      left join boards bd on bd.id = t.board_id
      left join coaches co on co.id = t.coach_id
+     left join fields fl on fl.id = t.field_id
      where t.contest_content_id = $1
        ${assignedBoardIds ? 'and t.board_id = any($2::uuid[])' : ''}
      order by t.order_index`,
@@ -392,12 +396,13 @@ router.get('/contents/:contentId/teams', h(async (req, res) => {
 
 router.get('/teams', h(async (_req, res) => {
   const { rows } = await query(
-    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches,
+    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${FIELDS_JSON} as fields,
        json_build_object('name', cc.name, 'competitions', json_build_object('name', comp.name)) as contest_contents
      from teams t
      left join schools sch on sch.id = t.school_id
      left join boards bd on bd.id = t.board_id
      left join coaches co on co.id = t.coach_id
+     left join fields fl on fl.id = t.field_id
      left join contest_contents cc on cc.id = t.contest_content_id
      left join competitions comp on comp.id = cc.competition_id
      order by t.order_index`
@@ -405,14 +410,14 @@ router.get('/teams', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'region', 'order_index'];
+const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'field_id', 'region', 'order_index'];
 
 router.post('/contents/:contentId/teams', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TEAM_FIELDS);
   const { rows } = await query(
-    `insert into teams (contest_content_id, name, student_ids, school_id, area_id, board_id, coach_id, region, order_index)
-     values ($1, $2, coalesce($3::uuid[], '{}'::uuid[]), $4, $5, $6, $7, coalesce($8, 'bac'), coalesce($9, 0)) returning *`,
-    [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.board_id ?? null, b.coach_id ?? null, b.region, b.order_index]
+    `insert into teams (contest_content_id, name, student_ids, school_id, area_id, board_id, coach_id, field_id, region, order_index)
+     values ($1, $2, coalesce($3::uuid[], '{}'::uuid[]), $4, $5, $6, $7, $8, coalesce($9, 'bac'), coalesce($10, 0)) returning *`,
+    [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.board_id ?? null, b.coach_id ?? null, b.field_id ?? null, b.region, b.order_index]
   );
   res.json(rows[0]);
 }));
@@ -437,7 +442,7 @@ router.delete('/teams/:id', requireAdmin, h(async (req, res) => {
 // SQL fragment: 1 dòng scores + teams(*, schools) + users(full_name)
 const SCORE_NESTED = `
   select s.*,
-    (to_jsonb(t.*) || jsonb_build_object('schools', ${SCHOOLS_JSON.replace(/\n/g, ' ')})) as teams,
+    (to_jsonb(t.*) || jsonb_build_object('schools', ${SCHOOLS_JSON.replace(/\n/g, ' ')}, 'coaches', ${COACHES_JSON.replace(/\n/g, ' ')}, 'fields', ${FIELDS_JSON.replace(/\n/g, ' ')})) as teams,
     case when u.id is null then null else json_build_object('full_name', u.full_name) end as users,
     case when cc.id is null then null else json_build_object('name', cc.name) end as contest_contents,
     case when bd.id is null then null else json_build_object('id', bd.id, 'name', bd.name, 'age_group', bd.age_group) end as boards
@@ -445,6 +450,8 @@ const SCORE_NESTED = `
   left join teams t on t.id = s.team_id
   left join schools sch on sch.id = t.school_id
   left join boards bd on bd.id = t.board_id
+  left join coaches co on co.id = t.coach_id
+  left join fields fl on fl.id = t.field_id
   left join users u on u.id = s.referee_id
   left join contest_contents cc on cc.id = s.contest_content_id
 `;
@@ -913,6 +920,36 @@ router.put('/coaches/:id', requireAdmin, h(async (req, res) => {
 
 router.delete('/coaches/:id', requireAdmin, h(async (req, res) => {
   await query('delete from coaches where id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ============================================================
+// Field (khu vực/trạm thi đấu vật lý) — gán theo đội
+// ============================================================
+router.get('/fields', h(async (_req, res) => {
+  const { rows } = await query('select * from fields order by name');
+  res.json(rows);
+}));
+
+router.post('/fields', requireAdmin, h(async (req, res) => {
+  const b = pick(req.body, ['name', 'notes']);
+  const { rows } = await query(
+    'insert into fields (name, notes) values ($1, $2) returning *',
+    [b.name, b.notes ?? null]
+  );
+  res.json(rows[0]);
+}));
+
+router.put('/fields/:id', requireAdmin, h(async (req, res) => {
+  const data = pick(req.body, ['name', 'notes']);
+  const q = buildUpdate('fields', req.params.id, data);
+  if (!q) return res.json({});
+  const { rows } = await query(q.text, q.values);
+  res.json(rows[0]);
+}));
+
+router.delete('/fields/:id', requireAdmin, h(async (req, res) => {
+  await query('delete from fields where id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 

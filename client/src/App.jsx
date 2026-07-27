@@ -18,6 +18,7 @@ import AdminTasks from './pages/admin/AdminTasks';
 import AdminSchools from './pages/admin/AdminSchools';
 import AdminBoards from './pages/admin/AdminBoards';
 import AdminCoaches from './pages/admin/AdminCoaches';
+import AdminFields from './pages/admin/AdminFields';
 import AdminReports from './pages/admin/AdminReports';
 import ServerDiag from './pages/admin/ServerDiag';
 import RefereeLogin from './pages/referee/RefereeLogin';
@@ -88,6 +89,7 @@ export default function App() {
               <Route path="schools" element={<AdminSchools />} />
               <Route path="boards" element={<AdminBoards />} />
               <Route path="coaches" element={<AdminCoaches />} />
+              <Route path="fields" element={<AdminFields />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="scoreboard" element={<AdminScoreboard />} />
               <Route path="students" element={<AdminStudents />} />

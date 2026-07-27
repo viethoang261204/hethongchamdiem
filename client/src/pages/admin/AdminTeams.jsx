@@ -12,13 +12,14 @@ const UNASSIGNED = '__unassigned__';
 export default function AdminTeams() {
   const { showConfirm, showAlert } = useNotify();
   const { data, loading, error, reload, setData } = useApiLoader(async () => {
-    const [comps, allCont, tm, st, sch, coa] = await Promise.all([
+    const [comps, allCont, tm, st, sch, coa, fld] = await Promise.all([
       capi.getCompetitions(),
       capi.getAllContents(),
       capi.getAllTeams(),
       capi.getStudents(),
       capi.getSchools(),
       capi.getCoaches(),
+      capi.getFields(),
     ]);
     return {
       competitions: comps.filter(c => c.is_active !== false),
@@ -27,6 +28,7 @@ export default function AdminTeams() {
       students: st,
       schools: sch,
       coaches: coa,
+      fields: fld,
     };
   }, []);
   const competitions = data?.competitions || [];
@@ -34,13 +36,14 @@ export default function AdminTeams() {
   const teams = data?.teams || [];
   const students = data?.students || [];
   const coaches = data?.coaches || [];
+  const fields = data?.fields || [];
   const [schools, setSchools] = useState([]);
   useEffect(() => { if (data?.schools) setSchools(data.schools); }, [data]);
   const [schoolFilter, setSchoolFilter] = useState('');
   const [filterComp, setFilterComp] = useState('');
   const [filterBoard, setFilterBoard] = useState('');
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '' });
+  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '', fieldId: '' });
   const [contents, setContents] = useState([]);
   const [boards, setBoards] = useState([]);
   const [errors, setErrors] = useState({});
@@ -126,7 +129,7 @@ export default function AdminTeams() {
   const getCompetitionId = (contentId) => allContents.find(x => x.id === contentId)?.competition_id || '';
 
   const openAdd = () => {
-    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '' });
+    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '', fieldId: '' });
     setContents([]);
     setErrors({});
     setModal('add');
@@ -142,6 +145,7 @@ export default function AdminTeams() {
       contestContentId: team.contest_content_id || '',
       boardId: team.board_id || '',
       coachId: team.coach_id || '',
+      fieldId: team.field_id || '',
     });
     setContents(content ? allContents.filter(c => c.competition_id === content.competition_id) : []);
     setErrors({});
@@ -258,6 +262,7 @@ export default function AdminTeams() {
           studentIds: form.studentIds,
           boardId: form.boardId || null,
           coachId: form.coachId || null,
+          fieldId: form.fieldId || null,
           order: teams.length + 1,
         });
       } else {
@@ -266,6 +271,7 @@ export default function AdminTeams() {
           studentIds: form.studentIds,
           boardId: form.boardId || null,
           coachId: form.coachId || null,
+          fieldId: form.fieldId || null,
         });
       }
       clearApiCache();
@@ -345,13 +351,14 @@ export default function AdminTeams() {
                 <th>Nội dung</th>
                 <th>Bảng đấu</th>
                 <th>HLV</th>
+                <th>Field</th>
                 <th>Học sinh</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {teamsFiltered.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
+                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
               ) : teamsFiltered.map((t) => {
                 const compName = getCompetitionName(t.contest_content_id);
                 const mems = (t.student_ids || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
@@ -362,6 +369,7 @@ export default function AdminTeams() {
                     <td>{getContentName(t.contest_content_id)}</td>
                     <td>{t.boards?.name || '-'}</td>
                     <td>{t.coaches?.name || '-'}</td>
+                    <td>{t.fields?.name || '-'}</td>
                     <td>{mems.length > 0 ? mems.map(m => m.full_name).join(', ') : '-'}</td>
                     <td>
                       <Link to={`/admin/competitions/${getCompetitionId(t.contest_content_id)}/contents/${t.contest_content_id}/scoreboard`} className="btn btn-secondary" style={{ marginRight: 8 }}>Điểm</Link>
@@ -440,6 +448,17 @@ export default function AdminTeams() {
                 >
                   <option value="">-- Chưa có HLV --</option>
                   {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Field</label>
+                <select
+                  className="form-input form-select"
+                  value={form.fieldId}
+                  onChange={(e) => setForm({ ...form, fieldId: e.target.value })}
+                >
+                  <option value="">-- Chưa gán Field --</option>
+                  {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
               <div className="form-group">

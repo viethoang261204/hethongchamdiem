@@ -250,6 +250,7 @@ export const api = {
       area_id: body.areaId ?? body.area_id ?? null,
       board_id: body.boardId ?? body.board_id ?? null,
       coach_id: body.coachId ?? body.coach_id ?? null,
+      field_id: body.fieldId ?? body.field_id ?? null,
       region: body.region ?? 'bac',
       order_index: body.order ?? body.order_index ?? 0,
     },
@@ -263,6 +264,7 @@ export const api = {
     if (body.areaId !== undefined || body.area_id !== undefined) update.area_id = body.areaId ?? body.area_id;
     if (body.boardId !== undefined || body.board_id !== undefined) update.board_id = body.boardId ?? body.board_id;
     if (body.coachId !== undefined || body.coach_id !== undefined) update.coach_id = body.coachId ?? body.coach_id;
+    if (body.fieldId !== undefined || body.field_id !== undefined) update.field_id = body.fieldId ?? body.field_id;
     if (body.region !== undefined) update.region = body.region;
     if (body.order !== undefined || body.order_index !== undefined) update.order_index = body.order ?? body.order_index;
     return withRetry(() => request(`/teams/${id}`, { method: 'PUT', body: update }), 'putTeam');
@@ -444,6 +446,25 @@ export const api = {
   },
 
   deleteCoach: (id) => withRetry(() => request(`/coaches/${id}`, { method: 'DELETE' }), 'deleteCoach'),
+
+  // ============================================================
+  // Field (khu vực/trạm thi đấu)
+  // ============================================================
+  getFields: () => withRetry(() => request('/fields'), 'getFields'),
+
+  postField: (body) => withRetry(() => request('/fields', {
+    method: 'POST',
+    body: { name: body.name, notes: body.notes ?? null },
+  }), 'postField'),
+
+  putField: (id, body) => {
+    const update = {};
+    if (body.name !== undefined) update.name = body.name;
+    if (body.notes !== undefined) update.notes = body.notes;
+    return withRetry(() => request(`/fields/${id}`, { method: 'PUT', body: update }), 'putField');
+  },
+
+  deleteField: (id) => withRetry(() => request(`/fields/${id}`, { method: 'DELETE' }), 'deleteField'),
 
   // ============================================================
   // Báo cáo

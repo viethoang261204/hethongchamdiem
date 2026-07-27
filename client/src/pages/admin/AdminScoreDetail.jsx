@@ -27,9 +27,18 @@ export default function AdminScoreDetail() {
         content = allContents.find(x => x.id === contentId) || null;
       } catch (_) {}
     }
-    return { score, content, images: imgs, edits };
+    // Lấy cả 2 lượt (round 1 + round 2) của cùng đội/nội dung để gộp lên 1
+    // Score Sheet theo mẫu tiếng Anh (thay vì chỉ hiện đúng lượt đang xem).
+    let scores = [score];
+    if (score?.team_id && contentId) {
+      try {
+        scores = await api.getScores({ teamId: score.team_id, contestContentId: contentId });
+      } catch (_) {}
+    }
+    return { score, scores, content, images: imgs, edits };
   }, [scoreId]);
   const score = data?.score;
+  const scores = data?.scores;
   const content = data?.content;
   const images = data?.images || [];
   const edits = data?.edits || [];
@@ -79,6 +88,7 @@ export default function AdminScoreDetail() {
 
       <ScoreDetailView
         score={score}
+        scores={scores}
         content={content}
         backLink={
           <Link to="/admin/scores" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

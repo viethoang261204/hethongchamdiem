@@ -92,7 +92,7 @@ export default function AdminContentsPage() {
         time_limit_seconds: form.time_limit_seconds !== '' ? Number(form.time_limit_seconds) : null,
         bonus_config: form.bonus_enabled
           ? {
-              label: form.bonus_label?.trim() || 'Điểm thưởng',
+              label: form.bonus_label?.trim() || 'Extra reward',
               base: Number(form.bonus_base) || 0,
               per_retry: Number(form.bonus_per_retry) || 0,
             }

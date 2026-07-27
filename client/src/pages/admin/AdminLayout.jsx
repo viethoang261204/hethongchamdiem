@@ -31,6 +31,7 @@ const NAV_SECTIONS = [
       { to: '/admin/schools', label: 'Trường học', icon: 'school' },
       { to: '/admin/boards', label: 'Bảng đấu', icon: 'ranking' },
       { to: '/admin/coaches', label: 'Huấn luyện viên', icon: 'user' },
+      { to: '/admin/fields', label: 'Field', icon: 'map' },
       { to: '/admin/students', label: 'Học sinh', icon: 'users' },
       { to: '/admin/teams', label: 'Đội thi', icon: 'users' },
       { to: '/admin/scoreboard', label: 'Bảng xếp hạng', icon: 'ranking' },

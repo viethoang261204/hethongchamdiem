@@ -9,7 +9,7 @@ import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
 // Điểm thưởng mặc định khi nội dung thi chưa tự cấu hình bonus_config riêng
-const DEFAULT_BONUS_CONFIG = { label: 'Điểm thưởng', base: 40, per_retry: 10 };
+const DEFAULT_BONUS_CONFIG = { label: 'Extra reward', base: 40, per_retry: 10 };
 
 /**
  * Wizard chấm điểm theo từng nhiệm vụ — tối ưu cho trọng tài không chuyên trên iPad.
@@ -81,10 +81,13 @@ export default function TaskScoringWizard({
   // Chữ ký tay (data URL PNG) — học sinh ký trực tiếp trên iPad/điện thoại
   const [studentSigImage, setStudentSigImage] = useState(prevCS.studentSignatureImage || '');
   const [refereeSigImage, setRefereeSigImage] = useState(prevCS.refereeSignatureImage || '');
-  // Các trường theo mẫu phiếu điểm giấy
+  // Các trường theo mẫu phiếu điểm giấy (Score Sheet)
   const [arenaEntryTime, setArenaEntryTime] = useState(existingScore?.arena_entry_time || '');
-  const [headRefereeName, setHeadRefereeName] = useState(existingScore?.head_referee_name || '');
-  const [scorekeeperName, setScorekeeperName] = useState(existingScore?.scorekeeper_name || '');
+  // Head Referee mặc định "Mr Ly Quang Van"; Scorekeeper mặc định tên tài khoản đang chấm
+  const [headRefereeName, setHeadRefereeName] = useState(existingScore?.head_referee_name || 'Mr Ly Quang Van');
+  const [scorekeeperName, setScorekeeperName] = useState(
+    existingScore?.scorekeeper_name || user?.fullName || user?.username || ''
+  );
   const [objection, setObjection] = useState(existingScore?.objection || '');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -129,7 +132,7 @@ export default function TaskScoringWizard({
   const handleSubmit = async () => {
     const timeSeconds = Number(timeSpent);
     if (!timeSpent || Number.isNaN(timeSeconds) || timeSeconds < 0) {
-      showAlert('Vui lòng nhập Thời gian thi (tính bằng giây).', 'error');
+      showAlert('Please enter Time spent (in seconds).', 'error');
       return;
     }
     setSubmitting(true);
@@ -176,14 +179,14 @@ export default function TaskScoringWizard({
         } catch (err) {
           // Đội đã có phiếu (tạo từ nơi khác) → server trả 409 kèm existing_id
           const m = /Đội này đã có phiếu điểm/.test(err.message || '');
-          if (m) throw new Error('Đội này đã có phiếu điểm. Quay lại danh sách và mở lại đội để sửa phiếu.');
+          if (m) throw new Error('This team already has a score sheet for this round. Go back to the team list and reopen the team to edit it.');
           throw err;
         }
       }
       setSuccess(true);
       setTimeout(() => navigate(backUrl), 2000);
     } catch (err) {
-      showAlert(err.message || 'Gửi điểm thất bại', 'error');
+      showAlert(err.message || 'Failed to submit score', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -194,8 +197,8 @@ export default function TaskScoringWizard({
     return (
       <div className="ts-success">
         <div className="ts-success-icon">✓</div>
-        <strong>{existingScore ? 'Đã cập nhật phiếu điểm!' : 'Gửi điểm thành công!'}</strong>
-        <p>Đang quay lại danh sách đội...</p>
+        <strong>{existingScore ? 'Score sheet updated!' : 'Score submitted successfully!'}</strong>
+        <p>Returning to team list...</p>
       </div>
     );
   }
@@ -204,10 +207,10 @@ export default function TaskScoringWizard({
   if (tasks.length === 0) {
     return (
       <div className="ts-wrapper">
-        <a href={backUrl} className="btn-ghost">← Quay lại</a>
+        <a href={backUrl} className="btn-ghost">← Back</a>
         <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
-          <p>Nội dung thi này chưa có nhiệm vụ nào.</p>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>Vui lòng liên hệ Admin để thêm nhiệm vụ.</p>
+          <p>This content has no tasks yet.</p>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>Please contact Admin to add tasks.</p>
         </div>
       </div>
     );
@@ -227,14 +230,14 @@ export default function TaskScoringWizard({
         <div className="ts-header-info">
           <div className="ts-team-name">
             {team?.name}
-            <span className="ts-board-chip">Lượt {round}</span>
+            <span className="ts-board-chip">Round {round}</span>
             {team?.boards?.name && <span className="ts-board-chip">{team.boards.name}</span>}
-            {existingScore && <span className="ts-edit-chip">Sửa phiếu</span>}
+            {existingScore && <span className="ts-edit-chip">Editing</span>}
           </div>
           <div className="ts-content-name">{content?.name}</div>
         </div>
         <div className="ts-header-score">
-          <div className="ts-score-label">Tổng</div>
+          <div className="ts-score-label">Total</div>
           <div className="ts-score-value">{totalScore}</div>
         </div>
       </header>
@@ -243,12 +246,12 @@ export default function TaskScoringWizard({
       <div className="ts-stepper">
         <div className={`ts-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}`} onClick={() => setStep(1)}>
           <span className="ts-step-num">1</span>
-          <span className="ts-step-label">Chấm điểm</span>
+          <span className="ts-step-label">Scoring</span>
         </div>
         <div className="ts-step-line" />
         <div className={`ts-step ${step >= 2 ? 'active' : ''}`}>
           <span className="ts-step-num">2</span>
-          <span className="ts-step-label">Xác nhận & gửi</span>
+          <span className="ts-step-label">Confirm & submit</span>
         </div>
       </div>
 
@@ -259,7 +262,7 @@ export default function TaskScoringWizard({
           <div className="ts-progress">
             <div className="ts-progress-bar" style={{ width: `${((screenIdx + 1) / screenCount) * 100}%` }} />
             <span className="ts-progress-text">
-              {isBonusScreen ? 'Điểm thưởng' : `Nhiệm vụ ${screenIdx + 1} / ${tasks.length}`}
+              {isBonusScreen ? 'Extra reward' : `Task ${screenIdx + 1} / ${tasks.length}`}
             </span>
           </div>
 
@@ -287,16 +290,16 @@ export default function TaskScoringWizard({
                     className={`ts-bigbtn ts-bigbtn-fail ${taskState[currentTask.id]?.points === 0 ? 'selected' : ''}`}
                     onClick={() => { setTask(currentTask.id, { points: 0 }); gotoNextScreen(); }}
                   >
-                    ✗ Không đạt
-                    <span className="ts-bigbtn-pts">0 điểm</span>
+                    ✗ Fail
+                    <span className="ts-bigbtn-pts">0 pts</span>
                   </button>
                   <button
                     type="button"
                     className={`ts-bigbtn ts-bigbtn-pass ${taskState[currentTask.id]?.points > 0 ? 'selected' : ''}`}
                     onClick={() => { setTask(currentTask.id, { points: Number(currentTask.max_score) || 0 }); gotoNextScreen(); }}
                   >
-                    ✓ Đạt
-                    <span className="ts-bigbtn-pts">+{currentTask.max_score} điểm</span>
+                    ✓ Pass
+                    <span className="ts-bigbtn-pts">+{currentTask.max_score} pts</span>
                   </button>
                 </div>
               )}
@@ -304,7 +307,7 @@ export default function TaskScoringWizard({
               {/* count: đếm số lượng */}
               {currentTask.scoring_type === 'count' && (
                 <div className="ts-count-box">
-                  <div className="ts-count-label">Số lượng đạt được</div>
+                  <div className="ts-count-label">Quantity achieved</div>
                   <div className="ts-input-stepper ts-input-stepper-xl">
                     <button type="button" onClick={() => setTask(currentTask.id, { qty: Math.max(0, (taskState[currentTask.id]?.qty || 0) - 1) })}>−</button>
                     <input
@@ -327,8 +330,8 @@ export default function TaskScoringWizard({
                     }}>+</button>
                   </div>
                   <div className="ts-count-calc">
-                    {taskState[currentTask.id]?.qty || 0} × {currentTask.max_score} = <strong>{taskPoints(currentTask)} điểm</strong>
-                    {currentTask.max_count ? <span className="ts-count-max"> (tối đa {currentTask.max_count})</span> : null}
+                    {taskState[currentTask.id]?.qty || 0} × {currentTask.max_score} = <strong>{taskPoints(currentTask)} pts</strong>
+                    {currentTask.max_count ? <span className="ts-count-max"> (max {currentTask.max_count})</span> : null}
                   </div>
                 </div>
               )}
@@ -336,7 +339,7 @@ export default function TaskScoringWizard({
               {/* numeric / tier: nhập điểm */}
               {(currentTask.scoring_type === 'numeric' || currentTask.scoring_type === 'tier') && (
                 <div className="ts-count-box">
-                  <div className="ts-count-label">Điểm đạt (tối đa {currentTask.max_score})</div>
+                  <div className="ts-count-label">Points scored (max {currentTask.max_score})</div>
                   <div className="ts-input-stepper ts-input-stepper-xl">
                     <button type="button" onClick={() => {
                       const v = taskState[currentTask.id]?.points ?? 0;
@@ -367,12 +370,12 @@ export default function TaskScoringWizard({
           {/* ── Màn điểm thưởng ── */}
           {isBonusScreen && (
             <div className="ts-task-focus">
-              <h3 className="ts-task-name">{bonusCfg.label || 'Điểm thưởng'}</h3>
+              <h3 className="ts-task-name">{bonusCfg.label || 'Extra reward'}</h3>
               <p className="ts-task-desc">
-                Công thức: {bonusCfg.base} − {bonusCfg.per_retry} × số lần chạy lại (tối thiểu 0)
+                Formula: {bonusCfg.base} − {bonusCfg.per_retry} × number of retries (minimum 0)
               </p>
               <div className="ts-count-box">
-                <div className="ts-count-label">Số lần chạy lại</div>
+                <div className="ts-count-label">Number of retries</div>
                 <div className="ts-input-stepper ts-input-stepper-xl">
                   <button type="button" onClick={() => setRetryCount(c => Math.max(0, c - 1))}>−</button>
                   <input
@@ -388,7 +391,7 @@ export default function TaskScoringWizard({
                   <button type="button" onClick={() => setRetryCount(c => c + 1)}>+</button>
                 </div>
                 <div className="ts-count-calc">
-                  Điểm thưởng: <strong>{bonusPoints} điểm</strong>
+                  Extra reward: <strong>{bonusPoints} pts</strong>
                 </div>
               </div>
             </div>
@@ -402,10 +405,10 @@ export default function TaskScoringWizard({
               onClick={() => setScreenIdx(i => Math.max(0, i - 1))}
               disabled={screenIdx === 0}
             >
-              ← Trước
+              ← Previous
             </button>
             <button type="button" className="ts-btn ts-btn-primary" onClick={gotoNextScreen}>
-              {screenIdx < screenCount - 1 ? 'Sau →' : 'Xong — Xác nhận →'}
+              {screenIdx < screenCount - 1 ? 'Next →' : 'Done — Confirm →'}
             </button>
           </div>
 
@@ -427,7 +430,7 @@ export default function TaskScoringWizard({
                 type="button"
                 className={`ts-task-pill ${isBonusScreen ? 'active' : ''} ${retryCount >= 0 && screenIdx > tasks.length - 1 ? '' : ''}`}
                 onClick={() => setScreenIdx(tasks.length)}
-                title={bonusCfg.label || 'Điểm thưởng'}
+                title={bonusCfg.label || 'Extra reward'}
               >
                 ★
               </button>
@@ -439,18 +442,18 @@ export default function TaskScoringWizard({
       {/* ── Step 2: xác nhận — trình bày như phiếu giấy để học sinh check ── */}
       {step === 2 && (
         <div className="ts-card ts-fade-in">
-          <h2 className="ts-card-title">Phiếu chấm điểm</h2>
+          <h2 className="ts-card-title">Score Sheet</h2>
           <div className="ts-sheet-sub">
             {team?.name}
-            {team?.boards?.name ? ` · ${team.boards.name}` : ''} · {content?.name} · Lượt {round}
+            {team?.boards?.name ? ` · ${team.boards.name}` : ''} · {content?.name} · Round {round}
           </div>
 
           <table className="ts-detail-table ts-sheet-table">
             <thead>
               <tr>
-                <th>Nhiệm vụ</th>
-                <th className="ts-col-qty">Số lượng</th>
-                <th className="ts-col-pts">Điểm</th>
+                <th>Task</th>
+                <th className="ts-col-qty">Quantity</th>
+                <th className="ts-col-pts">Score</th>
               </tr>
             </thead>
             <tbody>
@@ -459,7 +462,7 @@ export default function TaskScoringWizard({
                   <td>
                     {t.name}
                     {taskState[t.id]?.points === null && t.scoring_type !== 'count' && (
-                      <span className="ts-not-scored"> (chưa chấm)</span>
+                      <span className="ts-not-scored"> (not scored)</span>
                     )}
                   </td>
                   <td className="ts-col-qty">{t.scoring_type === 'count' ? (taskState[t.id]?.qty || 0) : '—'}</td>
@@ -468,7 +471,7 @@ export default function TaskScoringWizard({
               ))}
               {bonusCfg && (
                 <tr>
-                  <td>{bonusCfg.label || 'Điểm thưởng'} <span className="ts-not-scored">({retryCount} lần chạy lại)</span></td>
+                  <td>{bonusCfg.label || 'Extra reward'} <span className="ts-not-scored">({retryCount} retries)</span></td>
                   <td className="ts-col-qty">—</td>
                   <td className="ts-col-pts"><strong>{bonusPoints}</strong></td>
                 </tr>
@@ -476,7 +479,7 @@ export default function TaskScoringWizard({
             </tbody>
             <tfoot>
               <tr className="ts-sheet-total">
-                <td colSpan={2}>TỔNG ĐIỂM</td>
+                <td colSpan={2}>TOTAL SCORE</td>
                 <td className="ts-col-pts"><strong>{totalScore}</strong></td>
               </tr>
             </tfoot>
@@ -485,8 +488,8 @@ export default function TaskScoringWizard({
           <div className="ts-form-grid" style={{ marginTop: 16 }}>
             <div className="ts-form-row ts-full">
               <label className="ts-label">
-                Thời gian thi (giây) <span className="ts-req">*</span>
-                {timeLimitText && <span className="ts-hint-inline"> (tối đa {timeLimitText})</span>}
+                Time spent (seconds) <span className="ts-req">*</span>
+                {timeLimitText && <span className="ts-hint-inline"> (max {timeLimitText})</span>}
               </label>
               <input
                 type="number"
@@ -496,34 +499,34 @@ export default function TaskScoringWizard({
                 className="ts-input ts-input-lg"
                 value={timeSpent}
                 onChange={(e) => setTimeSpent(e.target.value)}
-                placeholder="VD: 155"
+                placeholder="e.g. 155"
               />
               {timeSpent !== '' && !Number.isNaN(Number(timeSpent)) && (
-                <div className="ts-hint">≈ {formatSecondsAsMinutes(timeSpent)} phút</div>
+                <div className="ts-hint">≈ {formatSecondsAsMinutes(timeSpent)} min</div>
               )}
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Thời gian bắt đầu vào sân</label>
+              <label className="ts-label">Time entering the field</label>
               <input
                 type="text"
                 className="ts-input"
                 value={arenaEntryTime}
                 onChange={(e) => setArenaEntryTime(e.target.value)}
-                placeholder="VD: 08:30"
+                placeholder="e.g. 08:30"
               />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Tên học sinh / đội trưởng</label>
+              <label className="ts-label">Contestant name / team leader</label>
               <input
                 type="text"
                 className="ts-input"
                 value={teamMembers}
                 onChange={(e) => setTeamMembers(e.target.value)}
-                placeholder="Tên người xác nhận"
+                placeholder="Name of the person confirming"
               />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Tên trọng tài</label>
+              <label className="ts-label">Referee name</label>
               <input
                 type="text"
                 className="ts-input"
@@ -533,69 +536,69 @@ export default function TaskScoringWizard({
             </div>
             <div className="ts-form-row">
               <SignatureBox
-                label="Học sinh / Đội trưởng ký"
+                label="Team / team leader signature"
                 value={studentSigImage}
                 onChange={setStudentSigImage}
               />
             </div>
             <div className="ts-form-row">
               <SignatureBox
-                label="Trọng tài ký"
+                label="Referee signature"
                 value={refereeSigImage}
                 onChange={setRefereeSigImage}
               />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Trưởng ban trọng tài</label>
+              <label className="ts-label">Head Referee</label>
               <input
                 type="text"
                 className="ts-input"
                 value={headRefereeName}
                 onChange={(e) => setHeadRefereeName(e.target.value)}
-                placeholder="Họ tên"
+                placeholder="Full name"
               />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Người ghi điểm</label>
+              <label className="ts-label">Scorekeeper</label>
               <input
                 type="text"
                 className="ts-input"
                 value={scorekeeperName}
                 onChange={(e) => setScorekeeperName(e.target.value)}
-                placeholder="Họ tên"
+                placeholder="Full name"
               />
             </div>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Ghi chú</label>
+              <label className="ts-label">Remarks</label>
               <textarea
                 className="ts-input"
                 rows={2}
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                placeholder="Ghi chú thêm (nếu có)"
+                placeholder="Additional remarks (if any)"
               />
             </div>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Kiến nghị</label>
+              <label className="ts-label">Recommendation</label>
               <textarea
                 className="ts-input"
                 rows={2}
                 value={objection}
                 onChange={(e) => setObjection(e.target.value)}
-                placeholder="Kiến nghị/khiếu nại của đội thi (nếu có)"
+                placeholder="Team's recommendation/objection (if any)"
               />
             </div>
           </div>
 
           <div className="ts-footer">
-            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Chấm lại</button>
+            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Re-score</button>
             <button
               type="button"
               className="ts-btn ts-btn-primary ts-btn-lg"
               onClick={handleSubmit}
               disabled={submitting}
             >
-              {submitting ? 'Đang gửi...' : `✓ ${existingScore ? 'Cập nhật phiếu' : 'Gửi điểm'} (${totalScore})`}
+              {submitting ? 'Submitting...' : `✓ ${existingScore ? 'Update score sheet' : 'Submit score'} (${totalScore})`}
             </button>
           </div>
         </div>
