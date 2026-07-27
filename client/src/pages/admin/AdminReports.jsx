@@ -1,8 +1,9 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from '../../api';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
-import { exportToPdf } from '../referee/exportPdf';
+import { exportMultipleToPdf } from '../referee/exportPdf';
+import ScoreSheetTable from '../shared/ScoreSheetTable';
 import './AdminLayout.css';
 
 export default function AdminReports() {
@@ -19,8 +20,11 @@ export default function AdminReports() {
   const [rows, setRows] = useState(null);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const reportRef = useRef(null);
+  // Tên group (trường/HLV) đang xuất PDF chi tiết — dùng để disable đúng nút đó
+  const [exportingGroup, setExportingGroup] = useState(null);
+  // Danh sách phiếu điểm chi tiết (đã fetch đủ scores + tasks) đang chờ render
+  // ẩn để html2canvas chụp từng phiếu, gộp thành 1 PDF cho cả group.
+  const [pendingExport, setPendingExport] = useState(null);
 
   const contentsForComp = useMemo(
     () => contents.filter((c) => !selectedComp || c.competition_id === selectedComp),
@@ -53,6 +57,7 @@ export default function AdminReports() {
           school: r.schools?.name || 'Chưa có trường',
           coach: r.coaches?.name || 'Chưa có HLV',
           content_name: r.content_name,
+          contest_content_id: r.contest_content_id,
           total_score: 0,
           total_time: 0,
           rounds: 0,
@@ -82,13 +87,39 @@ export default function AdminReports() {
   const compName = competitions.find((c) => c.id === selectedComp)?.name || '';
   const contentName = contents.find((c) => c.id === selectedContent)?.name || 'Tất cả nội dung';
 
-  const handleExportPdf = async () => {
-    setExporting(true);
+  // Xuất PDF CHI TIẾT (đầy đủ phiếu điểm từng đội, theo đúng mẫu Score Sheet)
+  // cho toàn bộ đội thuộc 1 group (1 trường/trung tâm hoặc 1 HLV) — không phải
+  // bảng tổng hợp điểm.
+  const handleExportGroupPdf = async (group) => {
+    setExportingGroup(group.name);
     try {
-      const slug = (compName || 'bao-cao-diem').replace(/\s+/g, '-').toLowerCase();
-      await exportToPdf(reportRef, `bao-cao-diem-${slug}`);
+      const tasksCache = new Map();
+      const sheets = [];
+      for (const t of group.teams) {
+        const contentId = t.contest_content_id;
+        if (contentId && !tasksCache.has(contentId)) {
+          tasksCache.set(contentId, await api.getTasks(contentId).catch(() => []));
+        }
+        const teamScores = contentId
+          ? await api.getScores({ teamId: t.team_id, contestContentId: contentId }).catch(() => [])
+          : [];
+        const contentObj = contents.find((c) => c.id === contentId) || { name: t.content_name };
+        sheets.push({
+          key: `${t.team_id}-${contentId}`,
+          scores: teamScores,
+          content: contentObj,
+          tasks: tasksCache.get(contentId) || [],
+        });
+      }
+      setPendingExport(sheets);
+      // Chờ React render xong các sheet ẩn rồi mới chụp (2 rAF cho chắc đã paint)
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const nodes = sheets.map((s) => document.getElementById(`export-sheet-${s.key}`));
+      const slug = group.name.replace(/\s+/g, '-').toLowerCase();
+      await exportMultipleToPdf(nodes, `phieu-diem-${slug}`);
     } finally {
-      setExporting(false);
+      setPendingExport(null);
+      setExportingGroup(null);
     }
   };
 
@@ -99,13 +130,8 @@ export default function AdminReports() {
       <div className="page-header no-print">
         <div>
           <h1 className="page-title">Báo cáo điểm</h1>
-          <p className="page-subtitle">Xuất báo cáo theo trường hoặc theo huấn luyện viên</p>
+          <p className="page-subtitle">Lọc theo trường/trung tâm hoặc huấn luyện viên, tải PDF chi tiết phiếu điểm ngay trong từng nhóm</p>
         </div>
-        {rows && rows.length > 0 && (
-          <button type="button" className="btn btn-primary" onClick={handleExportPdf} disabled={exporting}>
-            {exporting ? 'Đang xuất...' : 'Tải PDF'}
-          </button>
-        )}
       </div>
 
       {error && <div className="no-print"><ErrorBox error={error} onRetry={reload} /></div>}
@@ -142,11 +168,11 @@ export default function AdminReports() {
       {rowsError && <div className="no-print"><ErrorBox error={rowsError} onRetry={loadReport} /></div>}
 
       {rows && (
-        <div className="report-page" ref={reportRef} style={{ background: '#fff', padding: 16 }}>
+        <div className="report-page">
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
             <h2 style={{ margin: 0 }}>Báo cáo điểm — {compName}</h2>
             <p style={{ color: '#64748b', margin: '4px 0 0' }}>
-              {contentName} · Nhóm theo {groupBy === 'coach' ? 'huấn luyện viên' : 'trung tâm'} · In lúc {new Date().toLocaleString('vi-VN')}
+              {contentName} · Nhóm theo {groupBy === 'coach' ? 'huấn luyện viên' : 'trung tâm'} · Xem lúc {new Date().toLocaleString('vi-VN')}
             </p>
           </div>
 
@@ -156,7 +182,17 @@ export default function AdminReports() {
             <div className="card report-group" key={g.name} style={{ marginBottom: 20 }}>
               <div className="card-header">
                 <h3 className="card-title">{g.name}</h3>
-                <span className="page-subtitle">{g.teams.length} đội</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className="page-subtitle">{g.teams.length} đội</span>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => handleExportGroupPdf(g)}
+                    disabled={exportingGroup === g.name}
+                  >
+                    {exportingGroup === g.name ? 'Đang xuất...' : 'Tải PDF'}
+                  </button>
+                </div>
               </div>
               <div className="table-container">
                 <table>
@@ -182,6 +218,18 @@ export default function AdminReports() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Render ẩn (ngoài màn hình) toàn bộ phiếu điểm chi tiết của group đang
+          xuất, để html2canvas chụp từng phiếu rồi gộp thành 1 file PDF. */}
+      {pendingExport && (
+        <div style={{ position: 'fixed', top: 0, left: -99999, zIndex: -1 }}>
+          {pendingExport.map((s) => (
+            <div key={s.key} id={`export-sheet-${s.key}`}>
+              <ScoreSheetTable scores={s.scores} content={s.content} tasks={s.tasks} />
             </div>
           ))}
         </div>
