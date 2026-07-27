@@ -477,6 +477,10 @@
   border: 1px solid #000;
   padding: 7px 10px;
   vertical-align: top;
+  /* !important: trang admin (.nhutin-admin td/th) có sẵn màu chữ xám mờ với
+     cùng độ đặc hiệu CSS (.class + element) — nếu không ép, thứ tự nạp CSS
+     có thể khiến phiếu điểm bị đè thành chữ xám thay vì đen. */
+  color: #000 !important;
 }
 
 .ss-title {
@@ -505,7 +509,7 @@
 
 .ss-small {
   font-size: 11px;
-  color: #333;
+  color: #000 !important;
   margin-top: 3px;
 }
 

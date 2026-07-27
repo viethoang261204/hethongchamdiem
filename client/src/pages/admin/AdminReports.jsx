@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { api } from '../../api';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import { exportToPdf } from '../referee/exportPdf';
 import './AdminLayout.css';
 
 export default function AdminReports() {
@@ -18,6 +19,8 @@ export default function AdminReports() {
   const [rows, setRows] = useState(null);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState(null);
+  const [exporting, setExporting] = useState(false);
+  const reportRef = useRef(null);
 
   const contentsForComp = useMemo(
     () => contents.filter((c) => !selectedComp || c.competition_id === selectedComp),
@@ -79,6 +82,16 @@ export default function AdminReports() {
   const compName = competitions.find((c) => c.id === selectedComp)?.name || '';
   const contentName = contents.find((c) => c.id === selectedContent)?.name || 'Tất cả nội dung';
 
+  const handleExportPdf = async () => {
+    setExporting(true);
+    try {
+      const slug = (compName || 'bao-cao-diem').replace(/\s+/g, '-').toLowerCase();
+      await exportToPdf(reportRef, `bao-cao-diem-${slug}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) return <div className="nhutin-admin"><p style={{ padding: 24 }}>Đang tải...</p></div>;
 
   return (
@@ -89,7 +102,9 @@ export default function AdminReports() {
           <p className="page-subtitle">Xuất báo cáo theo trường hoặc theo huấn luyện viên</p>
         </div>
         {rows && rows.length > 0 && (
-          <button type="button" className="btn btn-primary" onClick={() => window.print()}>Tải PDF</button>
+          <button type="button" className="btn btn-primary" onClick={handleExportPdf} disabled={exporting}>
+            {exporting ? 'Đang xuất...' : 'Tải PDF'}
+          </button>
         )}
       </div>
 
@@ -127,7 +142,7 @@ export default function AdminReports() {
       {rowsError && <div className="no-print"><ErrorBox error={rowsError} onRetry={loadReport} /></div>}
 
       {rows && (
-        <div className="report-page">
+        <div className="report-page" ref={reportRef} style={{ background: '#fff', padding: 16 }}>
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
             <h2 style={{ margin: 0 }}>Báo cáo điểm — {compName}</h2>
             <p style={{ color: '#64748b', margin: '4px 0 0' }}>
