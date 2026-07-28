@@ -161,22 +161,43 @@ router.get('/contents', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const CONTENT_FIELDS = ['name', 'name_en', 'description', 'criteria', 'order_index', 'scoring_method', 'time_limit_seconds', 'bonus_config'];
+const CONTENT_FIELDS = ['name', 'name_en', 'description', 'criteria', 'order_index', 'scoring_method', 'time_limit_seconds', 'bonus_config', 'content_format'];
 
 router.post('/competitions/:competitionId/contents', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, CONTENT_FIELDS);
+  if (b.content_format && !['scoring', 'combat_drone', 'combat_stars'].includes(b.content_format)) {
+    return res.status(400).json({ error: 'content_format không hợp lệ.' });
+  }
   const { rows } = await query(
-    `insert into contest_contents (competition_id, name, name_en, description, criteria, order_index, scoring_method, time_limit_seconds, bonus_config)
-     values ($1, $2, $3, $4, coalesce($5::jsonb, '[]'::jsonb), coalesce($6, 0), $7, $8, $9::jsonb) returning *`,
+    `insert into contest_contents (competition_id, name, name_en, description, criteria, order_index, scoring_method, time_limit_seconds, bonus_config, content_format)
+     values ($1, $2, $3, $4, coalesce($5::jsonb, '[]'::jsonb), coalesce($6, 0), $7, $8, $9::jsonb, coalesce($10, 'scoring')) returning *`,
     [req.params.competitionId, b.name, b.name_en ?? null, b.description ?? null,
      b.criteria ? JSON.stringify(b.criteria) : null, b.order_index, b.scoring_method ?? null,
-     b.time_limit_seconds ?? null, b.bonus_config ? JSON.stringify(b.bonus_config) : null]
+     b.time_limit_seconds ?? null, b.bonus_config ? JSON.stringify(b.bonus_config) : null, b.content_format ?? null]
   );
   res.json(rows[0]);
 }));
 
+// Đổi content_format (Chấm điểm / Đối kháng Fly Smart Cup / Đối kháng Battle of
+// Stars) bị khóa nếu nội dung đã có đội, phiếu điểm, hoặc trận đối kháng —
+// tránh dữ liệu đã nhập không còn khớp với luồng chấm điểm mới chọn.
 router.put('/contents/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, CONTENT_FIELDS);
+  if (data.content_format !== undefined) {
+    if (!['scoring', 'combat_drone', 'combat_stars'].includes(data.content_format)) {
+      return res.status(400).json({ error: 'content_format không hợp lệ.' });
+    }
+    const { rows: cur } = await query('select content_format from contest_contents where id = $1', [req.params.id]);
+    if (!cur[0]) return res.status(404).json({ error: 'Không tìm thấy nội dung thi.' });
+    if (cur[0].content_format !== data.content_format) {
+      const { rows: hasTeams } = await query('select 1 from teams where contest_content_id = $1 limit 1', [req.params.id]);
+      const { rows: hasScores } = await query('select 1 from scores where contest_content_id = $1 limit 1', [req.params.id]);
+      const { rows: hasCombat } = await query('select 1 from combat_matches where contest_content_id = $1 limit 1', [req.params.id]);
+      if (hasTeams[0] || hasScores[0] || hasCombat[0]) {
+        return res.status(400).json({ error: 'Không thể đổi định dạng chấm điểm vì nội dung này đã có đội/phiếu điểm/trận đấu.' });
+      }
+    }
+  }
   if (data.criteria !== undefined) data.criteria = JSON.stringify(data.criteria);
   if (data.bonus_config !== undefined) data.bonus_config = data.bonus_config === null ? null : JSON.stringify(data.bonus_config);
   const q = buildUpdate('contest_contents', req.params.id, data);
@@ -891,6 +912,87 @@ router.put('/matches/:id/result', requireAuth, h(async (req, res) => {
 
   const { rows: updated } = await query('select * from matches where id = $1', [req.params.id]);
   res.json(updated[0]);
+}));
+
+// ============================================================
+// Trận đối kháng (combat_matches) — riêng cho content_format =
+// 'combat_drone' (Fly Smart Cup) / 'combat_stars' (Battle of Stars).
+// Admin tự tạo từng trận thủ công (không bốc thăm tự động) — xem
+// db/schema.sql để biết vì sao (vòng bảng round-robin không khớp thuật
+// toán nhánh lũy thừa 2 của `matches`).
+// ============================================================
+const COMBAT_MATCH_NESTED = `
+  select cm.*,
+    case when ta.id is null then null else json_build_object('id', ta.id, 'name', ta.name) end as team_a,
+    case when tb.id is null then null else json_build_object('id', tb.id, 'name', tb.name) end as team_b,
+    case when bd.id is null then null else json_build_object('id', bd.id, 'name', bd.name) end as boards
+  from combat_matches cm
+  left join teams ta on ta.id = cm.team_a_id
+  left join teams tb on tb.id = cm.team_b_id
+  left join boards bd on bd.id = cm.board_id
+`;
+
+router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
+  let assignedBoardIds = null;
+  if (req.user?.role === 'referee') {
+    const { rows: rb } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
+    if (rb.length) assignedBoardIds = rb.map((r) => r.board_id);
+  }
+  const { rows } = await query(
+    `${COMBAT_MATCH_NESTED}
+     where cm.contest_content_id = $1
+       ${assignedBoardIds ? 'and cm.board_id = any($2::uuid[])' : ''}
+     order by cm.created_at`,
+    assignedBoardIds ? [req.params.contentId, assignedBoardIds] : [req.params.contentId]
+  );
+  res.json(rows);
+}));
+
+const COMBAT_MATCH_FIELDS = [
+  'board_id', 'stage', 'group_label', 'match_no',
+  'team_a_id', 'team_b_id', 'team_a_no', 'team_b_no',
+  'winner_id', 'is_draw', 'details', 'notes',
+];
+
+router.post('/contents/:contentId/combat-matches', requireAdmin, h(async (req, res) => {
+  const b = pick(req.body, COMBAT_MATCH_FIELDS);
+  const { rows } = await query(
+    `insert into combat_matches (contest_content_id, board_id, stage, group_label, match_no, team_a_id, team_b_id, team_a_no, team_b_no, details)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, coalesce($10::jsonb, '{}'::jsonb)) returning *`,
+    [req.params.contentId, b.board_id ?? null, b.stage ?? null, b.group_label ?? null, b.match_no ?? null,
+     b.team_a_id ?? null, b.team_b_id ?? null, b.team_a_no ?? null, b.team_b_no ?? null,
+     b.details ? JSON.stringify(b.details) : null]
+  );
+  res.json(rows[0]);
+}));
+
+// Sửa chi tiết trận (admin, hoặc trọng tài được phân quyền board đó qua
+// referee_boards) — nhập điểm/hiệp/luân lưu (drone) hoặc điểm task 2 đội
+// (stars), ghi thắng/thua/hòa.
+router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
+  const { rows: mRows } = await query('select * from combat_matches where id = $1', [req.params.id]);
+  const match = mRows[0];
+  if (!match) return res.status(404).json({ error: 'Không tìm thấy trận đấu.' });
+
+  if (req.user.role !== 'admin') {
+    const { rows: assigned } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
+    if (assigned.length && !assigned.some((a) => a.board_id === match.board_id)) {
+      return res.status(403).json({ error: 'Bạn không được phân quyền ghi kết quả bảng đấu này.' });
+    }
+  }
+
+  const data = pick(req.body, COMBAT_MATCH_FIELDS);
+  if (data.details !== undefined) data.details = JSON.stringify(data.details ?? {});
+  if (data.winner_id !== undefined || data.is_draw !== undefined) data.played_at = new Date();
+  const q = buildUpdate('combat_matches', req.params.id, data);
+  if (!q) return res.json(match);
+  const { rows } = await query(q.text, q.values);
+  res.json(rows[0]);
+}));
+
+router.delete('/contents/:contentId/combat-matches/:id', requireAdmin, h(async (req, res) => {
+  await query('delete from combat_matches where id = $1 and contest_content_id = $2', [req.params.id, req.params.contentId]);
+  res.json({ ok: true });
 }));
 
 // ============================================================

@@ -351,6 +351,47 @@ create or replace trigger trg_fields_updated
   before update on fields for each row execute function set_updated_at();
 alter table teams add column if not exists field_id uuid references fields(id) on delete set null;
 
+-- Phân loại phương thức chấm ở cấp NỘI DUNG (khác content_boards.ranking_format
+-- vốn ở cấp content×board, dùng cho nhánh loại trực tiếp generic) —
+-- 'scoring' = chấm điểm bình thường (mặc định) · 'combat_drone' = Fly Smart Cup
+-- (mẫu Scoring Sheet of Drone Cup) · 'combat_stars' = Battle of Stars.
+alter table contest_contents add column if not exists content_format text;
+update contest_contents set content_format = 'scoring' where content_format is null;
+alter table contest_contents alter column content_format set default 'scoring';
+alter table contest_contents alter column content_format set not null;
+alter table contest_contents drop constraint if exists contest_contents_content_format_check;
+alter table contest_contents add constraint contest_contents_content_format_check
+  check (content_format in ('scoring', 'combat_drone', 'combat_stars'));
+
+-- Trận đối kháng cho 2 nội dung content_format = 'combat_drone'/'combat_stars'.
+-- KHÔNG dùng chung bảng `matches` (đó là nhánh loại trực tiếp generic theo
+-- board, chưa nội dung nào dùng thật, giữ nguyên để không rủi ro) — mỗi trận
+-- ở đây do admin tự tạo thủ công (không bốc thăm tự động, vì vòng bảng round-
+-- robin không khớp thuật toán nhánh lũy thừa 2 hiện có), chi tiết theo từng
+-- mẫu phiếu giấy lưu tự do trong `details` (giống cách `scores.criteria_scores`
+-- đang lưu dữ liệu linh hoạt theo từng loại chấm).
+create table if not exists combat_matches (
+  id                 uuid primary key default gen_random_uuid(),
+  contest_content_id uuid not null references contest_contents(id) on delete cascade,
+  board_id           uuid references boards(id) on delete set null,
+  stage              text,        -- nhãn vòng đấu tự do: "Preliminary 1", "Chung kết"...
+  group_label        text,        -- nhãn bảng vòng tròn (Appendix II) — null nếu là trận loại trực tiếp
+  match_no           text,        -- "___VS___" trên phiếu Drone Cup
+  team_a_id          uuid references teams(id) on delete set null,  -- Đội Đỏ / Red
+  team_b_id          uuid references teams(id) on delete set null,  -- Đội Xanh / Blue
+  team_a_no          text,        -- "Red No."
+  team_b_no          text,        -- "Blue No."
+  winner_id          uuid references teams(id) on delete set null,
+  is_draw            boolean default false,
+  played_at          timestamptz,
+  details            jsonb default '{}',
+  notes              text,
+  created_at         timestamptz default now(),
+  updated_at         timestamptz default now()
+);
+create or replace trigger trg_combat_matches_updated
+  before update on combat_matches for each row execute function set_updated_at();
+
 
 -- ============================================================
 -- 2. INDEXES
@@ -380,6 +421,9 @@ create index if not exists idx_score_edits_score    on score_edits(score_id);
 create index if not exists idx_teams_coach          on teams(coach_id);
 create index if not exists idx_matches_content_board on matches(contest_content_id, board_id);
 create index if not exists idx_teams_field          on teams(field_id);
+create index if not exists idx_combat_matches_content on combat_matches(contest_content_id);
+create index if not exists idx_combat_matches_board   on combat_matches(board_id);
+create index if not exists idx_combat_matches_group   on combat_matches(contest_content_id, group_label);
 
 
 -- ============================================================
