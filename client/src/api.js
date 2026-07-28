@@ -207,6 +207,25 @@ export const api = {
   ), 'putMatchResult'),
 
   // ============================================================
+  // Trận đối kháng riêng (Fly Smart Cup / Battle of Stars) — content_format
+  // ============================================================
+  getCombatMatches: (contestContentId) => withRetry(() => request(
+    `/contents/${contestContentId}/combat-matches`
+  ), 'getCombatMatches'),
+
+  postCombatMatch: (contestContentId, body) => withRetry(() => request(
+    `/contents/${contestContentId}/combat-matches`, { method: 'POST', body }
+  ), 'postCombatMatch'),
+
+  putCombatMatch: (id, body) => withRetry(() => request(
+    `/combat-matches/${id}`, { method: 'PUT', body }
+  ), 'putCombatMatch'),
+
+  deleteCombatMatch: (contestContentId, id) => withRetry(() => request(
+    `/contents/${contestContentId}/combat-matches/${id}`, { method: 'DELETE' }
+  ), 'deleteCombatMatch'),
+
+  // ============================================================
   // Students
   // ============================================================
   getStudents: () => withRetry(() => request('/students'), 'getStudents'),

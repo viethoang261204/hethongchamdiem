@@ -43,8 +43,19 @@ export default function RefereeSelect() {
     }
   };
 
+  // 2 nội dung đối kháng riêng (Fly Smart Cup / Battle of Stars) có bảng điểm
+  // và luồng nhập điểm hoàn toàn khác — đi thẳng vào màn hình riêng, bỏ qua
+  // bước chọn bảng đấu (server đã tự lọc trận theo referee_boards).
   const selectContent = async (c) => {
     setSelectedContent(c);
+    if (c.content_format === 'combat_drone') {
+      navigate(`/referee/competition/${selectedComp.id}/content/${c.id}/combat-drone`);
+      return;
+    }
+    if (c.content_format === 'combat_stars') {
+      navigate(`/referee/competition/${selectedComp.id}/content/${c.id}/combat-stars`);
+      return;
+    }
     setBoardsLoading(true);
     try {
       const [contentBoards, myBoardIds] = await Promise.all([

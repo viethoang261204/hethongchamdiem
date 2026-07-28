@@ -22,7 +22,7 @@ export default function AdminContentsPage() {
   const [selectedComp, setSelectedComp] = useState(searchParams.get('competitionId') || '');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ name: '', description: '', scoring_method: '', order_index: 1, criteria: [] });
+  const [form, setForm] = useState({ name: '', description: '', scoring_method: '', order_index: 1, criteria: [], content_format: 'scoring' });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -48,6 +48,7 @@ export default function AdminContentsPage() {
     setForm({
       name: '', description: '', scoring_method: '', order_index: contents.length + 1, criteria: [],
       time_limit_seconds: '', bonus_enabled: false, bonus_base: 40, bonus_per_retry: 10, bonus_label: '',
+      content_format: 'scoring',
     });
     setErrors({});
   };
@@ -65,6 +66,7 @@ export default function AdminContentsPage() {
       bonus_base: c.bonus_config?.base ?? 40,
       bonus_per_retry: c.bonus_config?.per_retry ?? 10,
       bonus_label: c.bonus_config?.label || '',
+      content_format: c.content_format || 'scoring',
     });
     setErrors({});
   };
@@ -97,6 +99,7 @@ export default function AdminContentsPage() {
               per_retry: Number(form.bonus_per_retry) || 0,
             }
           : null,
+        content_format: form.content_format || 'scoring',
       };
       if (modal === 'add') {
         await api.postContent(selectedComp, body);
@@ -186,7 +189,7 @@ export default function AdminContentsPage() {
                   <th style={{ width: 50 }}>#</th>
                   <th>Tên nội dung</th>
                   <th>Mô tả</th>
-                  <th>Phương thức chấm</th>
+                  <th>Định dạng</th>
                   <th></th>
                 </tr>
               </thead>
@@ -202,7 +205,11 @@ export default function AdminContentsPage() {
                       <div style={{ fontWeight: 600 }}>{c.name}</div>
                     </td>
                     <td style={{ fontSize: 13, color: '#64748b' }}>{c.description || '-'}</td>
-                    <td style={{ fontSize: 13 }}>{c.scoring_method || '-'}</td>
+                    <td style={{ fontSize: 13 }}>
+                      {c.content_format === 'combat_drone' ? 'Đối kháng — Fly Smart Cup'
+                        : c.content_format === 'combat_stars' ? 'Đối kháng — Battle of Stars'
+                        : 'Chấm điểm'}
+                    </td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <Link to={`/admin/competitions/${selectedComp}/contents/${c.id}/teams`} className="btn btn-secondary">Đội thi</Link>
@@ -251,7 +258,24 @@ export default function AdminContentsPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Phương thức chấm</label>
+                <label className="form-label">Định dạng chấm điểm <span style={{ color: '#dc2626' }}>*</span></label>
+                <select
+                  className="form-input form-select"
+                  value={form.content_format}
+                  onChange={(e) => setForm({ ...form, content_format: e.target.value })}
+                >
+                  <option value="scoring">Chấm điểm (mặc định — nhiệm vụ + xuất phiếu điểm thường)</option>
+                  <option value="combat_drone">Đối kháng — Fly Smart Cup (mẫu Drone Cup)</option>
+                  <option value="combat_stars">Đối kháng — Battle of Stars</option>
+                </select>
+                {modal !== 'add' && (
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                    Nếu nội dung đã có đội/phiếu điểm/trận đấu, hệ thống sẽ báo lỗi khi lưu nếu đổi định dạng.
+                  </div>
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phương thức chấm (mô tả)</label>
                 <input
                   className="form-input"
                   value={form.scoring_method}
@@ -269,6 +293,7 @@ export default function AdminContentsPage() {
                   onChange={(e) => setForm({ ...form, order_index: parseInt(e.target.value, 10) || 1 })}
                 />
               </div>
+              {form.content_format !== 'combat_drone' && (
               <div className="form-group">
                 <label className="form-label">Thời gian trận đấu (giây)</label>
                 <input
@@ -280,6 +305,8 @@ export default function AdminContentsPage() {
                   placeholder="VD: 150 — để trống nếu không giới hạn"
                 />
               </div>
+              )}
+              {form.content_format !== 'combat_drone' && (
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
@@ -316,6 +343,7 @@ export default function AdminContentsPage() {
                   </div>
                 )}
               </div>
+              )}
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setModal(null)} disabled={saving}>Hủy</button>

@@ -19,6 +19,7 @@ import AdminSchools from './pages/admin/AdminSchools';
 import AdminBoards from './pages/admin/AdminBoards';
 import AdminCoaches from './pages/admin/AdminCoaches';
 import AdminFields from './pages/admin/AdminFields';
+import AdminCombatMatches from './pages/admin/AdminCombatMatches';
 import AdminReports from './pages/admin/AdminReports';
 import ServerDiag from './pages/admin/ServerDiag';
 import RefereeLogin from './pages/referee/RefereeLogin';
@@ -29,6 +30,8 @@ import RefereeScoreForm from './pages/referee/RefereeScoreForm';
 import RefereeScoreHistory from './pages/referee/RefereeScoreHistory';
 import RefereeScoreDetail from './pages/referee/RefereeScoreDetail';
 import RefereeMatches from './pages/referee/RefereeMatches';
+import RefereeCombatDrone from './pages/referee/RefereeCombatDrone';
+import RefereeCombatStars from './pages/referee/RefereeCombatStars';
 
 const AuthContext = createContext(null);
 
@@ -90,6 +93,7 @@ export default function App() {
               <Route path="boards" element={<AdminBoards />} />
               <Route path="coaches" element={<AdminCoaches />} />
               <Route path="fields" element={<AdminFields />} />
+              <Route path="combat-matches" element={<AdminCombatMatches />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="scoreboard" element={<AdminScoreboard />} />
               <Route path="students" element={<AdminStudents />} />
@@ -107,6 +111,8 @@ export default function App() {
               <Route index element={<RefereeSelect />} />
               <Route path="competition/:competitionId/content/:contentId/region/:region/teams" element={<RefereeTeams />} />
               <Route path="competition/:competitionId/content/:contentId/region/:region/matches" element={<RefereeMatches />} />
+              <Route path="competition/:competitionId/content/:contentId/combat-drone" element={<RefereeCombatDrone />} />
+              <Route path="competition/:competitionId/content/:contentId/combat-stars" element={<RefereeCombatStars />} />
               <Route path="competition/:competitionId/content/:contentId/region/:region/team/:teamId/round/:roundNo/score" element={<RefereeScoreForm />} />
               <Route path="history" element={<RefereeScoreHistory />} />
               <Route path="history/:scoreId" element={<RefereeScoreDetail />} />
