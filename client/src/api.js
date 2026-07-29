@@ -80,7 +80,7 @@ export const api = {
 
   deleteSchool: (id) => withRetry(() => request(`/schools/${id}`, { method: 'DELETE' }), 'deleteSchool'),
 
-  importSchools: (items) => withRetry(() => request('/schools/import', { method: 'POST', body: items }), 'importSchools'),
+  importSchools: (rows) => withRetry(() => request('/schools/import', { method: 'POST', body: rows }), 'importSchools'),
 
   // ============================================================
   // Competitions
@@ -111,6 +111,8 @@ export const api = {
   },
 
   deleteCompetition: (id) => withRetry(() => request(`/competitions/${id}`, { method: 'DELETE' }), 'deleteCompetition'),
+
+  importCompetitions: (rows) => withRetry(() => request('/competitions/import', { method: 'POST', body: rows }), 'importCompetitions'),
 
   // ============================================================
   // Contest Contents
@@ -466,6 +468,8 @@ export const api = {
 
   deleteCoach: (id) => withRetry(() => request(`/coaches/${id}`, { method: 'DELETE' }), 'deleteCoach'),
 
+  importCoaches: (rows) => withRetry(() => request('/coaches/import', { method: 'POST', body: rows }), 'importCoaches'),
+
   // ============================================================
   // Field (khu vực/trạm thi đấu)
   // ============================================================
@@ -484,6 +488,8 @@ export const api = {
   },
 
   deleteField: (id) => withRetry(() => request(`/fields/${id}`, { method: 'DELETE' }), 'deleteField'),
+
+  importFields: (rows) => withRetry(() => request('/fields/import', { method: 'POST', body: rows }), 'importFields'),
 
   // ============================================================
   // Báo cáo

@@ -3,7 +3,15 @@ import { api } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const IMPORT_COLUMNS = [
+  { key: 'name', label: 'Tên HLV', required: true, example: 'Nguyễn Văn A' },
+  { key: 'phone', label: 'Số điện thoại', required: false, example: '0900000000' },
+  { key: 'email', label: 'Email', required: false, example: 'coach@example.com' },
+  { key: 'notes', label: 'Ghi chú', required: false, example: '' },
+];
 
 export default function AdminCoaches() {
   const { showConfirm, showAlert } = useNotify();
@@ -11,6 +19,7 @@ export default function AdminCoaches() {
   const list = data || [];
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', notes: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -103,7 +112,10 @@ export default function AdminCoaches() {
           <h1 className="page-title">Huấn luyện viên</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} HLV</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm HLV</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm HLV</button>
+        </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
       <div className="filters-bar">
@@ -213,6 +225,17 @@ export default function AdminCoaches() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập huấn luyện viên từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-huan-luyen-vien.xlsx"
+          onImport={(rows) => api.importCoaches(rows)}
+          onDone={reloadList}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

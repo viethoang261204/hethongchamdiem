@@ -40,6 +40,26 @@ const h = (fn) => (req, res) => {
   });
 };
 
+// helper: nhập hàng loạt từ Excel (client đã parse ra JSON) — lặp từng dòng,
+// gọi insertOneFn(row); lỗi ở 1 dòng không làm hỏng các dòng khác. insertOneFn
+// trả { skipped: true } để đánh dấu bỏ qua (trùng dữ liệu), hoặc
+// { generated: {...} } để gom vào danh sách hiển thị riêng (VD: mật khẩu tự sinh).
+async function bulkImport(rows, insertOneFn) {
+  const result = { added: 0, skipped: 0, errors: [], generated: [] };
+  for (const row of rows) {
+    try {
+      const r = await insertOneFn(row);
+      if (r?.skipped) result.skipped++;
+      else result.added++;
+      if (r?.generated) result.generated.push(r.generated);
+    } catch (err) {
+      result.errors.push({ row: row.__row ?? '?', message: err.message });
+    }
+  }
+  if (result.generated.length === 0) delete result.generated;
+  return result;
+}
+
 // SQL fragment: nested schools {name, level}
 const SCHOOLS_JSON = `case when sch.id is null then null
   else json_build_object('name', sch.name, 'level', sch.level) end`;
@@ -92,21 +112,21 @@ router.delete('/schools/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Import hàng loạt, bỏ qua trùng (name, level)
+// Nhập hàng loạt từ Excel — bỏ qua trùng (name, level) nhờ unique constraint sẵn có
 router.post('/schools/import', requireAdmin, h(async (req, res) => {
-  const items = Array.isArray(req.body) ? req.body : req.body.items || [];
-  let added = 0;
-  for (const it of items) {
-    if (!it?.name || !it?.level) continue;
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.name) throw new Error('Thiếu Tên trường.');
+    if (!['MN', 'TH', 'THCS', 'THPT'].includes(row.level)) throw new Error('Cấp học phải là MN, TH, THCS hoặc THPT.');
     const { rowCount } = await query(
       `insert into schools (name, level, province, district, source)
-       values ($1, $2, $3, $4, coalesce($5, 'import'))
+       values ($1, $2, $3, $4, 'import')
        on conflict (name, level) do nothing`,
-      [it.name, it.level, it.province ?? null, it.district ?? null, it.source ?? null]
+      [row.name, row.level, row.province || null, row.district || null]
     );
-    added += rowCount;
-  }
-  res.json({ ok: true, added });
+    return rowCount === 0 ? { skipped: true } : {};
+  });
+  res.json(result);
 }));
 
 // ============================================================
@@ -138,6 +158,27 @@ router.put('/competitions/:id', requireAdmin, h(async (req, res) => {
 router.delete('/competitions/:id', requireAdmin, h(async (req, res) => {
   await query('delete from competitions where id = $1', [req.params.id]);
   res.json({ ok: true });
+}));
+
+// Nhập hàng loạt từ Excel — bỏ qua trùng tên (không có unique constraint sẵn
+// nên tự SELECT kiểm tra trước, không dùng ON CONFLICT được).
+router.post('/competitions/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.name) throw new Error('Thiếu Tên cuộc thi.');
+    if (!row.location) throw new Error('Thiếu Địa điểm.');
+    if (!row.start_date) throw new Error('Thiếu Ngày bắt đầu.');
+    if (!row.end_date) throw new Error('Thiếu Ngày kết thúc.');
+    const { rows: dup } = await query('select 1 from competitions where lower(name) = lower($1) limit 1', [row.name]);
+    if (dup[0]) return { skipped: true };
+    await query(
+      `insert into competitions (name, description, location, start_date, end_date, is_active)
+       values ($1, $2, $3, $4, $5, true)`,
+      [row.name, row.description || null, row.location, row.start_date, row.end_date]
+    );
+    return {};
+  });
+  res.json(result);
 }));
 
 // ============================================================
@@ -1025,6 +1066,26 @@ router.delete('/coaches/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Nhập hàng loạt từ Excel — bỏ qua trùng (tên + SĐT), không có unique
+// constraint sẵn nên tự SELECT kiểm tra trước.
+router.post('/coaches/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.name) throw new Error('Thiếu Tên HLV.');
+    const { rows: dup } = await query(
+      'select 1 from coaches where lower(name) = lower($1) and coalesce(phone,\'\') = coalesce($2,\'\') limit 1',
+      [row.name, row.phone || null]
+    );
+    if (dup[0]) return { skipped: true };
+    await query(
+      'insert into coaches (name, phone, email, notes) values ($1, $2, $3, $4)',
+      [row.name, row.phone || null, row.email || null, row.notes || null]
+    );
+    return {};
+  });
+  res.json(result);
+}));
+
 // ============================================================
 // Field (khu vực/trạm thi đấu vật lý) — gán theo đội
 // ============================================================
@@ -1053,6 +1114,19 @@ router.put('/fields/:id', requireAdmin, h(async (req, res) => {
 router.delete('/fields/:id', requireAdmin, h(async (req, res) => {
   await query('delete from fields where id = $1', [req.params.id]);
   res.json({ ok: true });
+}));
+
+// Nhập hàng loạt từ Excel — bỏ qua trùng tên
+router.post('/fields/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.name) throw new Error('Thiếu Tên Field.');
+    const { rows: dup } = await query('select 1 from fields where lower(name) = lower($1) limit 1', [row.name]);
+    if (dup[0]) return { skipped: true };
+    await query('insert into fields (name, notes) values ($1, $2)', [row.name, row.notes || null]);
+    return {};
+  });
+  res.json(result);
 }));
 
 // ============================================================

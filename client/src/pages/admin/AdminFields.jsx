@@ -3,7 +3,13 @@ import { api } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const IMPORT_COLUMNS = [
+  { key: 'name', label: 'Tên Field', required: true, example: 'Field 1' },
+  { key: 'notes', label: 'Ghi chú', required: false, example: '' },
+];
 
 export default function AdminFields() {
   const { showConfirm, showAlert } = useNotify();
@@ -11,6 +17,7 @@ export default function AdminFields() {
   const list = data || [];
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', notes: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -94,7 +101,10 @@ export default function AdminFields() {
           <h1 className="page-title">Field (Khu vực thi đấu)</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} Field</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm Field</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm Field</button>
+        </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
       <div className="filters-bar">
@@ -190,6 +200,17 @@ export default function AdminFields() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập Field từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-field.xlsx"
+          onImport={(rows) => api.importFields(rows)}
+          onDone={reloadList}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

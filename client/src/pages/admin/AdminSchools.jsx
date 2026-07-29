@@ -2,7 +2,15 @@ import { useState, useMemo } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const IMPORT_COLUMNS = [
+  { key: 'name', label: 'Tên trường', required: true, example: 'THPT Chuyên Lê Hồng Phong' },
+  { key: 'level', label: 'Cấp học', required: true, example: 'THPT' },
+  { key: 'province', label: 'Tỉnh/TP', required: false, example: 'TP. Hồ Chí Minh' },
+  { key: 'district', label: 'Quận/Huyện', required: false, example: 'Quận 5' },
+];
 
 export default function AdminSchools() {
   const { showConfirm, showAlert } = useNotify();
@@ -12,6 +20,7 @@ export default function AdminSchools() {
   const [filterLevel, setFilterLevel] = useState('');
   const [filterProvince, setFilterProvince] = useState('');
   const [modal, setModal] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', level: 'THPT', province: '', district: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -131,7 +140,10 @@ export default function AdminSchools() {
           <h1 className="page-title">Quản lý trường học</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} trường</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trường</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trường</button>
+        </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
       <div className="filters-bar">
@@ -267,6 +279,18 @@ export default function AdminSchools() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập trường học từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-truong-hoc.xlsx"
+          notePrereq="Cấp học phải là một trong: MN, TH, THCS, THPT."
+          onImport={(rows) => api.importSchools(rows)}
+          onDone={async () => { setData(null); const updated = await api.getSchools(); setData(updated); }}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

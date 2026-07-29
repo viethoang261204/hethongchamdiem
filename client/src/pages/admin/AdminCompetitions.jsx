@@ -3,7 +3,16 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const IMPORT_COLUMNS = [
+  { key: 'name', label: 'Tên cuộc thi', required: true, example: 'Enjoy AI Asian Open 2026' },
+  { key: 'location', label: 'Địa điểm', required: true, example: 'TP. Hồ Chí Minh' },
+  { key: 'start_date', label: 'Ngày bắt đầu', required: true, example: '2026-08-01' },
+  { key: 'end_date', label: 'Ngày kết thúc', required: true, example: '2026-08-03' },
+  { key: 'description', label: 'Mô tả', required: false, example: '' },
+];
 
 export default function AdminCompetitions() {
   const { showConfirm, showAlert } = useNotify();
@@ -12,6 +21,7 @@ export default function AdminCompetitions() {
   const [search, setSearch] = useState('');
   const [filterActive, setFilterActive] = useState(''); // '' | 'active' | 'inactive'
   const [modal, setModal] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', location: '', startDate: '', endDate: '', isActive: true });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, securityCode: '' }
@@ -97,7 +107,10 @@ export default function AdminCompetitions() {
           <h1 className="page-title">Quản lý cuộc thi</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} cuộc thi</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm cuộc thi</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm cuộc thi</button>
+        </div>
       </div>
       <div className="filters-bar">
         <div className="search-box">
@@ -223,6 +236,17 @@ export default function AdminCompetitions() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập cuộc thi từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-cuoc-thi.xlsx"
+          onImport={(rows) => api.importCompetitions(rows)}
+          onDone={load}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );
