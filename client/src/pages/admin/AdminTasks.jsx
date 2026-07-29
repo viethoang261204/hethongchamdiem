@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { api, taskImageUrl } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
 const SCORING_TYPES = [
@@ -9,6 +10,15 @@ const SCORING_TYPES = [
   { value: 'count',   label: 'Đếm số lượng (điểm × số lượng)' },
   { value: 'numeric', label: 'Nhập điểm tay' },
   { value: 'tier',    label: 'Phân hạng (legacy)' },
+];
+
+const IMPORT_COLUMNS = [
+  { key: 'content_name', label: 'Tên nội dung thi', required: true, example: 'Robot Marathon' },
+  { key: 'name', label: 'Tên nhiệm vụ', required: true, example: 'Hoàn thành mê cung' },
+  { key: 'description', label: 'Mô tả', required: false, example: '' },
+  { key: 'scoring_type', label: 'Kiểu chấm (binary/count/numeric/tier)', required: false, example: 'binary' },
+  { key: 'max_score', label: 'Điểm tối đa', required: true, example: '100' },
+  { key: 'max_count', label: 'Số lượng tối đa', required: false, example: '' },
 ];
 
 const emptyForm = {
@@ -44,6 +54,7 @@ export default function AdminTasks() {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   // Ảnh nhiệm vụ: chọn file → preview local, upload sau khi lưu task
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -207,15 +218,18 @@ export default function AdminTasks() {
           <h1 className="page-title">Quản lý nhiệm vụ</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} nhiệm vụ</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={openAdd}
-          disabled={contents.length === 0}
-          title={contents.length === 0 ? 'Cần tạo nội dung thi trước' : 'Thêm nhiệm vụ'}
-        >
-          Thêm nhiệm vụ
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={openAdd}
+            disabled={contents.length === 0}
+            title={contents.length === 0 ? 'Cần tạo nội dung thi trước' : 'Thêm nhiệm vụ'}
+          >
+            Thêm nhiệm vụ
+          </button>
+        </div>
       </div>
 
       <div className="filters-bar">
@@ -469,6 +483,18 @@ export default function AdminTasks() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập nhiệm vụ từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-nhiem-vu.xlsx"
+          notePrereq="Tên nội dung thi phải khớp đúng 1 nội dung đã có sẵn. Kiểu chấm để trống = binary. Không nhập được ảnh minh hoạ qua Excel — thêm ảnh riêng sau khi nhập."
+          onImport={(rows) => api.importTasks(rows)}
+          onDone={async () => { setData(null); const updated = await api.getAllTasks(); setData((prev) => prev ? { ...prev, tasks: updated } : prev); }}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

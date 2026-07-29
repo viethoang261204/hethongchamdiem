@@ -129,6 +129,8 @@ export const api = {
 
   deleteContent: (id) => withRetry(() => request(`/contents/${id}`, { method: 'DELETE' }), 'deleteContent'),
 
+  importContents: (rows) => withRetry(() => request('/contents/import', { method: 'POST', body: rows }), 'importContents'),
+
   // ============================================================
   // Areas
   // ============================================================
@@ -419,6 +421,8 @@ export const api = {
   putTask: (id, body) => withRetry(() => request(`/tasks/${id}`, { method: 'PUT', body }), 'putTask'),
 
   deleteTask: (id) => withRetry(() => request(`/tasks/${id}`, { method: 'DELETE' }), 'deleteTask'),
+
+  importTasks: (rows) => withRetry(() => request('/tasks/import', { method: 'POST', body: rows }), 'importTasks'),
 
   // Ảnh minh hoạ nhiệm vụ (bytea trong Neon) — URL xem: taskImageUrl(task)
   uploadTaskImage: async ({ taskId, file }) => {

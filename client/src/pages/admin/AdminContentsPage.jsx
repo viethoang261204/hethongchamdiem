@@ -3,7 +3,16 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const IMPORT_COLUMNS = [
+  { key: 'competition_name', label: 'Tên cuộc thi', required: true, example: 'Enjoy AI Asian Open 2026' },
+  { key: 'name', label: 'Tên nội dung', required: true, example: 'Robot Marathon' },
+  { key: 'description', label: 'Mô tả', required: false, example: '' },
+  { key: 'time_limit_seconds', label: 'Thời gian trận đấu (giây)', required: false, example: '150' },
+  { key: 'content_format', label: 'Định dạng chấm điểm', required: false, example: 'Chấm điểm' },
+];
 
 export default function AdminContentsPage() {
   const { showConfirm, showAlert } = useNotify();
@@ -22,6 +31,7 @@ export default function AdminContentsPage() {
   const [selectedComp, setSelectedComp] = useState(searchParams.get('competitionId') || '');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', scoring_method: '', order_index: 1, criteria: [], content_format: 'scoring' });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -151,9 +161,12 @@ export default function AdminContentsPage() {
             {selectedCompData ? `${selectedCompData.name} — ${contents.length} nội dung` : 'Chọn cuộc thi để quản lý nội dung'}
           </p>
         </div>
-        {selectedComp && (
-          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm nội dung</button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          {selectedComp && (
+            <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm nội dung</button>
+          )}
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 24 }}>
@@ -382,6 +395,18 @@ export default function AdminContentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập nội dung thi từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-noi-dung-thi.xlsx"
+          notePrereq='Tên cuộc thi phải khớp đúng 1 cuộc thi đã có sẵn. Định dạng chấm điểm để trống = "Chấm điểm"; nếu điền thì phải đúng "Chấm điểm", "Đối kháng — Fly Smart Cup" hoặc "Đối kháng — Battle of Stars".'
+          onImport={(rows) => api.importContents(rows)}
+          onDone={async () => { setData(null); const updated = await api.getAllContents(); setData((prev) => prev ? { ...prev, allContents: updated } : prev); }}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

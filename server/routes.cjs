@@ -219,6 +219,42 @@ router.post('/competitions/:competitionId/contents', requireAdmin, h(async (req,
   res.json(rows[0]);
 }));
 
+// Nhập nội dung thi hàng loạt từ Excel — cột "Tên cuộc thi" phải khớp cuộc
+// thi đã tồn tại (không tự tạo, đây là quyết định cấu trúc để admin tự làm).
+const CONTENT_FORMAT_LABELS = {
+  'chấm điểm': 'scoring',
+  'đối kháng — fly smart cup': 'combat_drone',
+  'đối kháng - fly smart cup': 'combat_drone',
+  'đối kháng — battle of stars': 'combat_stars',
+  'đối kháng - battle of stars': 'combat_stars',
+};
+
+router.post('/contents/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.competition_name) throw new Error('Thiếu Tên cuộc thi.');
+    if (!row.name) throw new Error('Thiếu Tên nội dung.');
+    let contentFormat = 'scoring';
+    if (row.content_format) {
+      const key = String(row.content_format).trim().toLowerCase();
+      if (!CONTENT_FORMAT_LABELS[key]) {
+        throw new Error('Định dạng chấm điểm phải là "Chấm điểm", "Đối kháng — Fly Smart Cup" hoặc "Đối kháng — Battle of Stars".');
+      }
+      contentFormat = CONTENT_FORMAT_LABELS[key];
+    }
+    const { rows: comp } = await query('select id from competitions where lower(name) = lower($1)', [row.competition_name]);
+    if (comp.length === 0) throw new Error(`Không tìm thấy cuộc thi "${row.competition_name}".`);
+    if (comp.length > 1) throw new Error(`Tên cuộc thi "${row.competition_name}" bị trùng — vào sửa tay để tránh nhầm.`);
+    await query(
+      `insert into contest_contents (competition_id, name, description, time_limit_seconds, content_format)
+       values ($1, $2, $3, $4, $5)`,
+      [comp[0].id, row.name, row.description || null, row.time_limit_seconds ? Number(row.time_limit_seconds) : null, contentFormat]
+    );
+    return {};
+  });
+  res.json(result);
+}));
+
 // Đổi content_format (Chấm điểm / Đối kháng Fly Smart Cup / Đối kháng Battle of
 // Stars) bị khóa nếu nội dung đã có đội, phiếu điểm, hoặc trận đối kháng —
 // tránh dữ liệu đã nhập không còn khớp với luồng chấm điểm mới chọn.
@@ -1371,6 +1407,41 @@ router.put('/tasks/:id', requireAdmin, h(async (req, res) => {
 router.delete('/tasks/:id', requireAdmin, h(async (req, res) => {
   await query('delete from tasks where id = $1', [req.params.id]);
   res.json({ ok: true });
+}));
+
+// helper: resolve 1 nội dung thi theo tên (không phân biệt hoa/thường) —
+// dùng chung cho /tasks/import và /teams/import. Không tự tạo nội dung mới
+// (quyết định cấu trúc lớn hơn, để admin tự tạo qua đúng luồng).
+async function resolveContentByName(name) {
+  const { rows } = await query('select id from contest_contents where lower(name) = lower($1)', [name]);
+  if (rows.length === 0) throw new Error(`Không tìm thấy nội dung thi "${name}".`);
+  if (rows.length > 1) throw new Error(`Tên nội dung thi "${name}" trùng ở nhiều cuộc thi — vào sửa tay để tránh nhầm.`);
+  return rows[0].id;
+}
+
+// Nhập nhiệm vụ hàng loạt từ Excel — cột "Tên nội dung thi" phải khớp nội
+// dung đã tồn tại (không tự tạo).
+router.post('/tasks/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.content_name) throw new Error('Thiếu Tên nội dung thi.');
+    if (!row.name) throw new Error('Thiếu Tên nhiệm vụ.');
+    if (row.max_score === '' || row.max_score === undefined || Number.isNaN(Number(row.max_score))) {
+      throw new Error('Điểm tối đa phải là số.');
+    }
+    const scoringType = row.scoring_type || 'binary';
+    if (!['binary', 'tier', 'numeric', 'count'].includes(scoringType)) {
+      throw new Error('Kiểu chấm phải là binary, count, numeric hoặc tier.');
+    }
+    const contentId = await resolveContentByName(row.content_name);
+    await query(
+      `insert into tasks (contest_content_id, name, description, max_score, max_count, scoring_type)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [contentId, row.name, row.description || null, Number(row.max_score) || 0, row.max_count ? Number(row.max_count) : null, scoringType]
+    );
+    return {};
+  });
+  res.json(result);
 }));
 
 // Ảnh minh hoạ nhiệm vụ — admin upload (multipart field "file"), public xem
