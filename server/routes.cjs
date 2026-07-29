@@ -420,6 +420,41 @@ router.delete('/students/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Nhập hàng loạt từ Excel — cột "Tên trường" resolve theo tên (không phân
+// biệt hoa/thường), tự tạo trường mới (level mặc định THPT) nếu chưa có,
+// giống pattern quick-add trong AdminTeams.jsx. Bỏ qua nếu đã có học sinh
+// trùng (họ tên + trường).
+router.post('/students/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.full_name) throw new Error('Thiếu Họ và tên.');
+    let schoolId = null;
+    if (row.school_name) {
+      const { rows: existing } = await query('select id from schools where lower(name) = lower($1) limit 1', [row.school_name]);
+      if (existing[0]) {
+        schoolId = existing[0].id;
+      } else {
+        const { rows: created } = await query(
+          "insert into schools (name, level, source) values ($1, 'THPT', 'import') returning id",
+          [row.school_name]
+        );
+        schoolId = created[0].id;
+      }
+    }
+    const { rows: dup } = await query(
+      'select 1 from students where lower(full_name) = lower($1) and coalesce(school_id::text,\'\') = coalesce($2::text,\'\') limit 1',
+      [row.full_name, schoolId]
+    );
+    if (dup[0]) return { skipped: true };
+    await query(
+      'insert into students (full_name, gender, birth_date, school_id, grade) values ($1, $2, $3, $4, $5)',
+      [row.full_name, row.gender || null, row.birth_date || null, schoolId, row.grade || null]
+    );
+    return {};
+  });
+  res.json(result);
+}));
+
 // ============================================================
 // Teams
 // ============================================================
@@ -1186,6 +1221,40 @@ router.post('/users/referee', requireAdmin, h(async (req, res) => {
     [String(email).trim(), String(username).trim(), String(password), full_name || username, area_id ?? null]
   );
   res.json({ user: rows[0] });
+}));
+
+function genPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) out += chars[crypto.randomInt(chars.length)];
+  return out;
+}
+
+// Nhập hàng loạt tài khoản trọng tài từ Excel — username lấy từ phần trước
+// @ của email (giống luồng thêm tay). Nếu không có cột mật khẩu, tự sinh
+// mật khẩu ngẫu nhiên 8 ký tự và trả về trong `generated` để FE hiện 1 lần
+// duy nhất (DB chỉ lưu bcrypt hash, không có cách nào xem lại sau).
+router.post('/users/referee/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    const email = (row.email || '').trim();
+    if (!email) throw new Error('Thiếu Email.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Email không hợp lệ.');
+    const username = email.split('@')[0];
+    const password = row.password && String(row.password).length >= 6 ? String(row.password) : genPassword();
+    const fullName = row.full_name || username;
+
+    const { rows: dup } = await query('select 1 from users where username = $1 or email = $2 limit 1', [username, email]);
+    if (dup[0]) return { skipped: true };
+
+    await query(
+      `insert into users (email, username, password, full_name, role)
+       values ($1, $2, crypt($3, gen_salt('bf')), $4, 'referee')`,
+      [email, username, password, fullName]
+    );
+    return row.password ? {} : { generated: { username, password } };
+  });
+  res.json(result);
 }));
 
 router.put('/users/:id', requireAdmin, h(async (req, res) => {

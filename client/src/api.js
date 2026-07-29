@@ -255,6 +255,8 @@ export const api = {
 
   deleteStudent: (id) => withRetry(() => request(`/students/${id}`, { method: 'DELETE' }), 'deleteStudent'),
 
+  importStudents: (rows) => withRetry(() => request('/students/import', { method: 'POST', body: rows }), 'importStudents'),
+
   // ============================================================
   // Teams
   // ============================================================
@@ -372,6 +374,8 @@ export const api = {
     }), 'createRefereeUser');
     return data.user;
   },
+
+  importRefereeUsers: (rows) => withRetry(() => request('/users/referee/import', { method: 'POST', body: rows }), 'importRefereeUsers'),
 
   putUser: (id, body) => {
     const update = {};

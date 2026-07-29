@@ -3,9 +3,18 @@ import { api } from '../../api';
 import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
+
+const IMPORT_COLUMNS = [
+  { key: 'full_name', label: 'Họ và tên', required: true, example: 'Nguyễn Văn A' },
+  { key: 'school_name', label: 'Tên trường', required: false, example: 'THPT Chuyên Lê Hồng Phong' },
+  { key: 'grade', label: 'Khối', required: false, example: '11' },
+  { key: 'gender', label: 'Giới tính', required: false, example: 'Nam' },
+  { key: 'birth_date', label: 'Ngày sinh (YYYY-MM-DD)', required: false, example: '2010-05-20' },
+];
 
 export default function AdminStudents() {
   const { showConfirm, showAlert } = useNotify();
@@ -24,6 +33,7 @@ export default function AdminStudents() {
   const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '', dateOfBirth: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const SECURITY_CODE = '26122004';
 
   const load = async () => reload();
@@ -119,7 +129,10 @@ export default function AdminStudents() {
           <h1 className="page-title">Quản lý học sinh</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} học sinh</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm học sinh</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm học sinh</button>
+        </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
       <div className="filters-bar">
@@ -238,6 +251,18 @@ export default function AdminStudents() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập học sinh từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-hoc-sinh.xlsx"
+          notePrereq="Nếu điền Tên trường mà trường chưa có trong hệ thống, hệ thống sẽ tự tạo trường mới (bậc THPT)."
+          onImport={(rows) => api.importStudents(rows)}
+          onDone={() => { clearApiCache(); load(); }}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

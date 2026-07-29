@@ -3,7 +3,14 @@ import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { useAuth } from '../../App';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const IMPORT_COLUMNS = [
+  { key: 'email', label: 'Email', required: true, example: 'trongtai1@enjoyai.vn' },
+  { key: 'full_name', label: 'Họ tên', required: false, example: 'Nguyễn Văn A' },
+  { key: 'password', label: 'Mật khẩu (bỏ trống = tự sinh)', required: false, example: '' },
+];
 
 export default function AdminRefereeAccounts() {
   const { showConfirm, showAlert } = useNotify();
@@ -14,6 +21,7 @@ export default function AdminRefereeAccounts() {
   const list = data || [];
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', full_name: '' });
   const [saving, setSaving] = useState(false);
   const [errorMsg, setError] = useState('');
@@ -149,7 +157,10 @@ export default function AdminRefereeAccounts() {
           <h1 className="page-title">Quản lý tài khoản trọng tài</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} tài khoản</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm tài khoản</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm tài khoản</button>
+        </div>
       </div>
 
       <div className="filters-bar">
@@ -316,6 +327,18 @@ export default function AdminRefereeAccounts() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập tài khoản trọng tài từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-tai-khoan-trong-tai.xlsx"
+          notePrereq="Tên đăng nhập lấy tự động từ phần trước @ của email. Nếu để trống cột Mật khẩu, hệ thống tự sinh mật khẩu 8 ký tự — chỉ hiện được 1 lần ngay sau khi nhập, hãy chép lại gửi cho trọng tài."
+          onImport={(rows) => api.importRefereeUsers(rows)}
+          onDone={load}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );
