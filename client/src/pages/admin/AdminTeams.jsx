@@ -4,10 +4,21 @@ import { api } from '../../api';
 import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
 const UNASSIGNED = '__unassigned__';
+
+const IMPORT_COLUMNS = [
+  { key: 'content_name', label: 'Tên nội dung thi', required: true, example: 'Robot Marathon' },
+  { key: 'name', label: 'Tên đội', required: true, example: 'Đội A1' },
+  { key: 'school_name', label: 'Tên trường', required: false, example: 'THPT Chuyên Lê Hồng Phong' },
+  { key: 'board_name', label: 'Bảng đấu (Bảng A–E)', required: false, example: 'Bảng E' },
+  { key: 'coach_name', label: 'Huấn luyện viên', required: false, example: '' },
+  { key: 'field_name', label: 'Field', required: false, example: '' },
+  { key: 'region', label: 'Khu vực (bac/trung/nam)', required: false, example: 'bac' },
+];
 
 export default function AdminTeams() {
   const { showConfirm, showAlert } = useNotify();
@@ -48,6 +59,7 @@ export default function AdminTeams() {
   const [boards, setBoards] = useState([]);
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [importOpen, setImportOpen] = useState(false);
   const SECURITY_CODE = '26122004';
   const [studentModal, setStudentModal] = useState(false);
   const [studentForm, setStudentForm] = useState({ fullName: '', class: '', grade: '', dateOfBirth: '', school: '' });
@@ -317,7 +329,10 @@ export default function AdminTeams() {
           <h1 className="page-title">Quản lý đội thi</h1>
           <p className="page-subtitle">Tổng số: {teamsFiltered.length} đội</p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm đội</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm đội</button>
+        </div>
       </div>
 
       {error && <ErrorBox error={error} onRetry={reload} />}
@@ -621,6 +636,22 @@ export default function AdminTeams() {
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && (
+        <ExcelImportModal
+          title="Nhập đội thi từ Excel"
+          columns={IMPORT_COLUMNS}
+          templateFilename="mau-doi-thi.xlsx"
+          notePrereq='Tên nội dung thi phải khớp nội dung đã có sẵn (không tự tạo). Bảng đấu phải khớp đúng "Bảng A".."Bảng E" (không tự tạo). Trường/HLV/Field sẽ tự tạo mới nếu gõ tên chưa có. Không gán học sinh vào đội qua Excel — gán tay sau khi nhập.'
+          onImport={(rows) => api.importTeams(rows)}
+          onDone={async () => {
+            clearApiCache();
+            const [tm, sch, coa, fld] = await Promise.all([capi.getAllTeams(), capi.getSchools(), capi.getCoaches(), capi.getFields()]);
+            setData((prev) => prev ? { ...prev, teams: tm, schools: sch, coaches: coa, fields: fld } : prev);
+          }}
+          onClose={() => setImportOpen(false)}
+        />
       )}
     </div>
   );

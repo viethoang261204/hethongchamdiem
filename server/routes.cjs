@@ -568,6 +568,56 @@ router.delete('/teams/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// helper: resolve theo tên, TỰ TẠO mới nếu chưa có — dùng cho HLV/Field
+// (không có danh sách cố định, khác với Bảng đấu chỉ có đúng 5 bảng hệ thống).
+async function resolveOrCreateByName(table, name) {
+  if (!name) return null;
+  const { rows: existing } = await query(`select id from ${table} where lower(name) = lower($1) limit 1`, [name]);
+  if (existing[0]) return existing[0].id;
+  const { rows: created } = await query(`insert into ${table} (name) values ($1) returning id`, [name]);
+  return created[0].id;
+}
+
+// Nhập đội thi hàng loạt từ Excel — "Tên nội dung thi" phải khớp nội dung đã
+// có (không tự tạo); "Bảng đấu" phải khớp 1 trong 5 bảng cố định A-E (không
+// tự tạo); Trường/HLV/Field tự tạo nếu gõ tên chưa có. KHÔNG gán học sinh
+// vào đội qua import (gán tay ở AdminTeams.jsx như hiện tại).
+router.post('/teams/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    if (!row.content_name) throw new Error('Thiếu Tên nội dung thi.');
+    if (!row.name) throw new Error('Thiếu Tên đội.');
+    if (row.region && !['bac', 'trung', 'nam'].includes(row.region)) {
+      throw new Error('Khu vực phải là bac, trung hoặc nam.');
+    }
+    const contentId = await resolveContentByName(row.content_name);
+
+    let boardId = null;
+    if (row.board_name) {
+      const { rows: b } = await query('select id from boards where lower(name) = lower($1)', [row.board_name]);
+      if (!b[0]) throw new Error(`Không tìm thấy bảng đấu "${row.board_name}" (phải là Bảng A–E).`);
+      boardId = b[0].id;
+    }
+    let schoolId = null;
+    if (row.school_name) {
+      const { rows: s } = await query('select id from schools where lower(name) = lower($1) limit 1', [row.school_name]);
+      schoolId = s[0]
+        ? s[0].id
+        : (await query("insert into schools (name, level, source) values ($1, 'THPT', 'import') returning id", [row.school_name])).rows[0].id;
+    }
+    const coachId = await resolveOrCreateByName('coaches', row.coach_name);
+    const fieldId = await resolveOrCreateByName('fields', row.field_name);
+
+    await query(
+      `insert into teams (contest_content_id, name, school_id, board_id, coach_id, field_id, region)
+       values ($1, $2, $3, $4, $5, $6, coalesce($7, 'bac'))`,
+      [contentId, row.name, schoolId, boardId, coachId, fieldId, row.region || null]
+    );
+    return {};
+  });
+  res.json(result);
+}));
+
 // ============================================================
 // Scores
 // ============================================================

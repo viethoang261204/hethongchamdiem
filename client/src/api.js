@@ -297,6 +297,8 @@ export const api = {
 
   deleteTeam: (id) => withRetry(() => request(`/teams/${id}`, { method: 'DELETE' }), 'deleteTeam'),
 
+  importTeams: (rows) => withRetry(() => request('/teams/import', { method: 'POST', body: rows }), 'importTeams'),
+
   // ============================================================
   // Scores
   // ============================================================
