@@ -54,11 +54,12 @@ export default function AdminCombatMatches() {
   const SECURITY_CODE = '26122004';
 
   const { data, loading, error, reload } = useApiLoader(async () => {
-    const [comps, allContents] = await Promise.all([api.getCompetitions(), api.getAllContents()]);
-    return { competitions: comps, allContents };
+    const [comps, allContents, allBoards] = await Promise.all([api.getCompetitions(), api.getAllContents(), api.getAllBoards()]);
+    return { competitions: comps, allContents, allBoards };
   }, []);
   const competitions = data?.competitions || [];
   const allContents = data?.allContents || [];
+  const allBoards = data?.allBoards || []; // 5 bảng cố định A-E — không dùng content_boards ở đây
   const combatContents = useMemo(() => allContents.filter((c) => c.content_format !== 'scoring'), [allContents]);
 
   const [selectedComp, setSelectedComp] = useState('');
@@ -83,7 +84,7 @@ export default function AdminCombatMatches() {
   const tasks = cdata?.tasks || [];
 
   const [modal, setModal] = useState(null); // 'add' | { id }
-  const [form, setForm] = useState({ team_a_id: '', team_b_id: '', team_a_no: '', team_b_no: '', stage: '', group_label: '', match_no: '' });
+  const [form, setForm] = useState({ team_a_id: '', team_b_id: '', team_a_no: '', team_b_no: '', stage: '', group_label: '', match_no: '', board_id: '' });
   const [errors, setErrors] = useState({});
   const [detailModal, setDetailModal] = useState(null); // match object đang sửa chi tiết
   const [detailForm, setDetailForm] = useState({});
@@ -100,7 +101,7 @@ export default function AdminCombatMatches() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ team_a_id: '', team_b_id: '', team_a_no: '', team_b_no: '', stage: '', group_label: '', match_no: '' });
+    setForm({ team_a_id: '', team_b_id: '', team_a_no: '', team_b_no: '', stage: '', group_label: '', match_no: '', board_id: '' });
     setErrors({});
   };
 
@@ -110,27 +111,34 @@ export default function AdminCombatMatches() {
       team_a_id: m.team_a_id || '', team_b_id: m.team_b_id || '',
       team_a_no: m.team_a_no || '', team_b_no: m.team_b_no || '',
       stage: m.stage || '', group_label: m.group_label || '', match_no: m.match_no || '',
+      board_id: m.board_id || '',
     });
     setErrors({});
   };
 
+  // board_id BẮT BUỘC — trọng tài chỉ thấy trận thuộc bảng đã được phân quyền
+  // (referee_boards); thiếu board_id nghĩa là NULL, và NULL không bao giờ
+  // khớp trong mảng board đã phân quyền → trận biến mất khỏi màn hình trọng
+  // tài dù admin đã tạo (lỗi đã xảy ra thật, giờ chặn ngay từ form).
   const validate = () => {
     const errs = {};
     if (!form.team_a_id) errs.team_a_id = 'Chọn đội Đỏ.';
     if (!form.team_b_id) errs.team_b_id = 'Chọn đội Xanh.';
     if (form.team_a_id && form.team_a_id === form.team_b_id) errs.team_b_id = 'Đội Xanh phải khác đội Đỏ.';
+    if (!form.board_id) errs.board_id = 'Chọn bảng đấu — thiếu bảng thì trọng tài sẽ không thấy trận này.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
   const saveMatch = async () => {
-    if (!validate()) { showAlert('Vui lòng chọn đủ 2 đội khác nhau.', 'error'); return; }
+    if (!validate()) { showAlert('Vui lòng điền đủ thông tin bắt buộc.', 'error'); return; }
     try {
       const body = {
         team_a_id: form.team_a_id, team_b_id: form.team_b_id,
         team_a_no: form.team_a_no.trim() || null, team_b_no: form.team_b_no.trim() || null,
         stage: form.stage.trim() || null, group_label: form.group_label.trim() || null,
         match_no: form.match_no.trim() || null,
+        board_id: form.board_id || null,
       };
       if (modal === 'add') await api.postCombatMatch(selectedContentId, body);
       else await api.putCombatMatch(modal.id, body);
@@ -540,6 +548,17 @@ export default function AdminCombatMatches() {
               <button type="button" className="form-modal-close" onClick={() => setModal(null)} aria-label="Đóng">×</button>
             </div>
             <div className="form-modal-body">
+              <div className="form-group">
+                <label className="form-label">Bảng đấu <span style={{ color: '#dc2626' }}>*</span></label>
+                <select className={`form-input form-select ${errors.board_id ? 'form-input-error' : ''}`} value={form.board_id} onChange={(e) => setForm({ ...form, board_id: e.target.value })}>
+                  <option value="">-- Chọn bảng --</option>
+                  {allBoards.map((b) => <option key={b.id} value={b.id}>{b.name}{b.age_group ? ` — ${b.age_group}` : ''}</option>)}
+                </select>
+                {errors.board_id && <div className="form-error-text">{errors.board_id}</div>}
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                  Bắt buộc — trọng tài chỉ được phân quyền theo bảng đấu, thiếu bảng thì trận sẽ không hiện bên trọng tài.
+                </div>
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Đội Đỏ <span style={{ color: '#dc2626' }}>*</span></label>
