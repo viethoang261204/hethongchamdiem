@@ -31,6 +31,16 @@ export default function AdminBoards() {
     [contents, filterComp]
   );
 
+  // Fly Smart Cup / Battle of Stars (content_format khác 'scoring') dùng hẳn 1
+  // hệ thống trận đấu riêng (trang "Trận đối kháng" — combat_matches), tách
+  // biệt hoàn toàn với nhánh đấu loại trực tiếp chung (matches) ở trang này.
+  // Luồng trọng tài đã điều hướng thẳng sang màn hình riêng cho 2 nội dung
+  // này — nhánh đấu tạo ở đây sẽ KHÔNG bao giờ hiện cho trọng tài, nên phải
+  // chặn để tránh nhầm lẫn (đã xảy ra 1 lần: admin tạo nhánh ở đây, trọng
+  // tài không thấy gì vì đang đọc từ combat_matches trống).
+  const selectedContentObj = contents.find((c) => c.id === filterContent);
+  const isDedicatedCombat = selectedContentObj && selectedContentObj.content_format !== 'scoring';
+
   const loadBrackets = async (contentId, boardsList) => {
     const combatBoards = boardsList.filter((b) => b.ranking_format === 'combat');
     if (!combatBoards.length) { setBrackets({}); return; }
@@ -163,6 +173,16 @@ export default function AdminBoards() {
           </p>
         ) : loading || loadingAttached ? (
           <p style={{ padding: 24, textAlign: 'center' }}>Đang tải...</p>
+        ) : isDedicatedCombat ? (
+          <div style={{ padding: 24, textAlign: 'center', color: '#f59e0b' }}>
+            <p style={{ fontWeight: 600, marginBottom: 8 }}>
+              "{selectedContentObj.name}" dùng bảng điểm đối kháng riêng ({selectedContentObj.content_format === 'combat_drone' ? 'Fly Smart Cup' : 'Battle of Stars'}).
+            </p>
+            <p style={{ color: '#94a3b8' }}>
+              Luật xếp hạng/nhánh đấu ở trang này KHÔNG áp dụng cho nội dung này — trọng tài sẽ không thấy gì cả.
+              Vào <strong>Trận đối kháng</strong> (menu bên trái) để tạo và quản lý trận đấu cho nội dung này.
+            </p>
+          </div>
         ) : (
           <div className="table-container">
             <table>
