@@ -130,6 +130,46 @@ export default function CombatStarsSheetTable({ match, content, tasks: tasksProp
             </strong>
           </td>
         </tr>
+
+        <tr><td colSpan={7} className="ss-section">Scoring confirmation</td></tr>
+        <tr><td colSpan={7} className="ss-confirm-text">I hereby confirm that the scores above are correct and valid, with no objection.</td></tr>
+        <tr>
+          <td colSpan={4}>
+            <div className="ss-label">Team's confirmation</div>
+            <div>
+              Red: <strong>{d.teamMembersA || ''}</strong>
+              {d.studentSignatureImageA && <div><img src={d.studentSignatureImageA} alt="Red team signature" style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
+            </div>
+            <div>
+              Blue: <strong>{d.teamMembersB || ''}</strong>
+              {d.studentSignatureImageB && <div><img src={d.studentSignatureImageB} alt="Blue team signature" style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
+            </div>
+          </td>
+          <td colSpan={3}>
+            <div className="ss-label">Referee's confirmation</div>
+            <div>
+              <strong>{d.refereeSignature || ''}</strong>
+              {d.refereeSignatureImage && <div><img src={d.refereeSignatureImage} alt="Referee signature" style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
+            </div>
+          </td>
+        </tr>
+
+        <tr>
+          <td className="ss-label">Recommendation</td>
+          <td colSpan={6}>{d.objection || ''}</td>
+        </tr>
+        <tr>
+          <td className="ss-label">Head Referee</td>
+          <td colSpan={2}>{d.headRefereeName || 'Mr Ly Quang Van'}</td>
+          <td className="ss-label">Scorekeeper</td>
+          <td colSpan={3}>{d.scorekeeperName || ''}</td>
+        </tr>
+        {d.remarks && (
+          <tr>
+            <td className="ss-label">Remarks</td>
+            <td colSpan={6}>{d.remarks}</td>
+          </tr>
+        )}
       </tbody>
     </table>
   );

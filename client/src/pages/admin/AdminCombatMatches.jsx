@@ -6,6 +6,7 @@ import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { exportToPdf, exportMultipleToPdf } from '../referee/exportPdf';
 import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
+import SignatureBox from '../../components/SignaturePad';
 import './AdminLayout.css';
 
 const CONTENT_FORMAT_LABEL = {
@@ -161,6 +162,16 @@ export default function AdminCombatMatches() {
   };
 
   // ── Sửa chi tiết trận (khác nhau theo content_format) ──
+  const confirmFieldsFrom = (d) => ({
+    teamMembersA: d.teamMembersA || '', teamMembersB: d.teamMembersB || '',
+    studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
+    refereeSignature: d.refereeSignature || '',
+    refereeSigImage: d.refereeSignatureImage || '',
+    headRefereeName: d.headRefereeName || 'Mr Ly Quang Van',
+    scorekeeperName: d.scorekeeperName || '',
+    remarks: d.remarks || '', objection: d.objection || '',
+  });
+
   const openDetail = (m) => {
     const d = m.details || {};
     setDetailModal(m);
@@ -173,6 +184,7 @@ export default function AdminCombatMatches() {
         durationA: d.durationA ?? '', durationB: d.durationB ?? '',
         division: d.division || '',
         winner_id: m.winner_id || '', is_draw: !!m.is_draw,
+        ...confirmFieldsFrom(d),
       });
     } else {
       setDetailForm({
@@ -183,6 +195,7 @@ export default function AdminCombatMatches() {
         penaltyA: d.penaltyA?.length ? d.penaltyA : [{ score: '', time: '' }, { score: '', time: '' }, { score: '', time: '' }],
         penaltyB: d.penaltyB?.length ? d.penaltyB : [{ score: '', time: '' }, { score: '', time: '' }, { score: '', time: '' }],
         winner_id: m.winner_id || '', is_draw: !!m.is_draw,
+        ...confirmFieldsFrom(d),
       });
     }
   };
@@ -191,6 +204,15 @@ export default function AdminCombatMatches() {
     if (!detailModal) return;
     try {
       const isStars = selectedContent?.content_format === 'combat_stars';
+      const confirmFields = {
+        teamMembersA: detailForm.teamMembersA || null, teamMembersB: detailForm.teamMembersB || null,
+        studentSignatureImageA: detailForm.studentSigImageA || null, studentSignatureImageB: detailForm.studentSigImageB || null,
+        refereeSignature: detailForm.refereeSignature || null,
+        refereeSignatureImage: detailForm.refereeSigImage || null,
+        headRefereeName: detailForm.headRefereeName || null,
+        scorekeeperName: detailForm.scorekeeperName || null,
+        remarks: detailForm.remarks || null, objection: detailForm.objection || null,
+      };
       const details = isStars
         ? {
             division: detailForm.division || null,
@@ -199,6 +221,7 @@ export default function AdminCombatMatches() {
             retryCountA: Number(detailForm.retryCountA) || 0, retryCountB: Number(detailForm.retryCountB) || 0,
             pointsLostA: Number(detailForm.pointsLostA) || 0, pointsLostB: Number(detailForm.pointsLostB) || 0,
             durationA: detailForm.durationA || null, durationB: detailForm.durationB || null,
+            ...confirmFields,
           }
         : {
             division: detailForm.division || null,
@@ -207,6 +230,7 @@ export default function AdminCombatMatches() {
             penaltyShootout: !!detailForm.penaltyShootout,
             penaltyA: detailForm.penaltyShootout ? detailForm.penaltyA : [],
             penaltyB: detailForm.penaltyShootout ? detailForm.penaltyB : [],
+            ...confirmFields,
           };
       await api.putCombatMatch(detailModal.id, {
         details,
@@ -704,6 +728,54 @@ export default function AdminCombatMatches() {
                     <option value={detailModal.team_b_id}>{detailModal.team_b?.name} thắng (Xanh)</option>
                   </select>
                 )}
+              </div>
+
+              <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '16px 0' }} />
+              <h4 style={{ marginBottom: 8 }}>Xác nhận điểm</h4>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Học sinh/đội trưởng — Đỏ</label>
+                  <input className="form-input" value={detailForm.teamMembersA || ''} onChange={(e) => setDetailForm({ ...detailForm, teamMembersA: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Học sinh/đội trưởng — Xanh</label>
+                  <input className="form-input" value={detailForm.teamMembersB || ''} onChange={(e) => setDetailForm({ ...detailForm, teamMembersB: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <SignatureBox label="Chữ ký đội Đỏ" value={detailForm.studentSigImageA} onChange={(v) => setDetailForm({ ...detailForm, studentSigImageA: v })} />
+                </div>
+                <div className="form-group">
+                  <SignatureBox label="Chữ ký đội Xanh" value={detailForm.studentSigImageB} onChange={(v) => setDetailForm({ ...detailForm, studentSigImageB: v })} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Tên trọng tài</label>
+                  <input className="form-input" value={detailForm.refereeSignature || ''} onChange={(e) => setDetailForm({ ...detailForm, refereeSignature: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <SignatureBox label="Chữ ký trọng tài" value={detailForm.refereeSigImage} onChange={(v) => setDetailForm({ ...detailForm, refereeSigImage: v })} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Trưởng ban trọng tài</label>
+                  <input className="form-input" value={detailForm.headRefereeName || ''} onChange={(e) => setDetailForm({ ...detailForm, headRefereeName: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Người ghi điểm</label>
+                  <input className="form-input" value={detailForm.scorekeeperName || ''} onChange={(e) => setDetailForm({ ...detailForm, scorekeeperName: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Ghi chú</label>
+                <textarea className="form-input" rows={2} value={detailForm.remarks || ''} onChange={(e) => setDetailForm({ ...detailForm, remarks: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Kiến nghị</label>
+                <textarea className="form-input" rows={2} value={detailForm.objection || ''} onChange={(e) => setDetailForm({ ...detailForm, objection: e.target.value })} />
               </div>
             </div>
             <div className="form-actions">

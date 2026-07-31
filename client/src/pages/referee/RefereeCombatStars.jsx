@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../../api';
+import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
+import SignatureBox from '../../components/SignaturePad';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
@@ -14,6 +16,7 @@ const DEFAULT_BONUS_CONFIG = { label: 'Extra reward', base: 40, per_retry: 10 };
 // TÍNH TỰ ĐỘNG từ điểm ghi được của 2 đội — trọng tài không tự chọn.
 export default function RefereeCombatStars() {
   const { competitionId, contentId } = useParams();
+  const { user } = useAuth();
   const { showAlert } = useNotify();
   const [content, setContent] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -47,6 +50,13 @@ export default function RefereeCombatStars() {
       pointsLostA: d.pointsLostA ?? 0, pointsLostB: d.pointsLostB ?? 0,
       durationA: d.durationA ?? '', durationB: d.durationB ?? '',
       division: d.division || '',
+      teamMembersA: d.teamMembersA || '', teamMembersB: d.teamMembersB || '',
+      studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
+      refereeSignature: d.refereeSignature || user?.fullName || user?.username || '',
+      refereeSigImage: d.refereeSignatureImage || '',
+      headRefereeName: d.headRefereeName || 'Mr Ly Quang Van',
+      scorekeeperName: d.scorekeeperName || user?.fullName || user?.username || '',
+      remarks: d.remarks || '', objection: d.objection || '',
     });
     setOpenId(m.id);
   };
@@ -88,6 +98,13 @@ export default function RefereeCombatStars() {
           retryCountA: Number(form.retryCountA) || 0, retryCountB: Number(form.retryCountB) || 0,
           pointsLostA: Number(form.pointsLostA) || 0, pointsLostB: Number(form.pointsLostB) || 0,
           durationA: form.durationA || null, durationB: form.durationB || null,
+          teamMembersA: form.teamMembersA || null, teamMembersB: form.teamMembersB || null,
+          studentSignatureImageA: form.studentSigImageA || null, studentSignatureImageB: form.studentSigImageB || null,
+          refereeSignature: form.refereeSignature || null,
+          refereeSignatureImage: form.refereeSigImage || null,
+          headRefereeName: form.headRefereeName || null,
+          scorekeeperName: form.scorekeeperName || null,
+          remarks: form.remarks || null, objection: form.objection || null,
         },
         winner_id,
         is_draw: scoreA === scoreB,
@@ -237,6 +254,49 @@ export default function RefereeCombatStars() {
 
                     <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 8, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#4ade80' }}>
                       Kết quả (tự tính): {resultText}
+                    </div>
+
+                    <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                      <h3 className="ts-card-title" style={{ fontSize: 15, marginBottom: 8 }}>Xác nhận điểm</h3>
+                      <div className="ts-form-grid">
+                        <div className="ts-form-row">
+                          <label className="ts-label">Học sinh/đội trưởng — Đỏ ({m.team_a?.name})</label>
+                          <input type="text" className="ts-input" value={form.teamMembersA} onChange={(e) => setForm({ ...form, teamMembersA: e.target.value })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <label className="ts-label">Học sinh/đội trưởng — Xanh ({m.team_b?.name})</label>
+                          <input type="text" className="ts-input" value={form.teamMembersB} onChange={(e) => setForm({ ...form, teamMembersB: e.target.value })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <SignatureBox label="Chữ ký đội Đỏ" value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <SignatureBox label="Chữ ký đội Xanh" value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <label className="ts-label">Tên trọng tài</label>
+                          <input type="text" className="ts-input" value={form.refereeSignature} onChange={(e) => setForm({ ...form, refereeSignature: e.target.value })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <SignatureBox label="Chữ ký trọng tài" value={form.refereeSigImage} onChange={(v) => setForm({ ...form, refereeSigImage: v })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <label className="ts-label">Trưởng ban trọng tài</label>
+                          <input type="text" className="ts-input" value={form.headRefereeName} onChange={(e) => setForm({ ...form, headRefereeName: e.target.value })} />
+                        </div>
+                        <div className="ts-form-row">
+                          <label className="ts-label">Người ghi điểm</label>
+                          <input type="text" className="ts-input" value={form.scorekeeperName} onChange={(e) => setForm({ ...form, scorekeeperName: e.target.value })} />
+                        </div>
+                        <div className="ts-form-row ts-full">
+                          <label className="ts-label">Ghi chú</label>
+                          <textarea className="ts-input" rows={2} value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} />
+                        </div>
+                        <div className="ts-form-row ts-full">
+                          <label className="ts-label">Kiến nghị</label>
+                          <textarea className="ts-input" rows={2} value={form.objection} onChange={(e) => setForm({ ...form, objection: e.target.value })} />
+                        </div>
+                      </div>
                     </div>
 
                     <div className="ts-footer">
