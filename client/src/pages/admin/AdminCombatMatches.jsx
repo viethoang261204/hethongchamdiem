@@ -13,18 +13,38 @@ const CONTENT_FORMAT_LABEL = {
   combat_stars: 'Đối kháng — Battle of Stars',
 };
 
-// Quy ước chuẩn dùng khi tính bảng xếp hạng vòng bảng (Appendix II) —
-// không có trong ảnh mẫu, có thể chỉnh nếu cần: thắng = 3, hòa = 1, thua = 0;
-// "Highest Points" = tổng điểm số thực ghi được (tie-break phụ khi bằng điểm).
+// Quy ước dùng cho bảng xếp hạng vòng bảng (Appendix II) của Fly Smart Cup
+// (combat_drone) — không có trong ảnh mẫu, có thể chỉnh nếu cần: thắng = 3,
+// hòa = 1, thua = 0; "Highest Points" = tổng điểm số thực ghi được (tie-break
+// phụ khi bằng điểm).
 const WIN_POINTS = 3, DRAW_POINTS = 1, LOSS_POINTS = 0;
 
+// Xếp hạng vòng bảng của Battle of Stars (combat_stars) theo đúng luật do
+// người dùng cung cấp: (1) số trận thắng trực tiếp nhiều hơn → hạng cao hơn;
+// (2) bằng nhau thì tổng điểm ghi được cao hơn → hạng cao hơn; (3) bằng nhau
+// tiếp thì đội hoàn thành nhiệm vụ "Meteor Tower" nhiều lần hơn (qua tất cả
+// các trận) → hạng cao hơn.
+const STARS_BONUS_FALLBACK = { base: 40, per_retry: 10 };
+
+// Chỉ dùng cho combat_drone (Fly Smart Cup) — điểm 1 trận = tổng hiệp 1 + hiệp 2.
 function matchPoints(match) {
   const d = match.details || {};
-  if (match.content_format === 'combat_stars') return null; // không áp dụng half-score cho stars
   return {
     a: (Number(d.firstHalfA) || 0) + (Number(d.secondHalfA) || 0),
     b: (Number(d.firstHalfB) || 0) + (Number(d.secondHalfB) || 0),
   };
+}
+
+// Điểm ghi được của 1 đội trong 1 trận Battle of Stars — y hệt công thức
+// trong CombatStarsSheetTable (tổng điểm nhiệm vụ + điểm thưởng − points lost).
+function computeStarsMatchScore(match, side, bonusCfg, taskIds) {
+  const d = match.details || {};
+  const scores = side === 'A' ? (d.taskScoresA || {}) : (d.taskScoresB || {});
+  const retry = Number(side === 'A' ? d.retryCountA : d.retryCountB) || 0;
+  const lost = Number(side === 'A' ? d.pointsLostA : d.pointsLostB) || 0;
+  const taskSum = taskIds.reduce((s, id) => s + (Number(scores[id]) || 0), 0);
+  const extra = Math.max(0, (Number(bonusCfg.base) || 0) - (Number(bonusCfg.per_retry) || 0) * retry);
+  return taskSum + extra - lost;
 }
 
 export default function AdminCombatMatches() {
@@ -220,6 +240,14 @@ export default function AdminCombatMatches() {
   };
 
   // ── Bảng xếp hạng vòng bảng (Appendix II) — tính lại từ danh sách trận cùng group_label ──
+  const isStars = selectedContent?.content_format === 'combat_stars';
+  const meteorTowerTaskId = useMemo(
+    () => (isStars ? tasks.find((t) => t.name?.trim().toLowerCase() === 'meteor tower')?.id : null),
+    [isStars, tasks]
+  );
+  const starsBonusCfg = selectedContent?.bonus_config || STARS_BONUS_FALLBACK;
+  const starsTaskIds = useMemo(() => tasks.map((t) => t.id), [tasks]);
+
   const groups = useMemo(() => {
     const byGroup = new Map();
     for (const m of matches) {
@@ -235,31 +263,47 @@ export default function AdminCombatMatches() {
       const standings = Array.from(teamIds).map((tid) => {
         const teamName = teams.find((t) => t.id === tid)?.name || groupMatches.find((m) => m.team_a_id === tid)?.team_a?.name
           || groupMatches.find((m) => m.team_b_id === tid)?.team_b?.name || tid;
-        let points = 0, highestPoints = 0;
+        let wins = 0, points = 0, highestPoints = 0, totalScore = 0, meteorTowerCount = 0;
         const vs = {};
         for (const m of groupMatches) {
           if (m.team_a_id !== tid && m.team_b_id !== tid) continue;
           const isA = m.team_a_id === tid;
           const oppId = isA ? m.team_b_id : m.team_a_id;
-          const pts = matchPoints({ ...m, content_format: selectedContent?.content_format });
-          const myScore = pts ? (isA ? pts.a : pts.b) : null;
-          const oppScore = pts ? (isA ? pts.b : pts.a) : null;
-          if (myScore !== null) highestPoints += myScore;
-          if (m.winner_id) {
-            points += m.winner_id === tid ? WIN_POINTS : LOSS_POINTS;
-          } else if (m.is_draw) {
-            points += DRAW_POINTS;
+
+          if (m.winner_id === tid) wins++;
+          if (m.winner_id) points += m.winner_id === tid ? WIN_POINTS : LOSS_POINTS;
+          else if (m.is_draw) points += DRAW_POINTS;
+
+          if (isStars) {
+            const myScore = computeStarsMatchScore(m, isA ? 'A' : 'B', starsBonusCfg, starsTaskIds);
+            const oppScore = computeStarsMatchScore(m, isA ? 'B' : 'A', starsBonusCfg, starsTaskIds);
+            totalScore += myScore;
+            if (meteorTowerTaskId) {
+              const scores = isA ? (m.details?.taskScoresA || {}) : (m.details?.taskScoresB || {});
+              if ((Number(scores[meteorTowerTaskId]) || 0) > 0) meteorTowerCount++;
+            }
+            if (oppId) vs[oppId] = `${myScore}:${oppScore}`;
+          } else {
+            const pts = matchPoints(m);
+            const myScore = pts ? (isA ? pts.a : pts.b) : null;
+            const oppScore = pts ? (isA ? pts.b : pts.a) : null;
+            if (myScore !== null) highestPoints += myScore;
+            if (oppId) vs[oppId] = pts ? `${myScore}:${oppScore}` : (m.winner_id === tid ? 'W' : m.winner_id === oppId ? 'L' : m.is_draw ? 'D' : '');
           }
-          if (oppId) vs[oppId] = pts ? `${myScore}:${oppScore}` : (m.winner_id === tid ? 'W' : m.winner_id === oppId ? 'L' : m.is_draw ? 'D' : '');
         }
-        return { teamId: tid, teamName, points, highestPoints, vs };
+        return { teamId: tid, teamName, wins, points, highestPoints, totalScore, meteorTowerCount, vs };
       });
-      standings.sort((a, b) => b.points - a.points || b.highestPoints - a.highestPoints);
+      if (isStars) {
+        // (1) số trận thắng trực tiếp, (2) tổng điểm ghi được, (3) số lần hoàn thành Meteor Tower
+        standings.sort((a, b) => b.wins - a.wins || b.totalScore - a.totalScore || b.meteorTowerCount - a.meteorTowerCount);
+      } else {
+        standings.sort((a, b) => b.points - a.points || b.highestPoints - a.highestPoints);
+      }
       standings.forEach((s, i) => { s.rank = i + 1; });
       result.push({ label, teamIds: Array.from(teamIds), standings });
     }
     return result;
-  }, [matches, teams, selectedContent]);
+  }, [matches, teams, isStars, starsBonusCfg, starsTaskIds, meteorTowerTaskId]);
 
   // ── Xuất PDF ──
   const handleExportOne = async () => {
@@ -416,8 +460,18 @@ export default function AdminCombatMatches() {
                     <tr>
                       <th>Đội</th>
                       {g.standings.map((s) => <th key={s.teamId} style={{ textAlign: 'center' }}>{s.teamName}</th>)}
-                      <th style={{ textAlign: 'center' }}>Points</th>
-                      <th style={{ textAlign: 'center' }}>Highest Points</th>
+                      {isStars ? (
+                        <>
+                          <th style={{ textAlign: 'center' }}>Số trận thắng</th>
+                          <th style={{ textAlign: 'center' }}>Tổng điểm</th>
+                          <th style={{ textAlign: 'center' }} title="Tiêu chí phụ khi vẫn bằng nhau">Meteor Tower</th>
+                        </>
+                      ) : (
+                        <>
+                          <th style={{ textAlign: 'center' }}>Points</th>
+                          <th style={{ textAlign: 'center' }}>Highest Points</th>
+                        </>
+                      )}
                       <th style={{ textAlign: 'center' }}>Rank</th>
                     </tr>
                   </thead>
@@ -430,8 +484,18 @@ export default function AdminCombatMatches() {
                             {opp.teamId === row.teamId ? '—' : (row.vs[opp.teamId] || '')}
                           </td>
                         ))}
-                        <td style={{ textAlign: 'center' }}><strong>{row.points}</strong></td>
-                        <td style={{ textAlign: 'center' }}>{row.highestPoints}</td>
+                        {isStars ? (
+                          <>
+                            <td style={{ textAlign: 'center' }}><strong>{row.wins}</strong></td>
+                            <td style={{ textAlign: 'center' }}><strong>{row.totalScore}</strong></td>
+                            <td style={{ textAlign: 'center' }}>{row.meteorTowerCount}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td style={{ textAlign: 'center' }}><strong>{row.points}</strong></td>
+                            <td style={{ textAlign: 'center' }}>{row.highestPoints}</td>
+                          </>
+                        )}
                         <td style={{ textAlign: 'center' }}><strong>{row.rank}</strong></td>
                       </tr>
                     ))}
