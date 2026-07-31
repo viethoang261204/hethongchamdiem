@@ -10,7 +10,8 @@ const DEFAULT_BONUS_CONFIG = { label: 'Extra reward', base: 40, per_retry: 10 };
 
 // Chấm điểm nội dung content_format = 'combat_stars' (Battle of Stars) — 2 đội
 // cùng chấm chung 1 bộ nhiệm vụ (tái dùng tasks của nội dung), điểm thưởng
-// theo bonus_config, Points lost nhập tay, Total duration, đội thắng.
+// theo bonus_config, Points lost nhập tay, Total duration. Đội thắng/hòa được
+// TÍNH TỰ ĐỘNG từ điểm ghi được của 2 đội — trọng tài không tự chọn.
 export default function RefereeCombatStars() {
   const { competitionId, contentId } = useParams();
   const { showAlert } = useNotify();
@@ -46,7 +47,6 @@ export default function RefereeCombatStars() {
       pointsLostA: d.pointsLostA ?? 0, pointsLostB: d.pointsLostB ?? 0,
       durationA: d.durationA ?? '', durationB: d.durationB ?? '',
       division: d.division || '',
-      winner_id: m.winner_id || '', is_draw: !!m.is_draw,
     });
     setOpenId(m.id);
   };
@@ -77,6 +77,9 @@ export default function RefereeCombatStars() {
   const submit = async (m) => {
     setSubmitting(true);
     try {
+      const scoreA = computeScore('A');
+      const scoreB = computeScore('B');
+      const winner_id = scoreA > scoreB ? m.team_a_id : scoreB > scoreA ? m.team_b_id : null;
       await api.putCombatMatch(m.id, {
         details: {
           division: form.division || null,
@@ -86,8 +89,8 @@ export default function RefereeCombatStars() {
           pointsLostA: Number(form.pointsLostA) || 0, pointsLostB: Number(form.pointsLostB) || 0,
           durationA: form.durationA || null, durationB: form.durationB || null,
         },
-        winner_id: form.is_draw ? null : (form.winner_id || null),
-        is_draw: !!form.is_draw,
+        winner_id,
+        is_draw: scoreA === scoreB,
       });
       showAlert('Đã lưu điểm trận đấu.', 'success');
       setOpenId(null);
@@ -101,21 +104,21 @@ export default function RefereeCombatStars() {
 
   if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Đang tải...</p>;
 
-  const taskInput = (side, m, t) => {
+  const taskInput = (side, t) => {
     const scores = side === 'A' ? form.taskScoresA : form.taskScoresB;
     const qty = side === 'A' ? form.taskQtyA : form.taskQtyB;
     if (t.scoring_type === 'count') {
       return (
-        <div className="ts-input-stepper" key={t.id}>
-          <button type="button" onClick={() => setQty(side, t, Math.max(0, (qty?.[t.id] || 0) - 1))}>−</button>
-          <input type="number" min="0" value={qty?.[t.id] ?? 0} onChange={(e) => setQty(side, t, Math.max(0, parseInt(e.target.value, 10) || 0))} />
-          <button type="button" onClick={() => setQty(side, t, (qty?.[t.id] || 0) + 1)}>+</button>
-        </div>
+        <input
+          type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+          value={qty?.[t.id] ?? 0}
+          onChange={(e) => setQty(side, t, Math.max(0, parseInt(e.target.value, 10) || 0))}
+        />
       );
     }
     return (
       <input
-        type="number" min="0" max={t.max_score} className="ts-input"
+        type="number" min="0" max={t.max_score} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
         value={scores?.[t.id] ?? 0}
         onChange={(e) => setScore(side, t, Math.min(Number(t.max_score) || 999, Math.max(0, Number(e.target.value) || 0)))}
       />
@@ -128,7 +131,7 @@ export default function RefereeCombatStars() {
         <Link to="/referee">Chấm điểm</Link>
       </div>
       <h1 className="referee-page-title">Battle of Stars — Đối kháng</h1>
-      <p style={{ color: '#64748b', marginBottom: 20 }}>Chọn 1 trận để chấm điểm nhiệm vụ cho cả 2 đội.</p>
+      <p style={{ color: '#64748b', marginBottom: 20 }}>Chọn 1 trận để chấm điểm nhiệm vụ cho cả 2 đội. Kết quả thắng/hòa tự tính theo điểm.</p>
 
       {matches.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>Chưa có trận nào — vui lòng liên hệ admin.</div>
@@ -139,11 +142,19 @@ export default function RefereeCombatStars() {
           {matches.map((m) => {
             const isOpen = openId === m.id;
             const done = !!m.winner_id || m.is_draw;
+            const scoreA = isOpen ? computeScore('A') : null;
+            const scoreB = isOpen ? computeScore('B') : null;
+            const resultText = isOpen
+              ? (scoreA === scoreB ? `Hòa (${scoreA} - ${scoreB})`
+                : scoreA > scoreB ? `${m.team_a?.name} thắng (${scoreA} - ${scoreB})`
+                : `${m.team_b?.name} thắng (${scoreA} - ${scoreB})`)
+              : '';
+
             return (
-              <div className="ts-card" key={m.id}>
+              <div className="ts-card" key={m.id} style={{ padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
                   onClick={() => openMatch(m)} role="button">
-                  <strong style={{ color: '#f1f5f9' }}>
+                  <strong style={{ color: '#f1f5f9', fontSize: 14 }}>
                     {m.team_a?.name || '—'} <span style={{ color: '#64748b' }}>vs</span> {m.team_b?.name || '—'}
                   </strong>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -157,60 +168,75 @@ export default function RefereeCombatStars() {
                 </div>
 
                 {isOpen && (
-                  <div style={{ marginTop: 16 }}>
-                    <div className="ts-form-grid">
-                      <div className="form-group ts-full">
-                        <label className="ts-label">Division</label>
-                        <input type="text" className="ts-input" value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} />
-                      </div>
+                  <div style={{ marginTop: 12 }}>
+                    <div className="form-group" style={{ marginBottom: 10 }}>
+                      <label className="form-label" style={{ marginBottom: 2 }}>Division</label>
+                      <input type="text" className="form-input" style={{ maxWidth: 240 }} value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} />
                     </div>
 
-                    {['A', 'B'].map((side) => (
-                      <div key={side} style={{ marginTop: 14 }}>
-                        <h3 className="ts-card-title" style={{ fontSize: 15 }}>
-                          {side === 'A' ? `${m.team_a?.name} (Đỏ)` : `${m.team_b?.name} (Xanh)`}
-                        </h3>
-                        {tasks.map((t) => (
-                          <div key={t.id} className="ts-form-row" style={{ marginBottom: 8 }}>
-                            <label className="ts-label">{t.name} {t.scoring_type !== 'count' ? `(0-${t.max_score})` : ''}</label>
-                            {taskInput(side, m, t)}
-                          </div>
-                        ))}
-                        <div className="ts-form-row">
-                          <label className="ts-label">Số lần chạy lại</label>
-                          <input type="number" min="0" className="ts-input" value={side === 'A' ? form.retryCountA : form.retryCountB}
-                            onChange={(e) => setForm({ ...form, [side === 'A' ? 'retryCountA' : 'retryCountB']: e.target.value })} />
-                        </div>
-                        <div className="ts-form-row">
-                          <label className="ts-label">Points lost</label>
-                          <input type="number" min="0" className="ts-input" value={side === 'A' ? form.pointsLostA : form.pointsLostB}
-                            onChange={(e) => setForm({ ...form, [side === 'A' ? 'pointsLostA' : 'pointsLostB']: e.target.value })} />
-                        </div>
-                        <div className="ts-form-row">
-                          <label className="ts-label">Total duration (giây)</label>
-                          <input type="number" min="0" className="ts-input" value={side === 'A' ? form.durationA : form.durationB}
-                            onChange={(e) => setForm({ ...form, [side === 'A' ? 'durationA' : 'durationB']: e.target.value })} />
-                          {(side === 'A' ? form.durationA : form.durationB) && (
-                            <div className="ts-hint">≈ {formatSecondsAsMinutes(side === 'A' ? form.durationA : form.durationB)} phút</div>
-                          )}
-                        </div>
-                        <div className="ts-count-calc">Points scored: <strong>{computeScore(side)}</strong></div>
-                      </div>
-                    ))}
+                    <div className="table-container">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Nhiệm vụ</th>
+                            <th style={{ textAlign: 'center' }}>{m.team_a?.name} (Đỏ)</th>
+                            <th style={{ textAlign: 'center' }}>{m.team_b?.name} (Xanh)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tasks.map((t) => (
+                            <tr key={t.id}>
+                              <td style={{ fontSize: 13 }}>{t.name} <span style={{ color: '#94a3b8' }}>{t.scoring_type === 'count' ? `(SL × ${t.max_score})` : `(0-${t.max_score})`}</span></td>
+                              <td style={{ textAlign: 'center' }}>{taskInput('A', t)}</td>
+                              <td style={{ textAlign: 'center' }}>{taskInput('B', t)}</td>
+                            </tr>
+                          ))}
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Số lần chạy lại</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.retryCountA} onChange={(e) => setForm({ ...form, retryCountA: e.target.value })} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.retryCountB} onChange={(e) => setForm({ ...form, retryCountB: e.target.value })} />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Points lost</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.pointsLostA} onChange={(e) => setForm({ ...form, pointsLostA: e.target.value })} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.pointsLostB} onChange={(e) => setForm({ ...form, pointsLostB: e.target.value })} />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Total duration (giây)</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.durationA} onChange={(e) => setForm({ ...form, durationA: e.target.value })} />
+                              {form.durationA && <div style={{ fontSize: 11, color: '#94a3b8' }}>{formatSecondsAsMinutes(form.durationA)}</div>}
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.durationB} onChange={(e) => setForm({ ...form, durationB: e.target.value })} />
+                              {form.durationB && <div style={{ fontSize: 11, color: '#94a3b8' }}>{formatSecondsAsMinutes(form.durationB)}</div>}
+                            </td>
+                          </tr>
+                          <tr style={{ fontWeight: 700 }}>
+                            <td style={{ fontSize: 13 }}>Điểm ghi được</td>
+                            <td style={{ textAlign: 'center' }}>{scoreA}</td>
+                            <td style={{ textAlign: 'center' }}>{scoreB}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
 
-                    <div className="ts-bigbtns" style={{ gridTemplateColumns: '1fr 1fr auto', marginTop: 16 }}>
-                      <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${form.winner_id === m.team_a_id && !form.is_draw ? 'selected' : ''}`}
-                        onClick={() => setForm({ ...form, winner_id: m.team_a_id, is_draw: false })}>
-                        {m.team_a?.name} thắng
-                      </button>
-                      <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${form.winner_id === m.team_b_id && !form.is_draw ? 'selected' : ''}`}
-                        onClick={() => setForm({ ...form, winner_id: m.team_b_id, is_draw: false })}>
-                        {m.team_b?.name} thắng
-                      </button>
-                      <button type="button" className={`ts-bigbtn ts-bigbtn-fail ${form.is_draw ? 'selected' : ''}`}
-                        onClick={() => setForm({ ...form, is_draw: true, winner_id: '' })}>
-                        Hòa
-                      </button>
+                    <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 8, textAlign: 'center', fontSize: 13, fontWeight: 600, color: '#4ade80' }}>
+                      Kết quả (tự tính): {resultText}
                     </div>
 
                     <div className="ts-footer">
