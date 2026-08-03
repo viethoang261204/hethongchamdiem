@@ -7,6 +7,23 @@
   min-height: 100vh;
   font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif;
   background: #0d1221;
+
+  /* Design tokens — 3 lớp nền xám-xanh đậm (không đen tuyền) */
+  --bg-0: #0b1120;
+  --bg-1: #0d1221;
+  --bg-2: #111827;
+  --accent: #7c3aed;
+  --accent-soft: #a78bfa;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  /* Shadow nhiều lớp thật: 1 lớp sát viền (định hình khối) + 1 lớp lan tỏa xa (chiều sâu) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.25);
+  --shadow-md: 0 2px 6px rgba(0,0,0,0.35), 0 8px 28px rgba(0,0,0,0.35);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,0.4), 0 16px 48px rgba(0,0,0,0.4);
 }
 
 /* ─── Sidebar ───────────────────────────────────────────────── */
@@ -267,12 +284,12 @@
 
 /* ─── Card ──────────────────────────────────────────────────── */
 .referee-panel .card {
-  background: #111827;
-  border-radius: 16px;
+  background: var(--bg-2);
+  border-radius: var(--radius-lg);
   padding: 24px;
   margin-bottom: 24px;
-  border: 1px solid rgba(255,255,255,0.07);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-md);
 }
 
 /* ─── Referee Grid (select screen) ─────────────────────────── */
@@ -283,25 +300,39 @@
 }
 
 .referee-panel .referee-card {
-  background: #111827;
-  border-radius: 16px;
+  position: relative;
+  background: var(--bg-2);
+  border-radius: var(--radius-lg);
   padding: 20px;
-  border: 1px solid rgba(255,255,255,0.07);
+  padding-left: 24px;
+  border: 1px solid rgba(255,255,255,0.06);
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: all 0.2s;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.referee-panel .referee-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-soft));
+  opacity: 0.7;
+  transition: opacity 0.2s;
 }
 
 .referee-panel .referee-card:hover {
-  border-color: rgba(124,58,237,0.4);
-  box-shadow: 0 4px 24px rgba(124,58,237,0.2);
+  border-color: rgba(124,58,237,0.35);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-2px);
   text-decoration: none;
   color: inherit;
   background: #131c2e;
 }
+.referee-panel .referee-card:hover::before { opacity: 1; }
 
 .referee-panel .referee-card h3 {
   margin: 0 0 4px 0;
@@ -345,9 +376,11 @@
 .referee-panel .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 10px 18px;
-  border-radius: 10px;
+  padding: 12px 18px;
+  min-height: 44px;
+  border-radius: var(--radius-md);
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
@@ -357,7 +390,9 @@
   border: none;
   white-space: nowrap;
   letter-spacing: -0.01em;
+  box-sizing: border-box;
 }
+.referee-panel .btn:active { transform: scale(0.98); }
 
 .referee-panel .btn-primary {
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
@@ -378,6 +413,8 @@
   background: rgba(255,255,255,0.09);
   color: #f1f5f9;
   border-color: rgba(255,255,255,0.18);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .referee-panel .btn-danger {
@@ -411,6 +448,7 @@
   background: rgba(124,58,237,0.1);
   border-color: rgba(124,58,237,0.4);
   text-decoration: none;
+  transform: translateY(-1px);
 }
 
 /* ─── Filters ───────────────────────────────────────────────── */
@@ -500,7 +538,7 @@
 .referee-panel tbody tr:hover { background: rgba(124,58,237,0.05); }
 
 /* ─── Form ──────────────────────────────────────────────────── */
-.referee-panel .form-group { margin-bottom: 16px; }
+.referee-panel .form-group { margin-bottom: 18px; }
 
 .referee-panel .form-group label,
 .referee-panel .form-label {
@@ -581,10 +619,10 @@
 
 /* ─── Score Form Card ────────────────────────────────────────── */
 .referee-panel .score-form-card {
-  background: #111827;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.07);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+  background: var(--bg-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-md);
   max-width: 520px;
   overflow: hidden;
 }
@@ -644,7 +682,7 @@
 }
 
 .referee-panel .form-modal {
-  background: #111827;
+  background: var(--bg-2);
   border-radius: 20px;
   max-width: 560px;
   width: 100%;
@@ -653,7 +691,7 @@
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(124,58,237,0.06);
 }
 
 .referee-panel .form-modal-header {
