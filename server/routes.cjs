@@ -1158,6 +1158,86 @@ router.delete('/contents/:contentId/combat-matches/:id', requireAdmin, h(async (
 }));
 
 // ============================================================
+// Khiếu nại bảng điểm — luồng RIÊNG có trạng thái (khác field text tự do
+// `objection`/"Kiến nghị" đã có sẵn trên scores/combat_matches). Trọng tài
+// gửi khiếu nại về 1 phiếu điểm (đo lường HOẶC đối kháng), admin xử lý.
+// ============================================================
+const COMPLAINT_NESTED = `
+  select c.*,
+    case when u.id is null then null else json_build_object('id', u.id, 'full_name', u.full_name, 'username', u.username) end as referee,
+    case when ru.id is null then null else json_build_object('id', ru.id, 'full_name', ru.full_name, 'username', ru.username) end as resolver,
+    coalesce(st.name, nullif(trim(both from concat(cmt_a.name, ' vs ', cmt_b.name)), '')) as team_name,
+    coalesce(scc.name, ccc.name) as content_name,
+    s.round as score_round
+  from complaints c
+  left join scores s on s.id = c.score_id
+  left join teams st on st.id = s.team_id
+  left join contest_contents scc on scc.id = s.contest_content_id
+  left join combat_matches cm on cm.id = c.combat_match_id
+  left join teams cmt_a on cmt_a.id = cm.team_a_id
+  left join teams cmt_b on cmt_b.id = cm.team_b_id
+  left join contest_contents ccc on ccc.id = cm.contest_content_id
+  left join users u on u.id = c.referee_id
+  left join users ru on ru.id = c.resolved_by
+`;
+
+// Trọng tài (hoặc admin) gửi khiếu nại — referee_id LUÔN lấy từ token, không
+// nhận từ client để tránh giả mạo người gửi.
+router.post('/complaints', requireAuth, h(async (req, res) => {
+  const { score_id, combat_match_id, message } = req.body || {};
+  if (!message || !message.trim()) return res.status(400).json({ error: 'Thiếu nội dung khiếu nại.' });
+  if (!!score_id === !!combat_match_id) {
+    return res.status(400).json({ error: 'Phải chọn đúng 1 phiếu điểm hoặc 1 trận đối kháng để khiếu nại.' });
+  }
+  if (score_id) {
+    const { rows } = await query('select 1 from scores where id = $1', [score_id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy phiếu điểm.' });
+  } else {
+    const { rows } = await query('select 1 from combat_matches where id = $1', [combat_match_id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy trận đối kháng.' });
+  }
+  const { rows } = await query(
+    'insert into complaints (score_id, combat_match_id, referee_id, message) values ($1, $2, $3, $4) returning *',
+    [score_id ?? null, combat_match_id ?? null, req.user.id, message.trim()]
+  );
+  res.json(rows[0]);
+}));
+
+router.get('/complaints', requireAdmin, h(async (req, res) => {
+  const cond = [];
+  const vals = [];
+  if (req.query.status) { vals.push(req.query.status); cond.push(`c.status = $${vals.length}`); }
+  const where = cond.length ? `where ${cond.join(' and ')}` : '';
+  const { rows } = await query(`${COMPLAINT_NESTED} ${where} order by c.created_at desc`, vals);
+  res.json(rows);
+}));
+
+router.get('/complaints/mine', requireAuth, h(async (req, res) => {
+  const { rows } = await query(`${COMPLAINT_NESTED} where c.referee_id = $1 order by c.created_at desc`, [req.user.id]);
+  res.json(rows);
+}));
+
+router.get('/complaints/count', requireAdmin, h(async (req, res) => {
+  const status = req.query.status || 'pending';
+  const { rows } = await query('select count(*) from complaints where status = $1', [status]);
+  res.json({ count: Number(rows[0].count) });
+}));
+
+router.put('/complaints/:id', requireAdmin, h(async (req, res) => {
+  const { status, resolution_note } = req.body || {};
+  if (!['resolved', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'status phải là resolved hoặc rejected.' });
+  }
+  const { rows } = await query(
+    `update complaints set status = $1, resolution_note = $2, resolved_by = $3, resolved_at = now()
+     where id = $4 returning *`,
+    [status, resolution_note ?? null, req.user.id, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy khiếu nại.' });
+  res.json(rows[0]);
+}));
+
+// ============================================================
 // Huấn luyện viên (HLV)
 // ============================================================
 router.get('/coaches', h(async (_req, res) => {

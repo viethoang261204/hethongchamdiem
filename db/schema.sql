@@ -392,6 +392,31 @@ create table if not exists combat_matches (
 create or replace trigger trg_combat_matches_updated
   before update on combat_matches for each row execute function set_updated_at();
 
+-- Khiếu nại bảng điểm — trọng tài gửi yêu cầu khiếu nại về 1 phiếu điểm cụ
+-- thể (đo lường HOẶC đối kháng, không cả hai — ép bằng constraint bên dưới),
+-- admin xem/xử lý. Đây là 1 luồng RIÊNG có trạng thái, khác với field text
+-- tự do `objection`/"Kiến nghị" đã có sẵn trên scores/combat_matches (field
+-- đó chỉ là ghi chú tại thời điểm chấm, không có quy trình xử lý).
+create table if not exists complaints (
+  id               uuid primary key default gen_random_uuid(),
+  score_id         uuid references scores(id) on delete cascade,
+  combat_match_id  uuid references combat_matches(id) on delete cascade,
+  referee_id       uuid references users(id) on delete set null,
+  message          text not null,
+  status           text not null default 'pending' check (status in ('pending', 'resolved', 'rejected')),
+  resolution_note  text,
+  resolved_by      uuid references users(id) on delete set null,
+  resolved_at      timestamptz,
+  created_at       timestamptz default now(),
+  updated_at       timestamptz default now(),
+  constraint complaints_one_target check (
+    (score_id is not null and combat_match_id is null) or
+    (score_id is null and combat_match_id is not null)
+  )
+);
+create or replace trigger trg_complaints_updated
+  before update on complaints for each row execute function set_updated_at();
+
 
 -- ============================================================
 -- 2. INDEXES
@@ -424,6 +449,8 @@ create index if not exists idx_teams_field          on teams(field_id);
 create index if not exists idx_combat_matches_content on combat_matches(contest_content_id);
 create index if not exists idx_combat_matches_board   on combat_matches(board_id);
 create index if not exists idx_combat_matches_group   on combat_matches(contest_content_id, group_label);
+create index if not exists idx_complaints_status      on complaints(status);
+create index if not exists idx_complaints_referee     on complaints(referee_id);
 
 
 -- ============================================================
