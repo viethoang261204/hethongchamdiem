@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
+import { api } from '../../api';
 import './AdminLayout.css';
 
 const NAV_ICONS = {
@@ -13,6 +15,7 @@ const NAV_ICONS = {
   user: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>,
   file: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>,
   ranking: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>,
+  alert: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-8.25 3h.008v.008h-.008V15z"/></svg>,
 };
 
 const NAV_SECTIONS = [
@@ -39,6 +42,7 @@ const NAV_SECTIONS = [
       { to: '/admin/referee-accounts', label: 'Tài khoản trọng tài', icon: 'user' },
       { to: '/admin/scores', label: 'Phiếu điểm', icon: 'file' },
       { to: '/admin/reports', label: 'Báo cáo', icon: 'content' },
+      { to: '/admin/complaints', label: 'Yêu cầu khiếu nại', icon: 'alert', badgeKey: 'complaints' },
       { to: '/admin/diag', label: 'Kiểm tra kết nối', icon: 'ranking' },
     ],
   },
@@ -48,6 +52,11 @@ export default function AdminLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { showConfirm } = useNotify();
+  const [badges, setBadges] = useState({});
+
+  useEffect(() => {
+    api.getComplaintsCount('pending').then((r) => setBadges((b) => ({ ...b, complaints: r.count }))).catch(() => {});
+  }, []);
 
   const handleLogout = async () => {
     const ok = await showConfirm({ message: 'Đăng xuất khỏi admin?', confirmText: 'Đăng xuất', cancelText: 'Hủy', danger: true });
@@ -68,12 +77,23 @@ export default function AdminLayout() {
           {NAV_SECTIONS.map((sec) => (
             <div key={sec.title} className="nav-section">
               <div className="nav-section-title">{sec.title}</div>
-              {sec.items.map((item) => (
-                <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
-                  <span className="nav-item-icon">{NAV_ICONS[item.icon] || NAV_ICONS.file}</span>
-                  <span className="nav-item-label">{item.label}</span>
-                </NavLink>
-              ))}
+              {sec.items.map((item) => {
+                const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0;
+                return (
+                  <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
+                    <span className="nav-item-icon">{NAV_ICONS[item.icon] || NAV_ICONS.file}</span>
+                    <span className="nav-item-label">{item.label}</span>
+                    {badgeCount > 0 && (
+                      <span style={{
+                        marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 700,
+                        borderRadius: 999, padding: '1px 7px', lineHeight: '16px', minWidth: 18, textAlign: 'center',
+                      }}>
+                        {badgeCount}
+                      </span>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           ))}
         </nav>

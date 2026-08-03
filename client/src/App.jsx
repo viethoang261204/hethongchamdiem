@@ -21,6 +21,7 @@ import AdminCoaches from './pages/admin/AdminCoaches';
 import AdminFields from './pages/admin/AdminFields';
 import AdminCombatMatches from './pages/admin/AdminCombatMatches';
 import AdminReports from './pages/admin/AdminReports';
+import AdminComplaints from './pages/admin/AdminComplaints';
 import ServerDiag from './pages/admin/ServerDiag';
 import RefereeLogin from './pages/referee/RefereeLogin';
 import RefereeLayout from './pages/referee/RefereeLayout';
@@ -28,6 +29,7 @@ import RefereeSelect from './pages/referee/RefereeSelect';
 import RefereeTeams from './pages/referee/RefereeTeams';
 import RefereeScoreForm from './pages/referee/RefereeScoreForm';
 import RefereeScoreHistory from './pages/referee/RefereeScoreHistory';
+import RefereeComplaints from './pages/referee/RefereeComplaints';
 import RefereeScoreDetail from './pages/referee/RefereeScoreDetail';
 import RefereeMatches from './pages/referee/RefereeMatches';
 import RefereeCombatDrone from './pages/referee/RefereeCombatDrone';
@@ -95,6 +97,7 @@ export default function App() {
               <Route path="fields" element={<AdminFields />} />
               <Route path="combat-matches" element={<AdminCombatMatches />} />
               <Route path="reports" element={<AdminReports />} />
+              <Route path="complaints" element={<AdminComplaints />} />
               <Route path="scoreboard" element={<AdminScoreboard />} />
               <Route path="students" element={<AdminStudents />} />
               <Route path="referee-accounts" element={<AdminRefereeAccounts />} />
@@ -115,6 +118,7 @@ export default function App() {
               <Route path="competition/:competitionId/content/:contentId/combat-stars" element={<RefereeCombatStars />} />
               <Route path="competition/:competitionId/content/:contentId/region/:region/team/:teamId/round/:roundNo/score" element={<RefereeScoreForm />} />
               <Route path="history" element={<RefereeScoreHistory />} />
+              <Route path="complaints" element={<RefereeComplaints />} />
               <Route path="history/:scoreId" element={<RefereeScoreDetail />} />
             </>
           )}

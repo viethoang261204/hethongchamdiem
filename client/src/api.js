@@ -366,6 +366,19 @@ export const api = {
   getScoreEdits: (scoreId) => withRetry(() => request(`/scores/${scoreId}/edits`), 'getScoreEdits'),
 
   // ============================================================
+  // Khiếu nại bảng điểm
+  // ============================================================
+  postComplaint: (body) => withRetry(() => request('/complaints', { method: 'POST', body }), 'postComplaint'),
+
+  getComplaints: (status) => withRetry(() => request(`/complaints${status ? `?status=${status}` : ''}`), 'getComplaints'),
+
+  getMyComplaints: () => withRetry(() => request('/complaints/mine'), 'getMyComplaints'),
+
+  getComplaintsCount: (status = 'pending') => withRetry(() => request(`/complaints/count?status=${status}`), 'getComplaintsCount'),
+
+  putComplaint: (id, body) => withRetry(() => request(`/complaints/${id}`, { method: 'PUT', body }), 'putComplaint'),
+
+  // ============================================================
   // Users
   // ============================================================
   getUsers: (role) => withRetry(() => request(`/users${role ? `?role=${role}` : ''}`), 'getUsers'),

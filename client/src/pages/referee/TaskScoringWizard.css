@@ -779,6 +779,11 @@
   cursor: pointer;
 }
 .referee-panel .rt-badge-pending:hover { background: rgba(124,58,237,0.25); }
+.referee-panel .rt-badge-rejected {
+  background: rgba(239,68,68,0.15);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.3);
+}
 .referee-panel .referee-card-members {
   font-size: 12px;
   color: #94a3b8;
