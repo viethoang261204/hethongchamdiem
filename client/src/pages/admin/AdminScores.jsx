@@ -5,6 +5,7 @@ import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import SignatureBox from '../../components/SignaturePad';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
@@ -49,6 +50,7 @@ export default function AdminScores() {
       head_referee_name: '',
       scorekeeper_name: '',
       objection: '',
+      reviewerSignature: '',
     };
   }
 
@@ -127,6 +129,7 @@ export default function AdminScores() {
       head_referee_name: s.head_referee_name || '',
       scorekeeper_name: s.scorekeeper_name || '',
       objection: s.objection || '',
+      reviewerSignature: '',
     });
     setErrors({});
   };
@@ -137,6 +140,9 @@ export default function AdminScores() {
     if (!form.team_id) errs.team_id = 'Chưa chọn đội thi.';
     const sc = Number(form.score);
     if (Number.isNaN(sc)) errs.score = 'Điểm phải là số.';
+    if (modal !== 'add' && !form.reviewerSignature) {
+      errs.reviewerSignature = 'Cần chữ ký người duyệt (Trưởng ban trọng tài) để sửa phiếu điểm.';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -165,7 +171,7 @@ export default function AdminScores() {
       if (modal === 'add') {
         await api.postScore(body);
       } else if (modal?.id) {
-        await api.putScore(modal.id, body);
+        await api.putScore(modal.id, { ...body, reviewer_signature: form.reviewerSignature });
       }
       clearApiCache();
       setModal(null);
@@ -495,6 +501,24 @@ export default function AdminScores() {
                   placeholder="Kiến nghị/khiếu nại của đội thi (nếu có)"
                 />
               </div>
+
+              {modal !== 'add' && (
+                <div className="form-group" style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                    Người duyệt: Mr Ly Quang Van (Trưởng ban trọng tài)
+                  </div>
+                  <SignatureBox
+                    label="Chữ ký người duyệt"
+                    required
+                    value={form.reviewerSignature}
+                    onChange={(v) => { setForm({ ...form, reviewerSignature: v }); setErrors({ ...errors, reviewerSignature: '' }); }}
+                  />
+                  {errors.reviewerSignature && <div className="form-error-text">{errors.reviewerSignature}</div>}
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+                    Mọi lần sửa phiếu điểm đã chấm đều được lưu vào lịch sử (kèm chữ ký) và hiện trong báo cáo/PDF xuất ra.
+                  </div>
+                </div>
+              )}
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setModal(null)} disabled={saving}>Hủy</button>

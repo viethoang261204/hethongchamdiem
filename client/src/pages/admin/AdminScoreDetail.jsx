@@ -4,6 +4,7 @@ import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import ScoreDetailView from '../shared/ScoreDetailView';
+import { diffScoreEdit } from '../../lib/scoreEditDiff';
 import './AdminLayout.css';
 
 function formatDate(iso) {
@@ -143,23 +144,42 @@ export default function AdminScoreDetail() {
             <table>
               <thead>
                 <tr>
-                  <th>Thời gian sửa</th>
-                  <th>Người sửa</th>
-                  <th>Lượt</th>
-                  <th>Điểm (trước → sau)</th>
-                  <th>Thời gian thi (trước → sau)</th>
+                  <th style={{ width: 150 }}>Thời gian sửa</th>
+                  <th style={{ width: 160 }}>Người duyệt</th>
+                  <th style={{ width: 60 }}>Lượt</th>
+                  <th>Đã thay đổi</th>
                 </tr>
               </thead>
               <tbody>
-                {edits.map((e) => (
-                  <tr key={e.id}>
-                    <td>{formatDate(e.edited_at)}</td>
-                    <td>{e.users?.full_name || '-'}</td>
-                    <td>{e.round || '-'}</td>
-                    <td>{e.before_data?.score} → <strong>{e.after_data?.score}</strong></td>
-                    <td>{e.before_data?.time || '-'} → <strong>{e.after_data?.time || '-'}</strong></td>
-                  </tr>
-                ))}
+                {edits.map((e) => {
+                  const changes = diffScoreEdit(e.before_data, e.after_data);
+                  return (
+                    <tr key={e.id}>
+                      <td>{formatDate(e.edited_at)}</td>
+                      <td>
+                        {e.reviewer_name || e.users?.full_name || '-'}
+                        {e.reviewer_signature && (
+                          <div><img src={e.reviewer_signature} alt="Chữ ký" style={{ maxHeight: 32, maxWidth: 100, marginTop: 4 }} /></div>
+                        )}
+                      </td>
+                      <td>{e.round || '-'}</td>
+                      <td>
+                        {changes.length === 0 ? (
+                          <span style={{ color: '#94a3b8' }}>Không có thay đổi giá trị</span>
+                        ) : (
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {changes.map((c) => (
+                              <li key={c.field} style={{ fontSize: 13 }}>
+                                <strong>{c.label}:</strong> {c.before} → <strong>{c.after}</strong>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {e.note && <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>Ghi chú: {e.note}</div>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

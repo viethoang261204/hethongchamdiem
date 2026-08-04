@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import { diffScoreEdit } from '../../lib/scoreEditDiff';
 import '../referee/InventionTrailScoreForm.css';
 
 /**
@@ -178,27 +179,33 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
         {edits.length > 0 && (
           <>
             <tr><td colSpan={7} className="ss-section">Edit history</td></tr>
-            {edits.map((e) => (
-              <tr key={e.id}>
-                <td colSpan={7} style={{ padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 12.5 }}>
-                    <strong>{e.edited_at ? new Date(e.edited_at).toLocaleString('vi-VN') : ''}</strong>
-                    {' · '}Round {e.round || '-'}
-                    {' · '}Edited by: {e.users?.full_name || '-'}
-                    {' · '}Score: {e.before_data?.score ?? ''} → <strong>{e.after_data?.score ?? ''}</strong>
-                    {e.note ? <> · Note: {e.note}</> : null}
-                  </div>
-                  {(e.reviewer_name || e.reviewer_signature) && (
-                    <div style={{ marginTop: 4, fontSize: 12.5 }}>
-                      Reviewed by: <strong>{e.reviewer_name || ''}</strong>
-                      {e.reviewer_signature && (
-                        <div><img src={e.reviewer_signature} alt="Reviewer signature" style={{ maxHeight: 44, maxWidth: '100%' }} /></div>
-                      )}
+            {edits.map((e) => {
+              const changes = diffScoreEdit(e.before_data, e.after_data);
+              return (
+                <tr key={e.id}>
+                  <td colSpan={7} style={{ padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 12.5 }}>
+                      <strong>{e.edited_at ? new Date(e.edited_at).toLocaleString('vi-VN') : ''}</strong>
+                      {' · '}Round {e.round || '-'}
+                      {' · '}Reviewed &amp; edited by: <strong>{e.reviewer_name || e.users?.full_name || '-'}</strong>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
+                    {changes.length > 0 && (
+                      <ul style={{ margin: '4px 0 0', paddingLeft: 18, fontSize: 12.5 }}>
+                        {changes.map((c) => (
+                          <li key={c.field}>{c.label}: {c.before} → <strong>{c.after}</strong></li>
+                        ))}
+                      </ul>
+                    )}
+                    {e.note && <div style={{ marginTop: 4, fontSize: 12.5 }}>Note: {e.note}</div>}
+                    {e.reviewer_signature && (
+                      <div style={{ marginTop: 4 }}>
+                        <img src={e.reviewer_signature} alt="Reviewer signature" style={{ maxHeight: 44, maxWidth: '100%' }} />
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </>
         )}
       </tbody>

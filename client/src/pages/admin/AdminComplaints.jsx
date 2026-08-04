@@ -225,13 +225,8 @@ export default function AdminComplaints() {
                           onChange={(e) => setResolveModal({ ...resolveModal, notes: e.target.value })}
                         />
                       </div>
-                      <div className="form-group">
-                        <label className="form-label">Người duyệt (Trưởng ban trọng tài)</label>
-                        <input
-                          type="text" className="form-input"
-                          value={resolveModal.reviewerName}
-                          onChange={(e) => setResolveModal({ ...resolveModal, reviewerName: e.target.value })}
-                        />
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                        Người duyệt: {resolveModal.reviewerName} (Trưởng ban trọng tài)
                       </div>
                       <SignatureBox
                         label="Chữ ký người duyệt"

@@ -10,6 +10,11 @@ const { requireAuth, requireAdmin } = require('./auth.cjs');
 
 const router = express.Router();
 
+// Người duy nhất được phép ký duyệt khi sửa 1 phiếu điểm đã chấm (Trưởng ban
+// trọng tài) — cố định ở server, KHÔNG lấy tên từ client, để không ai giả
+// mạo tên người duyệt dù có sửa request thế nào.
+const HEAD_REFEREE_NAME = 'Mr Ly Quang Van';
+
 // helper: lọc body chỉ giữ các cột cho phép (chống ghi cột lạ)
 function pick(body, fields) {
   const out = {};
@@ -737,7 +742,8 @@ router.post('/scores', requireAuth, h(async (req, res) => {
 // Chỉ admin được sửa phiếu chấm — trọng tài KHÔNG được sửa sau khi đã gửi
 // (tránh chỉnh sửa điểm sau khi phiếu đã nộp, cần admin can thiệp nếu chấm nhầm).
 // Mỗi lần sửa được ghi lại vào score_edits (ai sửa, lúc nào, trước/sau) trong
-// cùng 1 transaction với UPDATE để không bao giờ mất log.
+// cùng 1 transaction với UPDATE để không bao giờ mất log. Bắt buộc có chữ ký
+// người duyệt (Trưởng ban trọng tài) — không có chữ ký thì không cho sửa.
 router.put('/scores/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, [
     'team_id', 'contest_content_id', 'referee_id', 'score', 'time', 'round', 'retry_count', 'bonus_points',
@@ -746,6 +752,10 @@ router.put('/scores/:id', requireAdmin, h(async (req, res) => {
   if (data.criteria_scores !== undefined) data.criteria_scores = JSON.stringify(data.criteria_scores);
   if (data.score !== undefined) data.score = Number(data.score) || 0;
   const keys = Object.keys(data);
+  const reviewerSignature = req.body.reviewer_signature || null;
+  if (keys.length > 0 && !reviewerSignature) {
+    return res.status(400).json({ error: 'Cần chữ ký người duyệt (Trưởng ban trọng tài) để sửa phiếu điểm.' });
+  }
 
   const result = await withTransaction(async (tx) => {
     const { rows: existing } = await tx('select * from scores where id = $1', [req.params.id]);
@@ -758,9 +768,9 @@ router.put('/scores/:id', requireAdmin, h(async (req, res) => {
     );
     const after = updated[0];
     await tx(
-      `insert into score_edits (score_id, round, edited_by, before_data, after_data)
-       values ($1, $2, $3, $4::jsonb, $5::jsonb)`,
-      [after.id, after.round, req.user.id, JSON.stringify(existing[0]), JSON.stringify(after)]
+      `insert into score_edits (score_id, round, edited_by, before_data, after_data, reviewer_name, reviewer_signature)
+       values ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7)`,
+      [after.id, after.round, req.user.id, JSON.stringify(existing[0]), JSON.stringify(after), HEAD_REFEREE_NAME, reviewerSignature]
     );
     return after;
   });
@@ -1238,6 +1248,12 @@ router.put('/complaints/:id', requireAdmin, h(async (req, res) => {
   if (!['resolved', 'rejected'].includes(status)) {
     return res.status(400).json({ error: 'status phải là resolved hoặc rejected.' });
   }
+  if (score_edit) {
+    const editableKeys = Object.keys(pick(score_edit, ['score', 'time', 'retry_count', 'bonus_points', 'notes']));
+    if (editableKeys.length && !score_edit.reviewer_signature) {
+      return res.status(400).json({ error: 'Cần chữ ký người duyệt (Trưởng ban trọng tài) để sửa phiếu điểm.' });
+    }
+  }
 
   const result = await withTransaction(async (tx) => {
     const { rows: complaintRows } = await tx('select * from complaints where id = $1', [req.params.id]);
@@ -1262,7 +1278,7 @@ router.put('/complaints/:id', requireAdmin, h(async (req, res) => {
             `insert into score_edits (score_id, round, edited_by, before_data, after_data, note, reviewer_name, reviewer_signature, complaint_id)
              values ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)`,
             [after.id, after.round, req.user.id, JSON.stringify(before), JSON.stringify(after),
-             resolution_note ?? null, score_edit.reviewer_name ?? null, score_edit.reviewer_signature ?? null, complaint.id]
+             resolution_note ?? null, HEAD_REFEREE_NAME, score_edit.reviewer_signature, complaint.id]
           );
         }
       }
