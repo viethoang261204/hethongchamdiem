@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import SignatureBox from '../../components/SignaturePad';
 import './AdminLayout.css';
 
 const STATUS_BADGE = {
@@ -20,20 +21,50 @@ export default function AdminComplaints() {
   const { data, loading, error, reload, setData } = useApiLoader(() => api.getComplaints(), []);
   const list = data || [];
   const [filterStatus, setFilterStatus] = useState('');
-  const [resolveModal, setResolveModal] = useState(null); // { id, status, note }
+  const [resolveModal, setResolveModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const filtered = filterStatus ? list.filter((c) => c.status === filterStatus) : list;
 
   const openResolve = (c, status) => {
-    setResolveModal({ id: c.id, status, note: c.resolution_note || '' });
+    const snap = c.score_snapshot || {};
+    setResolveModal({
+      id: c.id,
+      status,
+      note: c.resolution_note || '',
+      scoreId: c.score_id || null,
+      editScore: false,
+      score: snap.score ?? 0,
+      time: snap.time ?? '',
+      notes: snap.notes ?? '',
+      retryCount: snap.retry_count ?? 0,
+      bonusPoints: snap.bonus_points ?? 0,
+      reviewerName: 'Mr Ly Quang Van',
+      reviewerSignature: '',
+    });
   };
 
   const save = async () => {
     if (!resolveModal) return;
+    if (resolveModal.editScore && !resolveModal.reviewerSignature) {
+      showAlert('Cần chữ ký người duyệt để sửa trực tiếp bảng điểm.', 'error');
+      return;
+    }
     setSaving(true);
     try {
-      await api.putComplaint(resolveModal.id, { status: resolveModal.status, resolution_note: resolveModal.note.trim() || null });
+      const body = { status: resolveModal.status, resolution_note: resolveModal.note.trim() || null };
+      if (resolveModal.editScore && resolveModal.scoreId) {
+        body.score_edit = {
+          score: Number(resolveModal.score) || 0,
+          time: resolveModal.time?.toString().trim() || null,
+          notes: resolveModal.notes?.trim() || null,
+          retry_count: Number(resolveModal.retryCount) || 0,
+          bonus_points: Number(resolveModal.bonusPoints) || 0,
+          reviewer_name: resolveModal.reviewerName?.trim() || null,
+          reviewer_signature: resolveModal.reviewerSignature,
+        };
+      }
+      await api.putComplaint(resolveModal.id, body);
       setResolveModal(null);
       setData(null);
       const updated = await api.getComplaints();
@@ -136,6 +167,85 @@ export default function AdminComplaints() {
                 <label className="form-label">Phản hồi</label>
                 <textarea className="form-input" rows={3} value={resolveModal.note} onChange={(e) => setResolveModal({ ...resolveModal, note: e.target.value })} placeholder="Ghi chú phản hồi cho trọng tài..." />
               </div>
+
+              {resolveModal.scoreId && (
+                <div className="form-group" style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
+                    <input
+                      type="checkbox"
+                      checked={resolveModal.editScore}
+                      onChange={(e) => setResolveModal({ ...resolveModal, editScore: e.target.checked })}
+                    />
+                    Sửa trực tiếp bảng điểm cùng lúc
+                  </label>
+
+                  {resolveModal.editScore && (
+                    <div style={{ marginTop: 14 }}>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Điểm</label>
+                          <input
+                            type="number" step="0.01" className="form-input"
+                            value={resolveModal.score}
+                            onChange={(e) => setResolveModal({ ...resolveModal, score: e.target.value })}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Thời gian (giây)</label>
+                          <input
+                            type="number" min="0" className="form-input"
+                            value={resolveModal.time}
+                            onChange={(e) => setResolveModal({ ...resolveModal, time: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Số lần chạy lại</label>
+                          <input
+                            type="number" min="0" className="form-input"
+                            value={resolveModal.retryCount}
+                            onChange={(e) => setResolveModal({ ...resolveModal, retryCount: e.target.value })}
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Điểm thưởng</label>
+                          <input
+                            type="number" step="0.01" className="form-input"
+                            value={resolveModal.bonusPoints}
+                            onChange={(e) => setResolveModal({ ...resolveModal, bonusPoints: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Ghi chú phiếu điểm</label>
+                        <textarea
+                          className="form-input" rows={2}
+                          value={resolveModal.notes}
+                          onChange={(e) => setResolveModal({ ...resolveModal, notes: e.target.value })}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Người duyệt (Trưởng ban trọng tài)</label>
+                        <input
+                          type="text" className="form-input"
+                          value={resolveModal.reviewerName}
+                          onChange={(e) => setResolveModal({ ...resolveModal, reviewerName: e.target.value })}
+                        />
+                      </div>
+                      <SignatureBox
+                        label="Chữ ký người duyệt"
+                        required
+                        value={resolveModal.reviewerSignature}
+                        onChange={(v) => setResolveModal({ ...resolveModal, reviewerSignature: v })}
+                      />
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+                        Lần sửa này sẽ được lưu vào lịch sử chỉnh sửa của phiếu điểm (kèm chữ ký), và hiện trong báo cáo/PDF xuất ra.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setResolveModal(null)}>Hủy</button>

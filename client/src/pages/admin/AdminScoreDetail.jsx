@@ -81,7 +81,8 @@ export default function AdminScoreDetail() {
         <div>
           <h1 className="page-title">Chi tiết phiếu điểm</h1>
           <p className="page-subtitle">
-            {score.team?.name || '-'} · {content?.name || score.contest_content_id} · Nộp lúc {formatDate(score.submitted_at || score.submittedAt)}
+            {score.team?.name || '-'} · {content?.name || score.contest_content_id}
+            {score.started_at ? ` · Bắt đầu chấm lúc ${formatDate(score.started_at)}` : ''} · Nộp lúc {formatDate(score.submitted_at || score.submittedAt)}
           </p>
         </div>
       </div>

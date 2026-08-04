@@ -723,12 +723,13 @@ router.post('/scores', requireAuth, h(async (req, res) => {
   }
 
   const { rows } = await query(
-    `insert into scores (team_id, contest_content_id, referee_id, score, time, round, retry_count, bonus_points, criteria_scores, notes, arena_entry_time, head_referee_name, scorekeeper_name, objection)
-     values ($1, $2, $3, coalesce($4, 0), $5, $6, coalesce($7, 0), coalesce($8, 0), coalesce($9::jsonb, '{}'::jsonb), $10, $11, $12, $13, $14) returning *`,
+    `insert into scores (team_id, contest_content_id, referee_id, score, time, round, retry_count, bonus_points, criteria_scores, notes, arena_entry_time, head_referee_name, scorekeeper_name, objection, started_at)
+     values ($1, $2, $3, coalesce($4, 0), $5, $6, coalesce($7, 0), coalesce($8, 0), coalesce($9::jsonb, '{}'::jsonb), $10, $11, $12, $13, $14, $15) returning *`,
     [b.team_id, b.contest_content_id, refereeId, Number(b.score) || 0, b.time ?? null,
      round, b.retry_count ?? null, b.bonus_points ?? null,
      b.criteria_scores ? JSON.stringify(b.criteria_scores) : null, b.notes ?? null,
-     b.arena_entry_time ?? null, b.head_referee_name ?? null, b.scorekeeper_name ?? null, b.objection ?? null]
+     b.arena_entry_time ?? null, b.head_referee_name ?? null, b.scorekeeper_name ?? null, b.objection ?? null,
+     b.started_at ?? null]
   );
   res.json(rows[0]);
 }));
@@ -740,7 +741,7 @@ router.post('/scores', requireAuth, h(async (req, res) => {
 router.put('/scores/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, [
     'team_id', 'contest_content_id', 'referee_id', 'score', 'time', 'round', 'retry_count', 'bonus_points',
-    'criteria_scores', 'notes', 'arena_entry_time', 'head_referee_name', 'scorekeeper_name', 'objection',
+    'criteria_scores', 'notes', 'arena_entry_time', 'head_referee_name', 'scorekeeper_name', 'objection', 'started_at',
   ]);
   if (data.criteria_scores !== undefined) data.criteria_scores = JSON.stringify(data.criteria_scores);
   if (data.score !== undefined) data.score = Number(data.score) || 0;
@@ -1168,7 +1169,11 @@ const COMPLAINT_NESTED = `
     case when ru.id is null then null else json_build_object('id', ru.id, 'full_name', ru.full_name, 'username', ru.username) end as resolver,
     coalesce(st.name, nullif(trim(both from concat(cmt_a.name, ' vs ', cmt_b.name)), '')) as team_name,
     coalesce(scc.name, ccc.name) as content_name,
-    s.round as score_round
+    s.round as score_round,
+    case when s.id is null then null else json_build_object(
+      'id', s.id, 'score', s.score, 'time', s.time, 'notes', s.notes,
+      'retry_count', s.retry_count, 'bonus_points', s.bonus_points
+    ) end as score_snapshot
   from complaints c
   left join scores s on s.id = c.score_id
   left join teams st on st.id = s.team_id
@@ -1223,18 +1228,56 @@ router.get('/complaints/count', requireAdmin, h(async (req, res) => {
   res.json({ count: Number(rows[0].count) });
 }));
 
+// Xử lý khiếu nại — có thể kèm sửa trực tiếp phiếu điểm gây khiếu nại ngay
+// tại đây (score_edit), trong CÙNG 1 transaction với việc đóng khiếu nại, để
+// không bao giờ có trạng thái nửa vời (điểm đã sửa nhưng khiếu nại chưa đóng,
+// hoặc ngược lại). Lần sửa vẫn ghi vào score_edits như PUT /scores/:id, kèm
+// chữ ký người duyệt (reviewer_signature) làm bằng chứng xác nhận.
 router.put('/complaints/:id', requireAdmin, h(async (req, res) => {
-  const { status, resolution_note } = req.body || {};
+  const { status, resolution_note, score_edit } = req.body || {};
   if (!['resolved', 'rejected'].includes(status)) {
     return res.status(400).json({ error: 'status phải là resolved hoặc rejected.' });
   }
-  const { rows } = await query(
-    `update complaints set status = $1, resolution_note = $2, resolved_by = $3, resolved_at = now()
-     where id = $4 returning *`,
-    [status, resolution_note ?? null, req.user.id, req.params.id]
-  );
-  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy khiếu nại.' });
-  res.json(rows[0]);
+
+  const result = await withTransaction(async (tx) => {
+    const { rows: complaintRows } = await tx('select * from complaints where id = $1', [req.params.id]);
+    const complaint = complaintRows[0];
+    if (!complaint) return null;
+
+    if (score_edit && complaint.score_id) {
+      const editable = pick(score_edit, ['score', 'time', 'retry_count', 'bonus_points', 'notes']);
+      if (editable.score !== undefined) editable.score = Number(editable.score) || 0;
+      const keys = Object.keys(editable);
+      if (keys.length) {
+        const { rows: existingScoreRows } = await tx('select * from scores where id = $1', [complaint.score_id]);
+        const before = existingScoreRows[0];
+        if (before) {
+          const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+          const { rows: updatedRows } = await tx(
+            `update scores set ${sets} where id = $${keys.length + 1} returning *`,
+            [...keys.map((k) => editable[k]), complaint.score_id]
+          );
+          const after = updatedRows[0];
+          await tx(
+            `insert into score_edits (score_id, round, edited_by, before_data, after_data, note, reviewer_name, reviewer_signature, complaint_id)
+             values ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9)`,
+            [after.id, after.round, req.user.id, JSON.stringify(before), JSON.stringify(after),
+             resolution_note ?? null, score_edit.reviewer_name ?? null, score_edit.reviewer_signature ?? null, complaint.id]
+          );
+        }
+      }
+    }
+
+    const { rows: updated } = await tx(
+      `update complaints set status = $1, resolution_note = $2, resolved_by = $3, resolved_at = now()
+       where id = $4 returning *`,
+      [status, resolution_note ?? null, req.user.id, req.params.id]
+    );
+    return updated[0];
+  });
+
+  if (!result) return res.status(404).json({ error: 'Không tìm thấy khiếu nại.' });
+  res.json(result);
 }));
 
 // ============================================================

@@ -417,6 +417,19 @@ create table if not exists complaints (
 create or replace trigger trg_complaints_updated
   before update on complaints for each row execute function set_updated_at();
 
+-- Khi admin xử lý 1 khiếu nại về phiếu điểm, có thể sửa trực tiếp điểm ngay
+-- tại đó (thay vì phải qua trang Sửa phiếu riêng) — vẫn ghi vào score_edits
+-- như bình thường, chỉ thêm: link ngược về khiếu nại nào gây ra lần sửa này,
+-- và chữ ký người duyệt (Trưởng ban trọng tài) để có bằng chứng xác nhận.
+alter table score_edits add column if not exists complaint_id uuid references complaints(id) on delete set null;
+alter table score_edits add column if not exists reviewer_name text;
+alter table score_edits add column if not exists reviewer_signature text;
+create index if not exists idx_score_edits_complaint on score_edits(complaint_id);
+
+-- Thời điểm trọng tài bấm "Bắt đầu" để vào chấm 1 lượt — hệ thống tự ghi nhận
+-- (khác arena_entry_time là ô nhập tay tự do theo mẫu phiếu giấy cũ).
+alter table scores add column if not exists started_at timestamptz;
+
 
 -- ============================================================
 -- 2. INDEXES

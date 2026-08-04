@@ -19,6 +19,7 @@ import '../referee/InventionTrailScoreForm.css';
  */
 export default function ScoreSheetTable({ scores, content, tasks: tasksProp, sheetRef }) {
   const [tasksState, setTasksState] = useState(tasksProp || []);
+  const [edits, setEdits] = useState([]);
   const round1 = scores.find((s) => s.round === 1) || null;
   const round2 = scores.find((s) => s.round === 2) || null;
   const team = round1?.team || round2?.team;
@@ -29,6 +30,16 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
     if (!contentId) return;
     api.getTasks(contentId).then(setTasksState).catch(() => setTasksState([]));
   }, [contentId, tasksProp]);
+
+  // Lịch sử sửa điểm — chỉ admin xem được (GET /scores/:id/edits requireAdmin),
+  // trọng tài sẽ nhận lỗi quyền và section này tự ẩn (không hiện gì, không crash).
+  useEffect(() => {
+    const ids = [round1?.id, round2?.id].filter(Boolean);
+    if (!ids.length) { setEdits([]); return; }
+    Promise.all(ids.map((id) => api.getScoreEdits(id).catch(() => [])))
+      .then((lists) => setEdits(lists.flat().sort((a, b) => new Date(b.edited_at) - new Date(a.edited_at))));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round1?.id, round2?.id]);
 
   const tasks = tasksProp || tasksState;
   const cs1 = round1?.criteria_scores || {};
@@ -163,6 +174,33 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
           <td className="ss-label">Scorekeeper</td>
           <td colSpan={3}>{scorekeeper}</td>
         </tr>
+
+        {edits.length > 0 && (
+          <>
+            <tr><td colSpan={7} className="ss-section">Edit history</td></tr>
+            {edits.map((e) => (
+              <tr key={e.id}>
+                <td colSpan={7} style={{ padding: '8px 6px', borderBottom: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 12.5 }}>
+                    <strong>{e.edited_at ? new Date(e.edited_at).toLocaleString('vi-VN') : ''}</strong>
+                    {' · '}Round {e.round || '-'}
+                    {' · '}Edited by: {e.users?.full_name || '-'}
+                    {' · '}Score: {e.before_data?.score ?? ''} → <strong>{e.after_data?.score ?? ''}</strong>
+                    {e.note ? <> · Note: {e.note}</> : null}
+                  </div>
+                  {(e.reviewer_name || e.reviewer_signature) && (
+                    <div style={{ marginTop: 4, fontSize: 12.5 }}>
+                      Reviewed by: <strong>{e.reviewer_name || ''}</strong>
+                      {e.reviewer_signature && (
+                        <div><img src={e.reviewer_signature} alt="Reviewer signature" style={{ maxHeight: 44, maxWidth: '100%' }} /></div>
+                      )}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </>
+        )}
       </tbody>
     </table>
   );

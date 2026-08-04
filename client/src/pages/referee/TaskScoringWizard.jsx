@@ -33,6 +33,7 @@ export default function TaskScoringWizard({
   round = 1,
   memberNames,
   existing = [],
+  startedAt = null,
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -170,6 +171,7 @@ export default function TaskScoringWizard({
         head_referee_name: headRefereeName || null,
         scorekeeper_name: scorekeeperName || null,
         objection: objection || null,
+        started_at: startedAt || existingScore?.started_at || null,
       };
       if (existingScore) {
         await api.putScore(existingScore.id, payload);

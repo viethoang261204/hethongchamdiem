@@ -20,6 +20,7 @@ export default function RefereeScoreForm() {
   const [existing, setExisting] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [startedAt, setStartedAt] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -108,6 +109,34 @@ export default function RefereeScoreForm() {
     );
   }
 
+  // Trước khi vào chấm 1 lượt mới, yêu cầu trọng tài bấm "Bắt đầu" — hệ thống
+  // tự ghi nhận thời điểm đó (started_at), không cho nhập tay để tránh sai lệch.
+  if (!startedAt) {
+    return (
+      <div className="ts-wrapper">
+        <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
+          <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{team?.name}</p>
+          <p style={{ color: '#94a3b8', marginBottom: 24 }}>
+            {content?.name} · Round {round}
+          </p>
+          <button
+            type="button"
+            className="ts-btn ts-btn-primary ts-btn-lg"
+            onClick={() => setStartedAt(new Date().toISOString())}
+          >
+            ▶ BẮT ĐẦU
+          </button>
+          <p style={{ color: '#64748b', fontSize: 12.5, marginTop: 16 }}>
+            Hệ thống sẽ tự ghi nhận thời gian bắt đầu chấm lượt này.
+          </p>
+          <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost" style={{ marginTop: 20, display: 'inline-flex' }}>
+            ← Quay lại danh sách đội
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   // Mặc định: dùng TaskScoringWizard mới
   return (
     <TaskScoringWizard
@@ -120,6 +149,7 @@ export default function RefereeScoreForm() {
       round={round}
       memberNames={memberNames}
       existing={existing}
+      startedAt={startedAt}
     />
   );
 }
