@@ -357,6 +357,8 @@ export const api = {
     if (body.head_referee_name !== undefined || body.headRefereeName !== undefined) update.head_referee_name = body.head_referee_name ?? body.headRefereeName;
     if (body.scorekeeper_name !== undefined || body.scorekeeperName !== undefined) update.scorekeeper_name = body.scorekeeper_name ?? body.scorekeeperName;
     if (body.objection !== undefined) update.objection = body.objection;
+    if (body.started_at !== undefined) update.started_at = body.started_at;
+    if (body.reviewer_signature !== undefined) update.reviewer_signature = body.reviewer_signature;
     return withRetry(() => request(`/scores/${id}`, { method: 'PUT', body: update }), 'putScore');
   },
 

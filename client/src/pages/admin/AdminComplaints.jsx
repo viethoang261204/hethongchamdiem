@@ -169,7 +169,7 @@ export default function AdminComplaints() {
               </div>
 
               {resolveModal.scoreId && (
-                <div className="form-group" style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                <div className="form-group" style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, color: '#1e293b' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13.5 }}>
                     <input
                       type="checkbox"
@@ -225,7 +225,7 @@ export default function AdminComplaints() {
                           onChange={(e) => setResolveModal({ ...resolveModal, notes: e.target.value })}
                         />
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: '#1e293b' }}>
                         Người duyệt: {resolveModal.reviewerName} (Trưởng ban trọng tài)
                       </div>
                       <SignatureBox
@@ -234,7 +234,7 @@ export default function AdminComplaints() {
                         value={resolveModal.reviewerSignature}
                         onChange={(v) => setResolveModal({ ...resolveModal, reviewerSignature: v })}
                       />
-                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
                         Lần sửa này sẽ được lưu vào lịch sử chỉnh sửa của phiếu điểm (kèm chữ ký), và hiện trong báo cáo/PDF xuất ra.
                       </div>
                     </div>

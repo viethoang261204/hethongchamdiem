@@ -503,8 +503,8 @@ export default function AdminScores() {
               </div>
 
               {modal !== 'add' && (
-                <div className="form-group" style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+                <div className="form-group" style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, color: '#1e293b' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: '#1e293b' }}>
                     Người duyệt: Mr Ly Quang Van (Trưởng ban trọng tài)
                   </div>
                   <SignatureBox
@@ -514,7 +514,7 @@ export default function AdminScores() {
                     onChange={(v) => { setForm({ ...form, reviewerSignature: v }); setErrors({ ...errors, reviewerSignature: '' }); }}
                   />
                   {errors.reviewerSignature && <div className="form-error-text">{errors.reviewerSignature}</div>}
-                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
                     Mọi lần sửa phiếu điểm đã chấm đều được lưu vào lịch sử (kèm chữ ký) và hiện trong báo cáo/PDF xuất ra.
                   </div>
                 </div>
