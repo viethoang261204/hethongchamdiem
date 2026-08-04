@@ -55,7 +55,7 @@ export default function RefereeScoreForm() {
   }, [competitionId, contentId, teamId]);
 
   if (loading) return (
-    <div className="ts-wrapper">
+    <div className="ts-wrapper ts-center-screen">
       <div className="ts-loading">
         <div className="ts-spinner" />
         <p>Đang tải phiếu chấm...</p>
@@ -64,8 +64,8 @@ export default function RefereeScoreForm() {
   );
 
   if (notFound) return (
-    <div className="ts-wrapper">
-      <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
+    <div className="ts-wrapper ts-center-screen">
+      <div className="ts-card ts-gate-card">
         <p style={{ color: '#f87171' }}>Không tìm thấy đội hoặc nội dung thi.</p>
         <a href={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>
           ← Quay lại
@@ -80,8 +80,8 @@ export default function RefereeScoreForm() {
   const existingScore = existing.find((s) => s.contest_content_id === contentId && s.round === round) || null;
   if (existingScore) {
     return (
-      <div className="ts-wrapper">
-        <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
+      <div className="ts-wrapper ts-center-screen">
+        <div className="ts-card ts-gate-card">
           <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Đội này đã có phiếu điểm lượt {round}.</p>
           <p style={{ color: '#94a3b8', marginBottom: 20 }}>
             Sau khi gửi, trọng tài không thể sửa lại phiếu. Nếu chấm nhầm, vui lòng liên hệ admin.
@@ -113,15 +113,13 @@ export default function RefereeScoreForm() {
   // tự ghi nhận thời điểm đó (started_at), không cho nhập tay để tránh sai lệch.
   if (!startedAt) {
     return (
-      <div className="ts-wrapper">
-        <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
-          <p style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{team?.name}</p>
-          <p style={{ color: '#94a3b8', marginBottom: 24 }}>
-            {content?.name} · Round {round}
-          </p>
+      <div className="ts-wrapper ts-center-screen">
+        <div className="ts-card ts-gate-card">
+          <div className="ts-gate-eyebrow">{content?.name} · Round {round}</div>
+          <p className="ts-gate-team">{team?.name}</p>
           <button
             type="button"
-            className="ts-btn ts-btn-primary ts-btn-lg"
+            className="ts-btn ts-btn-primary ts-btn-lg ts-gate-start-btn"
             onClick={() => setStartedAt(new Date().toISOString())}
           >
             ▶ BẮT ĐẦU

@@ -9,6 +9,43 @@
   padding-bottom: 100px;
 }
 
+/* Màn chờ / thông báo 1-thẻ (BẮT ĐẦU, không tìm thấy, đã có phiếu...) — căn
+   giữa cả ngang lẫn dọc trong viewport thay vì trôi nổi ở góc trên-trái của
+   1 vùng nội dung rất rộng (nhìn trống/lệch trên màn hình lớn). */
+.referee-panel .ts-wrapper.ts-center-screen {
+  min-height: calc(100vh - 160px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 0;
+}
+.referee-panel .ts-gate-card {
+  text-align: center;
+  padding: 44px 48px;
+  width: 100%;
+  max-width: 440px;
+}
+.referee-panel .ts-gate-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a78bfa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.referee-panel .ts-gate-team {
+  font-size: 22px;
+  font-weight: 800;
+  color: #f1f5f9;
+  letter-spacing: -0.02em;
+  margin: 0 0 28px;
+}
+.referee-panel .ts-gate-start-btn {
+  width: 100%;
+  font-size: 17px;
+  letter-spacing: 0.02em;
+}
+
 /* ─── Loading ────────────────────────────────────────────────── */
 .referee-panel .ts-loading {
   display: flex;
@@ -862,14 +899,17 @@
 .ts-task-image-wrap {
   margin: 12px 0;
   text-align: center;
-  background: rgba(148, 163, 184, 0.06);
+  background: rgba(255, 255, 255, 0.92);
   border-radius: 12px;
-  padding: 8px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25), 0 10px 24px rgba(0,0,0,0.3);
 }
 .ts-task-image-wrap .ts-task-image {
   max-width: 100%;
   max-height: 320px;
-  border-radius: 8px;
+  min-height: 120px;
+  border-radius: 6px;
   object-fit: contain;
 }
 
