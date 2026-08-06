@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════
-   Task Scoring Wizard — Tablet-first Design
-   Designed for 10-13" tablets in landscape & portrait
+   Task Scoring Wizard — flat enterprise assessment UI
+   Palette: bg #111827 · card #1F2937 · border #374151 · text #F9FAFB
+   secondary #9CA3AF · accent #2563EB (only accent color in the system)
    ═══════════════════════════════════════════════════════════════ */
 
 .referee-panel .ts-wrapper {
-  max-width: 820px;
+  max-width: 760px;
   margin: 0 auto;
   padding-bottom: 100px;
 }
@@ -21,29 +22,28 @@
 }
 .referee-panel .ts-gate-card {
   text-align: center;
-  padding: 44px 48px;
+  padding: 40px;
   width: 100%;
-  max-width: 440px;
+  max-width: 420px;
 }
 .referee-panel .ts-gate-eyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  color: #a78bfa;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
 }
 .referee-panel .ts-gate-team {
-  font-size: 22px;
-  font-weight: 800;
-  color: #f1f5f9;
-  letter-spacing: -0.02em;
-  margin: 0 0 28px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f9fafb;
+  letter-spacing: -0.01em;
+  margin: 0 0 24px;
 }
 .referee-panel .ts-gate-start-btn {
   width: 100%;
-  font-size: 17px;
-  letter-spacing: 0.02em;
+  font-size: 14px;
 }
 
 /* ─── Loading ────────────────────────────────────────────────── */
@@ -53,15 +53,15 @@
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
-  color: #94a3b8;
+  color: #9ca3af;
   gap: 16px;
 }
 
 .referee-panel .ts-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(124,58,237,0.15);
-  border-top-color: #7c3aed;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #374151;
+  border-top-color: #2563eb;
   border-radius: 50%;
   animation: ts-spin 0.7s linear infinite;
 }
@@ -70,75 +70,74 @@
   to { transform: rotate(360deg); }
 }
 
-/* ─── Sticky header ──────────────────────────────────────────── */
+/* ─── Header ─────────────────────────────────────────────────── */
 .referee-panel .ts-header {
   position: sticky;
-  top: -28px;
+  top: 0;
   z-index: 50;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, #1e1b4b 0%, #0b1120 100%);
-  border-radius: 14px;
-  margin: -14px -16px 18px;
-  border: 1px solid rgba(124,58,237,0.25);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  padding: 14px 20px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  margin: 0 0 16px;
 }
 
 .referee-panel .ts-back {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.05);
-  color: #c4b5fd;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #9ca3af;
   text-decoration: none;
   flex-shrink: 0;
-  transition: background 0.18s;
+  transition: border-color 0.15s, color 0.15s;
 }
-.referee-panel .ts-back:hover { background: rgba(124,58,237,0.18); color: #fff; }
-.referee-panel .ts-back svg { width: 20px; height: 20px; }
+.referee-panel .ts-back:hover { border-color: #4b5563; color: #f9fafb; }
+.referee-panel .ts-back svg { width: 18px; height: 18px; }
 
 .referee-panel .ts-header-info { flex: 1; min-width: 0; }
 .referee-panel .ts-team-name {
-  font-size: 16px;
-  font-weight: 700;
-  color: #f1f5f9;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f9fafb;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .referee-panel .ts-content-name {
-  font-size: 12px;
-  color: #94a3b8;
+  font-size: 12.5px;
+  color: #9ca3af;
   margin-top: 2px;
 }
 
 .referee-panel .ts-header-score {
   text-align: right;
-  background: rgba(124,58,237,0.15);
-  border: 1px solid rgba(124,58,237,0.3);
-  border-radius: 10px;
+  background: transparent;
+  border: 1px solid #374151;
+  border-radius: 6px;
   padding: 6px 14px;
   flex-shrink: 0;
 }
 .referee-panel .ts-score-label {
   font-size: 10px;
-  color: #94a3b8;
+  color: #9ca3af;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-weight: 600;
 }
 .referee-panel .ts-score-value {
-  font-size: 22px;
-  font-weight: 800;
-  color: #c4b5fd;
-  line-height: 1;
+  font-size: 19px;
+  font-weight: 700;
+  color: #f9fafb;
+  line-height: 1.3;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
 }
 
 /* ─── Stepper ────────────────────────────────────────────────── */
@@ -146,93 +145,83 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 18px;
-  padding: 8px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 12px;
+  margin-bottom: 16px;
+  padding: 0;
 }
 
 .referee-panel .ts-step {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: transparent;
+  padding: 4px 0;
   cursor: default;
-  transition: background 0.18s;
 }
-.referee-panel .ts-step.active { background: rgba(124,58,237,0.15); }
 .referee-panel .ts-step.done { cursor: pointer; }
-.referee-panel .ts-step.done:hover { background: rgba(124,58,237,0.1); }
 
 .referee-panel .ts-step-num {
-  width: 26px; height: 26px;
+  width: 22px; height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 13px;
-  background: rgba(255,255,255,0.06);
-  color: #64748b;
+  font-weight: 600;
+  font-size: 12px;
+  background: transparent;
+  border: 1.5px solid #4b5563;
+  color: #9ca3af;
   flex-shrink: 0;
 }
 .referee-panel .ts-step.active .ts-step-num {
-  background: #7c3aed;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.25);
 }
 .referee-panel .ts-step.done .ts-step-num {
-  background: #16a34a;
-  color: #fff;
+  background: transparent;
+  border-color: #10b981;
+  color: #10b981;
 }
 
 .referee-panel .ts-step-label {
-  font-size: 13px;
-  color: #64748b;
-  font-weight: 600;
+  font-size: 12.5px;
+  color: #9ca3af;
+  font-weight: 500;
 }
-.referee-panel .ts-step.active .ts-step-label { color: #c4b5fd; }
-.referee-panel .ts-step.done .ts-step-label { color: #4ade80; }
+.referee-panel .ts-step.active .ts-step-label { color: #f9fafb; font-weight: 600; }
+.referee-panel .ts-step.done .ts-step-label { color: #9ca3af; }
 
 .referee-panel .ts-step-line {
-  height: 2px;
-  flex: 0 0 12px;
-  background: rgba(255,255,255,0.08);
-  border-radius: 1px;
+  height: 1px;
+  flex: 0 0 24px;
+  background: #374151;
 }
 
 /* ─── Card ───────────────────────────────────────────────────── */
 .referee-panel .ts-card {
-  background: #111827;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.06);
+  background: #1f2937;
+  border-radius: 8px;
+  border: 1px solid #374151;
   padding: 24px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35), 0 8px 28px rgba(0,0,0,0.35);
 }
 
-.referee-panel .ts-fade-in { animation: ts-fade 0.3s ease; }
+.referee-panel .ts-fade-in { animation: ts-fade 0.15s ease; }
 @keyframes ts-fade {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .referee-panel .ts-card-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #f1f5f9;
+  font-size: 16px;
+  font-weight: 600;
+  color: #f9fafb;
   margin: 0 0 18px 0;
-  letter-spacing: -0.02em;
 }
 
 /* ─── Form grid ──────────────────────────────────────────────── */
 .referee-panel .ts-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 16px;
   margin-bottom: 20px;
 }
 .referee-panel .ts-form-row.ts-full { grid-column: 1 / -1; }
@@ -240,82 +229,78 @@
 .referee-panel .ts-label {
   display: block;
   font-size: 12.5px;
-  font-weight: 600;
-  color: #94a3b8;
+  font-weight: 500;
+  color: #9ca3af;
   margin-bottom: 6px;
-  letter-spacing: 0.01em;
 }
-.referee-panel .ts-req { color: #f87171; }
+.referee-panel .ts-req { color: #ef4444; }
 .referee-panel .ts-hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: #9ca3af;
   margin-top: 6px;
 }
-.referee-panel .ts-hint strong { color: #c4b5fd; }
+.referee-panel .ts-hint strong { color: #d1d5db; }
 
 .referee-panel .ts-input {
   width: 100%;
-  padding: 12px 14px;
-  border: 1.5px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  font-size: 15px;
+  padding: 10px 12px;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  font-size: 14px;
   font-family: inherit;
-  background: rgba(255,255,255,0.04);
-  color: #f1f5f9;
-  transition: border-color 0.18s, box-shadow 0.18s;
+  background: #111827;
+  color: #f9fafb;
+  transition: border-color 0.15s;
   box-sizing: border-box;
-  min-height: 48px;
+  min-height: 40px;
 }
-.referee-panel .ts-input::placeholder { color: #475569; }
+.referee-panel .ts-input::placeholder { color: #6b7280; }
 .referee-panel .ts-input:focus {
   outline: none;
-  border-color: rgba(124,58,237,0.55);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.13);
-  background: rgba(124,58,237,0.05);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
 }
 .referee-panel .ts-input-lg {
-  font-size: 20px;
-  font-weight: 700;
-  min-height: 56px;
+  font-size: 16px;
+  font-weight: 600;
+  min-height: 44px;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
 }
 
 /* ─── Stepper input (+/-) ────────────────────────────────────── */
 .referee-panel .ts-input-stepper {
   display: grid;
-  grid-template-columns: 48px 1fr 48px;
+  grid-template-columns: 40px 1fr 40px;
   gap: 8px;
   align-items: stretch;
 }
 .referee-panel .ts-input-stepper button {
-  background: rgba(255,255,255,0.05);
-  border: 1.5px solid rgba(255,255,255,0.1);
-  color: #c4b5fd;
-  border-radius: 10px;
-  font-size: 20px;
-  font-weight: 700;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #d1d5db;
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 600;
   cursor: pointer;
-  min-height: 48px;
-  transition: all 0.15s;
+  min-height: 40px;
+  transition: border-color 0.15s, background 0.15s;
   font-family: inherit;
 }
 .referee-panel .ts-input-stepper button:hover {
-  background: rgba(124,58,237,0.2);
-  border-color: rgba(124,58,237,0.4);
+  border-color: #4b5563;
+  background: rgba(255,255,255,0.03);
 }
-.referee-panel .ts-input-stepper button:active { transform: scale(0.96); }
 .referee-panel .ts-input-stepper input {
-  border: 1.5px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
-  color: #f1f5f9;
-  font-size: 19px;
-  font-weight: 700;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 16px;
+  font-weight: 600;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  min-height: 48px;
+  min-height: 40px;
   width: 100%;
   box-sizing: border-box;
   -moz-appearance: textfield;
@@ -323,8 +308,8 @@
 .referee-panel .ts-input-stepper input::-webkit-outer-spin-button,
 .referee-panel .ts-input-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-.referee-panel .ts-input-stepper-lg button { min-height: 64px; font-size: 24px; }
-.referee-panel .ts-input-stepper-lg input { min-height: 64px; font-size: 24px; }
+.referee-panel .ts-input-stepper-lg button { min-height: 52px; font-size: 20px; }
+.referee-panel .ts-input-stepper-lg input { min-height: 52px; font-size: 20px; }
 
 .referee-panel .ts-quick-btns {
   display: flex;
@@ -333,26 +318,24 @@
 }
 .referee-panel .ts-quick-btns button {
   flex: 1;
-  padding: 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1.5px solid rgba(255,255,255,0.1);
-  color: #cbd5e1;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 14px;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #d1d5db;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 13.5px;
   cursor: pointer;
-  min-height: 48px;
+  min-height: 40px;
   font-family: inherit;
-  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
-.referee-panel .ts-quick-btns button:hover { background: rgba(255,255,255,0.08); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-.referee-panel .ts-quick-btns button:active { transform: scale(0.97); }
+.referee-panel .ts-quick-btns button:hover { border-color: #4b5563; background: rgba(255,255,255,0.03); }
 .referee-panel .ts-quick-btns .ts-quick-full {
-  background: rgba(34,197,94,0.15);
-  border-color: rgba(34,197,94,0.3);
-  color: #4ade80;
+  border-color: #10b981;
+  color: #10b981;
 }
-.referee-panel .ts-quick-btns .ts-quick-full:hover { background: rgba(34,197,94,0.25); }
+.referee-panel .ts-quick-btns .ts-quick-full:hover { background: rgba(16,185,129,0.08); }
 
 /* ─── Footer / buttons ───────────────────────────────────────── */
 .referee-panel .ts-footer {
@@ -361,7 +344,7 @@
   justify-content: space-between;
   padding-top: 18px;
   margin-top: 18px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid #374151;
 }
 
 .referee-panel .ts-btn {
@@ -369,48 +352,45 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 14px 22px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   text-decoration: none;
-  border: none;
-  transition: all 0.18s;
-  min-height: 52px;
-  min-width: 100px;
-  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  min-height: 38px;
+  min-width: 88px;
   white-space: nowrap;
 }
-.referee-panel .ts-btn:active { transform: scale(0.98); }
 .referee-panel .ts-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .referee-panel .ts-btn-primary {
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  background: #2563eb;
   color: #fff;
-  box-shadow: 0 4px 14px rgba(124,58,237,0.4);
 }
-.referee-panel .ts-btn-primary:hover { box-shadow: 0 6px 20px rgba(124,58,237,0.55); transform: translateY(-1px); }
+.referee-panel .ts-btn-primary:hover:not(:disabled) { background: #1d4ed8; }
 
 .referee-panel .ts-btn-secondary {
-  background: rgba(255,255,255,0.06);
-  color: #cbd5e1;
-  border: 1.5px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: #d1d5db;
+  border: 1px solid #374151;
 }
-.referee-panel .ts-btn-secondary:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
+.referee-panel .ts-btn-secondary:hover:not(:disabled) { border-color: #4b5563; color: #f9fafb; }
 
 .referee-panel .ts-btn-ghost {
   background: transparent;
-  color: #94a3b8;
-  border: 1.5px solid rgba(255,255,255,0.12);
+  color: #9ca3af;
+  border: 1px solid transparent;
 }
-.referee-panel .ts-btn-ghost:hover { background: rgba(255,255,255,0.05); color: #cbd5e1; }
+.referee-panel .ts-btn-ghost:hover:not(:disabled) { color: #f9fafb; background: rgba(255,255,255,0.04); }
 
-.referee-panel .ts-btn-sm { padding: 8px 14px; min-height: 36px; font-size: 13px; }
-.referee-panel .ts-btn-lg { padding: 16px 28px; font-size: 17px; min-height: 60px; }
+.referee-panel .ts-btn-sm { padding: 6px 12px; min-height: 32px; font-size: 12.5px; }
+.referee-panel .ts-btn-lg { padding: 11px 24px; font-size: 14.5px; min-height: 44px; }
 
-/* ─── Step 2: Tasks ──────────────────────────────────────────── */
+/* ─── Step 1: Tasks ──────────────────────────────────────────── */
 .referee-panel .ts-task-header {
   display: flex;
   align-items: center;
@@ -421,88 +401,86 @@
 
 .referee-panel .ts-progress {
   position: relative;
-  height: 8px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 4px;
+  height: 4px;
+  background: #374151;
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .referee-panel .ts-progress-bar {
   position: absolute;
   top: 0; left: 0; bottom: 0;
-  background: linear-gradient(90deg, #7c3aed, #06b6d4);
-  transition: width 0.3s;
-  border-radius: 4px;
+  background: #2563eb;
+  transition: width 0.2s;
 }
 .referee-panel .ts-progress-text {
   display: block;
   font-size: 12px;
-  color: #94a3b8;
+  color: #9ca3af;
   margin-top: 4px;
   text-align: right;
 }
 
 /* Focus mode (1 task at a time) */
-.referee-panel .ts-task-focus { padding-top: 6px; }
+.referee-panel .ts-task-focus { padding-top: 8px; }
 .referee-panel .ts-task-counter {
-  font-size: 12px;
-  color: #7c3aed;
-  font-weight: 700;
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   margin-bottom: 6px;
 }
 .referee-panel .ts-task-name {
-  font-size: 24px;
-  font-weight: 800;
-  color: #f1f5f9;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f9fafb;
   margin: 0 0 4px 0;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
 }
 .referee-panel .ts-task-name-en {
-  font-size: 14px;
-  color: #94a3b8;
-  font-style: italic;
-  margin-bottom: 16px;
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 12px;
 }
+.referee-panel .ts-task-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #9ca3af;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  margin: 0 0 16px 0;
+}
+
 .referee-panel .ts-task-image {
   width: 100%;
-  max-height: 280px;
-  border-radius: 12px;
+  max-height: 240px;
+  border-radius: 6px;
   overflow: hidden;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
   margin-bottom: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid #374151;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .referee-panel .ts-task-image img {
   max-width: 100%;
-  max-height: 280px;
+  max-height: 240px;
   object-fit: contain;
   display: block;
 }
 .referee-panel .ts-task-image-empty {
   flex-direction: column;
   gap: 8px;
-  color: #475569;
+  color: #6b7280;
   font-size: 13px;
-  padding: 40px;
+  padding: 32px;
 }
-.referee-panel .ts-task-image-empty svg { width: 40px; height: 40px; opacity: 0.5; }
-
-.referee-panel .ts-task-desc {
-  font-size: 15px;
-  line-height: 1.6;
-  color: #cbd5e1;
-  background: rgba(124,58,237,0.08);
-  border-left: 3px solid #7c3aed;
-  padding: 12px 16px;
-  border-radius: 0 10px 10px 0;
-  margin: 0 0 20px 0;
-}
+.referee-panel .ts-task-image-empty svg { width: 32px; height: 32px; opacity: 0.5; }
 
 .referee-panel .ts-task-input-row { margin-bottom: 20px; }
 
@@ -510,58 +488,53 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 18px;
+  margin-top: 20px;
+  margin-bottom: 16px;
 }
-.referee-panel .ts-task-nav .ts-btn { flex: 1; }
+.referee-panel .ts-task-nav .ts-btn { flex: 0 0 auto; min-width: 110px; }
 
-/* Pill index */
+/* Pill index — nhỏ gọn, phẳng, chỉ để nhảy nhanh giữa các nhiệm vụ */
 .referee-panel .ts-task-index {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 10px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.06);
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #374151;
 }
 .referee-panel .ts-task-pill {
-  width: 36px; height: 36px;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #94a3b8;
-  font-weight: 700;
-  font-size: 13px;
+  width: 28px; height: 28px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #9ca3af;
+  font-weight: 600;
+  font-size: 11.5px;
   cursor: pointer;
   font-family: inherit;
-  transition: all 0.15s;
+  transition: border-color 0.15s, color 0.15s;
 }
-.referee-panel .ts-task-pill:hover { background: rgba(124,58,237,0.15); }
+.referee-panel .ts-task-pill:hover { border-color: #4b5563; color: #f9fafb; }
 .referee-panel .ts-task-pill.active {
-  background: #7c3aed;
-  color: #fff;
-  border-color: #7c3aed;
-  box-shadow: 0 0 0 2px rgba(124,58,237,0.3);
+  border-color: #2563eb;
+  color: #2563eb;
 }
 .referee-panel .ts-task-pill.filled {
-  background: rgba(34,197,94,0.15);
-  color: #4ade80;
-  border-color: rgba(34,197,94,0.3);
+  color: #10b981;
+  border-color: #10b981;
 }
 .referee-panel .ts-task-pill.filled.active {
-  background: #7c3aed;
-  color: #fff;
-  border-color: #7c3aed;
+  border-color: #2563eb;
+  color: #2563eb;
 }
 
 /* All tasks list */
 .referee-panel .ts-task-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   max-height: 60vh;
   overflow-y: auto;
-  padding: 4px;
+  padding: 2px;
   margin-bottom: 16px;
 }
 .referee-panel .ts-task-row {
@@ -569,50 +542,51 @@
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 12px;
-  transition: background 0.15s;
+  background: transparent;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  transition: border-color 0.15s;
 }
-.referee-panel .ts-task-row:hover { background: rgba(124,58,237,0.06); }
+.referee-panel .ts-task-row:hover { border-color: #4b5563; }
 
 .referee-panel .ts-task-row-num {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: rgba(124,58,237,0.2);
-  color: #c4b5fd;
-  font-weight: 700;
-  font-size: 13px;
+  width: 26px; height: 26px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid #374151;
+  color: #9ca3af;
+  font-weight: 600;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 .referee-panel .ts-task-row-img {
-  width: 60px; height: 60px;
-  border-radius: 8px;
+  width: 56px; height: 56px;
+  border-radius: 4px;
   object-fit: cover;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
   flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid #374151;
 }
 .referee-panel .ts-task-row-img-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #475569;
+  color: #6b7280;
 }
-.referee-panel .ts-task-row-img-empty svg { width: 24px; height: 24px; }
+.referee-panel .ts-task-row-img-empty svg { width: 22px; height: 22px; }
 .referee-panel .ts-task-row-body { flex: 1; min-width: 0; }
 .referee-panel .ts-task-row-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: #f1f5f9;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f9fafb;
   margin-bottom: 2px;
 }
 .referee-panel .ts-task-row-desc {
   font-size: 12px;
-  color: #94a3b8;
+  color: #9ca3af;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -620,20 +594,20 @@
 }
 .referee-panel .ts-task-row-meta {
   font-size: 11px;
-  color: #64748b;
+  color: #6b7280;
   margin-top: 2px;
 }
-.referee-panel .ts-task-row-meta strong { color: #c4b5fd; }
+.referee-panel .ts-task-row-meta strong { color: #9ca3af; }
 
 .referee-panel .ts-task-row-input input {
-  width: 80px;
-  height: 48px;
-  border: 1.5px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  background: rgba(255,255,255,0.04);
-  color: #f1f5f9;
-  font-size: 19px;
-  font-weight: 700;
+  width: 76px;
+  height: 40px;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 15px;
+  font-weight: 600;
   text-align: center;
   font-variant-numeric: tabular-nums;
   -moz-appearance: textfield;
@@ -642,15 +616,15 @@
 .referee-panel .ts-task-row-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .referee-panel .ts-task-row-input input:focus {
   outline: none;
-  border-color: rgba(124,58,237,0.55);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.13);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
 }
 
-/* ─── Step 3: Summary ────────────────────────────────────────── */
+/* ─── Step 2: Summary ────────────────────────────────────────── */
 .referee-panel .ts-summary {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+  background: transparent;
+  border: 1px solid #374151;
+  border-radius: 6px;
   padding: 4px 16px;
   margin-bottom: 18px;
 }
@@ -659,39 +633,38 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  font-size: 14px;
-  color: #cbd5e1;
+  border-bottom: 1px solid #374151;
+  font-size: 13.5px;
+  color: #9ca3af;
 }
 .referee-panel .ts-summary-row:last-child { border-bottom: none; }
-.referee-panel .ts-summary-row strong { color: #f1f5f9; font-size: 15px; }
+.referee-panel .ts-summary-row strong { color: #f9fafb; font-size: 14px; }
 .referee-panel .ts-summary-total {
-  border-top: 2px solid rgba(124,58,237,0.3);
+  border-top: 1px solid #4b5563;
   margin-top: 4px;
   padding: 14px 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
 }
 .referee-panel .ts-summary-total strong {
-  color: #c4b5fd;
-  font-size: 26px;
-  font-weight: 800;
+  color: #f9fafb;
+  font-size: 22px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
 }
 
 .referee-panel .ts-detail {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 10px;
+  background: transparent;
+  border: 1px solid #374151;
+  border-radius: 6px;
   padding: 12px 16px;
   margin-bottom: 18px;
 }
 .referee-panel .ts-detail summary {
   cursor: pointer;
   font-size: 13px;
-  color: #94a3b8;
-  font-weight: 600;
+  color: #9ca3af;
+  font-weight: 500;
   list-style: none;
   padding: 4px 0;
   user-select: none;
@@ -701,7 +674,7 @@
   content: '▸ ';
   display: inline-block;
   transition: transform 0.2s;
-  color: #7c3aed;
+  color: #6b7280;
   margin-right: 4px;
 }
 .referee-panel .ts-detail[open] summary::before { transform: rotate(90deg); }
@@ -716,42 +689,42 @@
   padding: 8px 10px;
   text-align: left;
   font-size: 13px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-bottom: 1px solid #374151;
 }
 .referee-panel .ts-detail-table th {
-  color: #94a3b8;
-  font-weight: 700;
+  color: #9ca3af;
+  font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
-.referee-panel .ts-detail-table td strong { color: #c4b5fd; }
+.referee-panel .ts-detail-table td strong { color: #f9fafb; }
 
 /* ─── Success screen ─────────────────────────────────────────── */
 .referee-panel .ts-success {
   text-align: center;
-  padding: 60px 24px;
-  background: rgba(34,197,94,0.08);
-  border: 1px solid rgba(34,197,94,0.25);
-  border-radius: 16px;
-  max-width: 480px;
+  padding: 56px 24px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  max-width: 440px;
   margin: 40px auto;
 }
 .referee-panel .ts-success-icon {
-  width: 64px; height: 64px;
+  width: 52px; height: 52px;
   margin: 0 auto 16px;
   border-radius: 50%;
-  background: #16a34a;
-  color: #fff;
-  font-size: 32px;
+  background: rgba(16,185,129,0.12);
+  border: 1.5px solid #10b981;
+  color: #10b981;
+  font-size: 24px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 0 6px rgba(34,197,94,0.15);
 }
-.referee-panel .ts-success strong { color: #4ade80; font-size: 18px; }
-.referee-panel .ts-success p { color: #94a3b8; margin-top: 8px; font-size: 14px; }
+.referee-panel .ts-success strong { color: #f9fafb; font-size: 16px; }
+.referee-panel .ts-success p { color: #9ca3af; margin-top: 8px; font-size: 13.5px; }
 
 /* ─── Referee Teams: stats + filter ──────────────────────────── */
 .referee-panel .rt-stats {
@@ -761,36 +734,35 @@
   margin-bottom: 18px;
 }
 .referee-panel .rt-stat {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 8px;
   padding: 14px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 .referee-panel .rt-stat-value {
-  font-size: 26px;
-  font-weight: 800;
-  color: #f1f5f9;
+  font-size: 22px;
+  font-weight: 700;
+  color: #f9fafb;
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .referee-panel .rt-stat-label {
   font-size: 11px;
-  color: #94a3b8;
+  color: #9ca3af;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   margin-top: 4px;
-  font-weight: 600;
+  font-weight: 500;
 }
-.referee-panel .rt-stat-done { border-color: rgba(34,197,94,0.25); }
-.referee-panel .rt-stat-done .rt-stat-value { color: #4ade80; }
-.referee-panel .rt-stat-pending { border-color: rgba(245,158,11,0.25); }
-.referee-panel .rt-stat-pending .rt-stat-value { color: #fbbf24; }
+.referee-panel .rt-stat-done { border-color: #1f3d33; }
+.referee-panel .rt-stat-done .rt-stat-value { color: #10b981; }
+.referee-panel .rt-stat-pending { border-color: #3f2f1a; }
+.referee-panel .rt-stat-pending .rt-stat-value { color: #f59e0b; }
 
 .referee-panel .referee-card.is-done {
-  border-color: rgba(34,197,94,0.3);
-  background: rgba(34,197,94,0.04);
+  border-color: #1f3d33;
+  background: #1a2b25;
 }
 .referee-panel .referee-card-head {
   display: flex;
@@ -804,32 +776,32 @@
   display: inline-flex;
   align-items: center;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: 4px;
   flex-shrink: 0;
   margin-top: 2px;
 }
 .referee-panel .rt-badge-done {
-  background: rgba(34,197,94,0.15);
-  color: #4ade80;
-  border: 1px solid rgba(34,197,94,0.3);
+  background: rgba(16,185,129,0.12);
+  color: #10b981;
+  border: 1px solid rgba(16,185,129,0.3);
 }
 .referee-panel .rt-badge-pending {
-  background: rgba(124,58,237,0.15);
-  color: #c4b5fd;
-  border: 1px solid rgba(124,58,237,0.3);
+  background: transparent;
+  color: #9ca3af;
+  border: 1px solid #374151;
   cursor: pointer;
 }
-.referee-panel .rt-badge-pending:hover { background: rgba(124,58,237,0.25); }
+.referee-panel .rt-badge-pending:hover { border-color: #4b5563; color: #f9fafb; }
 .referee-panel .rt-badge-rejected {
-  background: rgba(239,68,68,0.15);
+  background: rgba(239,68,68,0.1);
   color: #f87171;
   border: 1px solid rgba(239,68,68,0.3);
 }
 .referee-panel .referee-card-members {
   font-size: 12px;
-  color: #94a3b8;
+  color: #9ca3af;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -840,161 +812,170 @@
   display: flex;
   gap: 6px;
   font-size: 12px;
-  color: #4ade80;
+  color: #10b981;
   padding-top: 8px;
-  border-top: 1px solid rgba(34,197,94,0.15);
-  font-weight: 600;
+  border-top: 1px solid #374151;
+  font-weight: 500;
 }
-.referee-panel .referee-card-foot strong { color: #fff; font-size: 14px; }
+.referee-panel .referee-card-foot strong { color: #f9fafb; font-size: 13px; }
 
 /* ─── Responsive (tablet portrait + mobile) ─────────────────── */
 @media (max-width: 768px) {
   .referee-panel .ts-form-grid { grid-template-columns: 1fr; }
   .referee-panel .rt-stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
   .referee-panel .rt-stat { padding: 10px 6px; }
-  .referee-panel .rt-stat-value { font-size: 22px; }
+  .referee-panel .rt-stat-value { font-size: 20px; }
   .referee-panel .ts-step-label { display: none; }
-  .referee-panel .ts-stepper { gap: 0; }
+  .referee-panel .ts-stepper { gap: 4px; }
   .referee-panel .ts-step { flex: 0 0 auto; }
   .referee-panel .ts-team-name { font-size: 14px; }
   .referee-panel .ts-content-name { display: none; }
-  .referee-panel .ts-task-name { font-size: 20px; }
+  .referee-panel .ts-task-name { font-size: 18px; }
   .referee-panel .ts-card { padding: 18px; }
-  .referee-panel .ts-task-image { max-height: 200px; }
-  .referee-panel .ts-task-image img { max-height: 200px; }
+  .referee-panel .ts-task-image { max-height: 180px; }
+  .referee-panel .ts-task-image img { max-height: 180px; }
   .referee-panel .ts-task-row { flex-wrap: wrap; }
-  .referee-panel .ts-task-row-img { width: 48px; height: 48px; }
-  .referee-panel .ts-task-row-input input { width: 70px; }
+  .referee-panel .ts-task-row-img { width: 44px; height: 44px; }
+  .referee-panel .ts-task-row-input input { width: 66px; }
 }
 
 @media (max-width: 480px) {
-  .referee-panel .ts-task-image { max-height: 160px; }
-  .referee-panel .ts-task-image img { max-height: 160px; }
+  .referee-panel .ts-task-image { max-height: 150px; }
+  .referee-panel .ts-task-image img { max-height: 150px; }
   .referee-panel .ts-task-row-input { width: 100%; }
   .referee-panel .ts-task-row-input input { width: 100%; }
 }
 
 /* ─── Touch improvements (tablet) ───────────────────────────── */
 @media (pointer: coarse) {
-  .referee-panel .ts-btn { min-height: 56px; }
-  .referee-panel .ts-input { min-height: 52px; font-size: 16px; }
-  .referee-panel .ts-task-pill { width: 40px; height: 40px; }
-  .referee-panel .filter-select { min-height: 48px; }
+  .referee-panel .ts-btn { min-height: 44px; }
+  .referee-panel .ts-input { min-height: 44px; font-size: 16px; }
+  .referee-panel .ts-task-pill { width: 32px; height: 32px; }
+  .referee-panel .filter-select { min-height: 44px; }
   .referee-panel .referee-card { padding: 18px; }
 }
 
-/* ─── Wizard v2: nút chấm to + màn đếm số lượng + phiếu xác nhận ── */
+/* ─── Board / edit chips ─────────────────────────────────────── */
 .ts-board-chip, .ts-edit-chip {
   display: inline-block;
   margin-left: 8px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   vertical-align: middle;
+  border: 1px solid transparent;
 }
-.ts-board-chip { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.ts-edit-chip { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.ts-board-chip { background: transparent; border-color: #374151; color: #9ca3af; }
+.ts-edit-chip { background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.3); }
 
+/* Ảnh minh hoạ nhiệm vụ — khung nhẹ, không chiếm hết trang (max-height 400,
+   width co lại và căn giữa thay vì full-bleed theo bề ngang thẻ) */
 .ts-task-image-wrap {
-  margin: 12px 0;
+  margin: 4px auto 16px;
   text-align: center;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 12px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.25), 0 10px 24px rgba(0,0,0,0.3);
+  background: #fff;
+  border-radius: 6px;
+  padding: 10px;
+  border: 1px solid #374151;
+  max-width: 480px;
 }
 .ts-task-image-wrap .ts-task-image {
   max-width: 100%;
-  max-height: 320px;
-  min-height: 120px;
-  border-radius: 6px;
+  max-height: 400px;
+  min-height: 100px;
+  border-radius: 4px;
   object-fit: contain;
 }
 
+/* Đánh giá Đạt/Không đạt — segmented control 2 lựa chọn, không phải nút hành
+   động to màu mè (đây là công cụ đánh giá, không phải nút "bấm để chơi"). */
 .ts-bigbtns {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin: 18px 0 8px;
+  gap: 8px;
+  margin: 16px 0 4px;
+  padding: 3px;
+  background: #111827;
+  border: 1px solid #374151;
+  border-radius: 6px;
 }
 .ts-bigbtn {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 96px;
-  border-radius: 14px;
-  border: 2px solid rgba(148, 163, 184, 0.25);
-  background: rgba(148, 163, 184, 0.06);
-  color: inherit;
-  font-size: 20px;
-  font-weight: 800;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.12s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.ts-bigbtn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
-.ts-bigbtn:active { transform: scale(0.97); }
-.ts-bigbtn-pts { font-size: 14px; font-weight: 600; opacity: 0.75; }
-.ts-bigbtn-pass.selected,
-.ts-bigbtn-pass:hover { border-color: #22c55e; background: rgba(34, 197, 94, 0.12); color: #22c55e; }
-.ts-bigbtn-fail.selected,
-.ts-bigbtn-fail:hover { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.ts-bigbtn:hover { color: #d1d5db; }
+.ts-bigbtn-pts { font-size: 12px; font-weight: 500; opacity: 0.8; }
+.ts-bigbtn-pass.selected {
+  background: rgba(16,185,129,0.12);
+  border-color: #10b981;
+  color: #10b981;
+}
+.ts-bigbtn-fail.selected {
+  background: rgba(239,68,68,0.1);
+  border-color: #ef4444;
+  color: #f87171;
+}
 
-.ts-count-box { text-align: center; margin: 18px 0 8px; }
-.ts-count-label { font-size: 14px; font-weight: 600; margin-bottom: 10px; opacity: 0.85; }
-.ts-count-calc { margin-top: 10px; font-size: 16px; }
-.ts-count-calc strong { font-size: 20px; }
-.ts-count-max { font-size: 12px; opacity: 0.6; }
+.ts-count-box { text-align: center; margin: 16px 0 4px; }
+.ts-count-label { font-size: 13px; font-weight: 500; margin-bottom: 10px; color: #9ca3af; }
+.ts-count-calc { margin-top: 10px; font-size: 14px; color: #9ca3af; }
+.ts-count-calc strong { font-size: 17px; color: #f9fafb; }
+.ts-count-max { font-size: 12px; opacity: 0.7; }
 
 .ts-input-stepper-xl { justify-content: center; }
 .ts-input-stepper-xl button {
-  width: 64px;
-  height: 64px;
-  font-size: 28px;
-  border-radius: 14px;
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+  border-radius: 6px;
 }
 .ts-input-stepper-xl input {
-  width: 90px;
-  height: 64px;
-  font-size: 28px;
-  font-weight: 800;
+  width: 80px;
+  height: 52px;
+  font-size: 22px;
+  font-weight: 700;
   text-align: center;
 }
 
-.ts-sheet-sub { font-size: 13px; opacity: 0.7; margin: -6px 0 12px; }
+.ts-sheet-sub { font-size: 13px; color: #9ca3af; margin: -6px 0 12px; }
 .ts-sheet-table { width: 100%; }
 .ts-sheet-table .ts-col-qty { text-align: center; width: 90px; }
 .ts-sheet-table .ts-col-pts { text-align: right; width: 80px; }
 .ts-sheet-total td {
-  font-weight: 800;
-  font-size: 16px;
-  border-top: 2px solid rgba(148, 163, 184, 0.4);
+  font-weight: 700;
+  font-size: 15px;
+  border-top: 1px solid #4b5563;
   padding-top: 10px;
 }
 .ts-not-scored { font-size: 12px; color: #f59e0b; }
-.ts-hint-inline { font-size: 12px; opacity: 0.65; font-weight: 400; }
-
-@media (pointer: coarse) {
-  .referee-panel .ts-bigbtn { min-height: 110px; font-size: 22px; }
-}
+.ts-hint-inline { font-size: 12px; color: #9ca3af; font-weight: 400; }
 
 /* ─── Bảng xếp hạng (trọng tài) ──────────────────────────────── */
 .referee-panel .rt-rank {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
   font-size: 12px;
-  font-weight: 700;
-  background: rgba(255,255,255,0.06);
-  color: #94a3b8;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid #374151;
+  color: #9ca3af;
 }
-.referee-panel .rt-rank-1 { background: rgba(251,191,36,0.18); color: #fbbf24; }
-.referee-panel .rt-rank-2 { background: rgba(203,213,225,0.18); color: #e2e8f0; }
-.referee-panel .rt-rank-3 { background: rgba(217,119,6,0.18); color: #f59e0b; }
+.referee-panel .rt-rank-1 { border-color: #f59e0b; color: #f59e0b; }
+.referee-panel .rt-rank-2 { border-color: #9ca3af; color: #d1d5db; }
+.referee-panel .rt-rank-3 { border-color: #b45309; color: #d97706; }

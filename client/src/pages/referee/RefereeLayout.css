@@ -6,24 +6,27 @@
 .referee-panel {
   min-height: 100vh;
   font-family: 'Be Vietnam Pro', 'Segoe UI', sans-serif;
-  background: #0d1221;
+  background: #111827;
 
-  /* Design tokens — 3 lớp nền xám-xanh đậm (không đen tuyền) */
-  --bg-0: #0b1120;
-  --bg-1: #0d1221;
-  --bg-2: #111827;
-  --accent: #7c3aed;
-  --accent-soft: #a78bfa;
-  --success: #22c55e;
+  /* Design tokens — flat enterprise palette (1 accent, không gradient/glow) */
+  --bg-0: #0b1220;
+  --bg-1: #111827;
+  --bg-2: #1f2937;
+  --border: #374151;
+  --text: #f9fafb;
+  --text-muted: #9ca3af;
+  --accent: #2563eb;
+  --accent-soft: #3b82f6;
+  --success: #10b981;
   --danger: #ef4444;
   --warning: #f59e0b;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  /* Shadow nhiều lớp thật: 1 lớp sát viền (định hình khối) + 1 lớp lan tỏa xa (chiều sâu) */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.25);
-  --shadow-md: 0 2px 6px rgba(0,0,0,0.35), 0 8px 28px rgba(0,0,0,0.35);
-  --shadow-lg: 0 4px 12px rgba(0,0,0,0.4), 0 16px 48px rgba(0,0,0,0.4);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  /* Bề mặt phẳng, chỉ viền mỏng — không đổ bóng nhiều lớp */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.25);
 }
 
 /* ─── Sidebar ───────────────────────────────────────────────── */
@@ -31,7 +34,7 @@
   left: 0; top: 0;
   width: 268px;
   min-width: 268px;
-  background: #0b1120;
+  background: var(--bg-0);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -39,14 +42,15 @@
   height: 100vh;
   z-index: 100;
   transition: transform 0.3s ease;
-  border-right: 1px solid rgba(255,255,255,0.04);
+  border-right: 1px solid var(--border);
 }
 
+/* AdminLayout.css's ".nhutin-admin .sidebar::before" (shimmer gradient bar)
+   also matches here since this panel shares the .nhutin-admin class — tắt
+   hẳn, không dùng gradient/glow theo yêu cầu thiết kế phẳng. */
 .referee-panel .sidebar::before {
-  content: '';
-  display: block;
-  height: 3px;
-  background: linear-gradient(90deg, #7c3aed, #a78bfa, #06b6d4);
+  content: none;
+  display: none;
 }
 
 .referee-panel .sidebar-header {
@@ -54,15 +58,14 @@
   align-items: center;
   gap: 12px;
   padding: 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
 }
 
 .referee-panel .sidebar-logo-img {
   width: 44px; height: 44px;
   object-fit: contain;
-  border-radius: 10px;
-  filter: drop-shadow(0 0 6px rgba(124,58,237,0.4));
+  border-radius: var(--radius-sm);
 }
 
 .referee-panel .logo-text {
@@ -130,8 +133,8 @@
 }
 
 .referee-panel .nav-item.active {
-  background: rgba(124,58,237,0.18);
-  color: #c4b5fd;
+  background: rgba(37,99,235,0.15);
+  color: #93c5fd;
   font-weight: 600;
 }
 
@@ -141,7 +144,7 @@
   left: 0; top: 50%;
   transform: translateY(-50%);
   width: 3px; height: 20px;
-  background: #7c3aed;
+  background: var(--accent);
   border-radius: 0 3px 3px 0;
 }
 
@@ -177,8 +180,8 @@
 
 .referee-panel .user-avatar {
   width: 36px; height: 36px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -254,13 +257,13 @@
 .referee-panel .referee-page-title {
   font-size: 24px;
   font-weight: 800;
-  color: #f1f5f9;
+  color: #f9fafb;
   margin: 0 0 3px 0;
   letter-spacing: -0.03em;
 }
 
 .referee-panel .page-subtitle {
-  color: #64748b;
+  color: #9ca3af;
   font-size: 13.5px;
   margin: 0;
 }
@@ -272,7 +275,7 @@
 }
 
 .referee-panel .breadcrumb a {
-  color: #a78bfa;
+  color: var(--accent-soft);
   text-decoration: none;
 }
 .referee-panel .breadcrumb a:hover { text-decoration: underline; }
@@ -288,8 +291,7 @@
   border-radius: var(--radius-lg);
   padding: 24px;
   margin-bottom: 24px;
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
 }
 
 /* ─── Referee Grid (select screen) ─────────────────────────── */
@@ -304,13 +306,12 @@
   background: var(--bg-2);
   border-radius: var(--radius-lg);
   padding: 20px;
-  padding-left: 24px;
-  border: 1px solid rgba(255,255,255,0.06);
+  padding-left: 22px;
+  border: 1px solid var(--border);
   text-decoration: none;
   color: inherit;
   display: block;
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s, background 0.15s;
   overflow: hidden;
 }
 
@@ -318,33 +319,31 @@
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 4px;
-  background: linear-gradient(180deg, var(--accent), var(--accent-soft));
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.6;
+  transition: opacity 0.15s;
 }
 
 .referee-panel .referee-card:hover {
-  border-color: rgba(124,58,237,0.35);
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+  border-color: #4b5563;
   text-decoration: none;
   color: inherit;
-  background: #131c2e;
+  background: #24304a;
 }
 .referee-panel .referee-card:hover::before { opacity: 1; }
 
 .referee-panel .referee-card h3 {
   margin: 0 0 4px 0;
   font-size: 1rem;
-  color: #f1f5f9;
+  color: #f9fafb;
   font-weight: 700;
 }
 
 .referee-panel .referee-card p {
   margin: 0;
   font-size: 0.85rem;
-  color: #64748b;
+  color: #9ca3af;
 }
 
 /* ─── Steps ─────────────────────────────────────────────────── */
@@ -361,14 +360,14 @@
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 8px;
   font-size: 0.875rem;
-  color: #64748b;
+  color: #9ca3af;
   font-weight: 500;
 }
 
 .referee-panel .referee-steps .step.active {
-  background: rgba(124,58,237,0.2);
-  border-color: rgba(124,58,237,0.4);
-  color: #c4b5fd;
+  background: rgba(37,99,235,0.15);
+  border-color: rgba(37,99,235,0.35);
+  color: #93c5fd;
   font-weight: 600;
 }
 
@@ -378,77 +377,68 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 12px 18px;
-  min-height: 44px;
+  padding: 9px 16px;
+  min-height: 38px;
   border-radius: var(--radius-md);
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.18s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   text-decoration: none;
   font-family: inherit;
-  border: none;
+  border: 1px solid transparent;
   white-space: nowrap;
   letter-spacing: -0.01em;
   box-sizing: border-box;
 }
-.referee-panel .btn:active { transform: scale(0.98); }
 
 .referee-panel .btn-primary {
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  background: var(--accent);
   color: #fff;
-  box-shadow: 0 4px 14px rgba(124,58,237,0.35);
 }
-.referee-panel .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(124,58,237,0.5);
-}
+.referee-panel .btn-primary:hover { background: #1d4ed8; }
 
 .referee-panel .btn-secondary {
-  background: rgba(255,255,255,0.05);
-  color: #94a3b8;
-  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 .referee-panel .btn-secondary:hover {
-  background: rgba(255,255,255,0.09);
-  color: #f1f5f9;
-  border-color: rgba(255,255,255,0.18);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  border-color: #4b5563;
 }
 
 .referee-panel .btn-danger {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(220,38,38,0.3);
+  background: transparent;
+  color: #f87171;
+  border: 1px solid #7f1d1d;
 }
 .referee-panel .btn-danger:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(220,38,38,0.4);
+  background: rgba(239,68,68,0.1);
+  border-color: #ef4444;
 }
 
 .referee-panel .btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 16px;
-  border-radius: 10px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
   font-size: 13.5px;
   font-weight: 500;
-  color: #a78bfa;
+  color: var(--text-muted);
   background: transparent;
-  border: 1px solid rgba(167,139,250,0.2);
+  border: 1px solid var(--border);
   cursor: pointer;
   text-decoration: none;
   font-family: inherit;
   margin-bottom: 16px;
-  transition: all 0.18s;
+  transition: background 0.15s, color 0.15s;
 }
 .referee-panel .btn-ghost:hover {
-  background: rgba(124,58,237,0.1);
-  border-color: rgba(124,58,237,0.4);
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
   text-decoration: none;
-  transform: translateY(-1px);
 }
 
 /* ─── Filters ───────────────────────────────────────────────── */
@@ -473,15 +463,15 @@
   font-size: 13.5px;
   font-family: inherit;
   background: rgba(255,255,255,0.04);
-  color: #f1f5f9;
+  color: #f9fafb;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
 }
 .referee-panel .search-box input::placeholder { color: #475569; }
 .referee-panel .search-box input:focus {
   outline: none;
-  border-color: rgba(124,58,237,0.5);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
 }
 
 .referee-panel .filter-select {
@@ -491,21 +481,21 @@
   font-size: 13.5px;
   font-family: inherit;
   background: rgba(255,255,255,0.04);
-  color: #f1f5f9;
+  color: #f9fafb;
   cursor: pointer;
   min-width: 150px;
   transition: border-color 0.2s;
 }
 .referee-panel .filter-select:focus {
   outline: none;
-  border-color: rgba(124,58,237,0.5);
+  border-color: var(--accent);
 }
 
 /* ─── Table ─────────────────────────────────────────────────── */
 .referee-panel .table-container {
   overflow-x: auto;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
 }
 
 .referee-panel table {
@@ -530,12 +520,12 @@
   padding: 13px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.04);
   font-size: 13.5px;
-  color: #94a3b8;
+  color: #9ca3af;
 }
 
 .referee-panel tbody tr:last-child td { border-bottom: none; }
 .referee-panel tbody tr { transition: background 0.12s; }
-.referee-panel tbody tr:hover { background: rgba(124,58,237,0.05); }
+.referee-panel tbody tr:hover { background: rgba(255,255,255,0.03); }
 
 /* ─── Form ──────────────────────────────────────────────────── */
 .referee-panel .form-group { margin-bottom: 18px; }
@@ -545,7 +535,7 @@
   display: block;
   font-size: 12.5px;
   font-weight: 600;
-  color: #64748b;
+  color: #9ca3af;
   margin-bottom: 6px;
   letter-spacing: 0.01em;
 }
@@ -564,7 +554,7 @@
   font-size: 13.5px;
   font-family: inherit;
   background: rgba(255,255,255,0.04);
-  color: #f1f5f9;
+  color: #f9fafb;
   transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
 }
@@ -575,9 +565,9 @@
 .referee-panel .form-input:focus,
 .referee-panel .form-select:focus {
   outline: none;
-  border-color: rgba(124,58,237,0.55);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.13);
-  background: rgba(124,58,237,0.05);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+  background: rgba(255,255,255,0.04);
 }
 
 .referee-panel .form-group input.form-input-error,
@@ -621,8 +611,7 @@
 .referee-panel .score-form-card {
   background: var(--bg-2);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255,255,255,0.06);
-  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
   max-width: 520px;
   overflow: hidden;
 }
@@ -637,7 +626,7 @@
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: #f9fafb;
 }
 
 .referee-panel .score-form-card .score-form-body { padding: 24px; }
@@ -658,7 +647,7 @@
 
 .referee-panel .score-form-card .form-note {
   font-size: 13px;
-  color: #64748b;
+  color: #9ca3af;
   margin: -4px 0 16px 0;
 }
 
@@ -683,15 +672,15 @@
 
 .referee-panel .form-modal {
   background: var(--bg-2);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   max-width: 560px;
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(124,58,237,0.06);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
 }
 
 .referee-panel .form-modal-header {
@@ -706,7 +695,7 @@
 .referee-panel .form-modal-title {
   font-size: 17px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: #f9fafb;
   margin: 0;
 }
 
@@ -715,7 +704,7 @@
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 8px;
   background: rgba(255,255,255,0.04);
-  color: #64748b;
+  color: #9ca3af;
   font-size: 16px;
   cursor: pointer;
   display: flex;
@@ -769,7 +758,7 @@
 .referee-panel .card-title {
   font-size: 16px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: #f9fafb;
   letter-spacing: -0.02em;
 }
 

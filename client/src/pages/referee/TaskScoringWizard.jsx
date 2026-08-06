@@ -236,7 +236,10 @@ export default function TaskScoringWizard({
             {team?.boards?.name && <span className="ts-board-chip">{team.boards.name}</span>}
             {existingScore && <span className="ts-edit-chip">Editing</span>}
           </div>
-          <div className="ts-content-name">{content?.name}</div>
+          <div className="ts-content-name">
+            {content?.name}
+            {step === 1 && (isBonusScreen ? ' · Extra reward' : ` · Task ${screenIdx + 1} of ${tasks.length}`)}
+          </div>
         </div>
         <div className="ts-header-score">
           <div className="ts-score-label">Total</div>
@@ -274,14 +277,14 @@ export default function TaskScoringWizard({
               <h3 className="ts-task-name">{currentTask.name}</h3>
               {currentTask.name_en && <div className="ts-task-name-en">{currentTask.name_en}</div>}
 
+              {currentTask.description && (
+                <p className="ts-task-desc">{currentTask.description}</p>
+              )}
+
               {curImg && (
                 <div className="ts-task-image-wrap">
                   <img src={curImg} alt={currentTask.name} className="ts-task-image" />
                 </div>
-              )}
-
-              {currentTask.description && (
-                <p className="ts-task-desc">{currentTask.description}</p>
               )}
 
               {/* binary: 2 nút to */}
