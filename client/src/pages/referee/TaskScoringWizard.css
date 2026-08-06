@@ -981,3 +981,20 @@
 @media (pointer: coarse) {
   .referee-panel .ts-bigbtn { min-height: 110px; font-size: 22px; }
 }
+
+/* ─── Bảng xếp hạng (trọng tài) ──────────────────────────────── */
+.referee-panel .rt-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  color: #94a3b8;
+}
+.referee-panel .rt-rank-1 { background: rgba(251,191,36,0.18); color: #fbbf24; }
+.referee-panel .rt-rank-2 { background: rgba(203,213,225,0.18); color: #e2e8f0; }
+.referee-panel .rt-rank-3 { background: rgba(217,119,6,0.18); color: #f59e0b; }

@@ -263,6 +263,13 @@ create table if not exists referee_boards (
 );
 create index if not exists idx_referee_boards_board on referee_boards(board_id);
 
+-- Phân quyền xem Bảng xếp hạng cho trọng tài — mặc định trọng tài chỉ chấm
+-- điểm (false); admin bật cờ này cho từng tài khoản để họ thấy thêm mục
+-- "Bảng xếp hạng" (toàn giải, không giới hạn theo referee_boards) trong menu
+-- trọng tài. Không phải cột bảo mật dữ liệu (bảng xếp hạng vốn đã public qua
+-- trang chủ) — chỉ là bật/tắt tính năng hiển thị trong khu vực trọng tài.
+alter table users add column if not exists can_view_scoreboard boolean not null default false;
+
 -- Mỗi đội thi 2 lượt độc lập / nội dung (lượt 1 + lượt 2), có thể chấm ở 2
 -- thời điểm khác nhau — thay cho "mỗi đội 1 phiếu duy nhất" trước đây.
 drop index if exists uq_scores_team_content;

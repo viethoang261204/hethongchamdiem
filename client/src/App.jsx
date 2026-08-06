@@ -30,6 +30,7 @@ import RefereeTeams from './pages/referee/RefereeTeams';
 import RefereeScoreForm from './pages/referee/RefereeScoreForm';
 import RefereeScoreHistory from './pages/referee/RefereeScoreHistory';
 import RefereeComplaints from './pages/referee/RefereeComplaints';
+import RefereeScoreboard from './pages/referee/RefereeScoreboard';
 import RefereeScoreDetail from './pages/referee/RefereeScoreDetail';
 import RefereeMatches from './pages/referee/RefereeMatches';
 import RefereeCombatDrone from './pages/referee/RefereeCombatDrone';
@@ -119,6 +120,7 @@ export default function App() {
               <Route path="competition/:competitionId/content/:contentId/region/:region/team/:teamId/round/:roundNo/score" element={<RefereeScoreForm />} />
               <Route path="history" element={<RefereeScoreHistory />} />
               <Route path="complaints" element={<RefereeComplaints />} />
+              <Route path="scoreboard" element={<RefereeScoreboard />} />
               <Route path="history/:scoreId" element={<RefereeScoreDetail />} />
             </>
           )}

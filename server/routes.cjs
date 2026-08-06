@@ -1424,7 +1424,7 @@ router.get('/users', requireAdmin, h(async (req, res) => {
   let where = '';
   if (req.query.role) { vals.push(req.query.role); where = 'where role = $1'; }
   const { rows } = await query(
-    `select id, email, username, full_name, role, area_id, created_at from users ${where} order by created_at`,
+    `select id, email, username, full_name, role, area_id, can_view_scoreboard, created_at from users ${where} order by created_at`,
     vals
   );
   res.json(rows);
@@ -1432,7 +1432,7 @@ router.get('/users', requireAdmin, h(async (req, res) => {
 
 // Tạo tài khoản trọng tài (thay thế Supabase Edge Function create-referee-user)
 router.post('/users/referee', requireAdmin, h(async (req, res) => {
-  const { email, password, username, full_name, area_id } = req.body || {};
+  const { email, password, username, full_name, area_id, can_view_scoreboard } = req.body || {};
   if (!email || !password || !username) {
     return res.status(400).json({ error: 'Thiếu email, password hoặc username' });
   }
@@ -1440,10 +1440,10 @@ router.post('/users/referee', requireAdmin, h(async (req, res) => {
     return res.status(400).json({ error: 'Mật khẩu phải ít nhất 6 ký tự.' });
   }
   const { rows } = await query(
-    `insert into users (email, username, password, full_name, role, area_id)
-     values ($1, $2, crypt($3, gen_salt('bf')), $4, 'referee', $5)
-     returning id, email, username, full_name, role, area_id`,
-    [String(email).trim(), String(username).trim(), String(password), full_name || username, area_id ?? null]
+    `insert into users (email, username, password, full_name, role, area_id, can_view_scoreboard)
+     values ($1, $2, crypt($3, gen_salt('bf')), $4, 'referee', $5, $6)
+     returning id, email, username, full_name, role, area_id, can_view_scoreboard`,
+    [String(email).trim(), String(username).trim(), String(password), full_name || username, area_id ?? null, !!can_view_scoreboard]
   );
   res.json({ user: rows[0] });
 }));
@@ -1483,7 +1483,7 @@ router.post('/users/referee/import', requireAdmin, h(async (req, res) => {
 }));
 
 router.put('/users/:id', requireAdmin, h(async (req, res) => {
-  const data = pick(req.body, ['full_name', 'area_id', 'role']);
+  const data = pick(req.body, ['full_name', 'area_id', 'role', 'can_view_scoreboard']);
   // Đổi mật khẩu: hash lại bằng bcrypt trong DB
   if (req.body.password) {
     const { rows } = await query(
@@ -1494,11 +1494,11 @@ router.put('/users/:id', requireAdmin, h(async (req, res) => {
   }
   const q = buildUpdate('users', req.params.id, data);
   if (!q) {
-    const { rows } = await query('select id, email, username, full_name, role, area_id from users where id = $1', [req.params.id]);
+    const { rows } = await query('select id, email, username, full_name, role, area_id, can_view_scoreboard from users where id = $1', [req.params.id]);
     return res.json(rows[0] || {});
   }
   const { rows } = await query(
-    q.text.replace('returning *', 'returning id, email, username, full_name, role, area_id'),
+    q.text.replace('returning *', 'returning id, email, username, full_name, role, area_id, can_view_scoreboard'),
     q.values
   );
   res.json(rows[0]);

@@ -386,10 +386,10 @@ export const api = {
   getUsers: (role) => withRetry(() => request(`/users${role ? `?role=${role}` : ''}`), 'getUsers'),
 
   // Tạo tài khoản referee (token lấy tự động từ localStorage — tham số thứ 2 giữ để tương thích)
-  createRefereeUser: async ({ email, password, username, full_name, area_id }) => {
+  createRefereeUser: async ({ email, password, username, full_name, area_id, can_view_scoreboard }) => {
     const data = await withRetry(() => request('/users/referee', {
       method: 'POST',
-      body: { email, password, username, full_name, area_id },
+      body: { email, password, username, full_name, area_id, can_view_scoreboard },
     }), 'createRefereeUser');
     return data.user;
   },
@@ -402,6 +402,9 @@ export const api = {
     if (body.area_id !== undefined || body.areaId !== undefined) update.area_id = body.area_id ?? body.areaId;
     if (body.role !== undefined) update.role = body.role;
     if (body.password) update.password = body.password;
+    if (body.can_view_scoreboard !== undefined || body.canViewScoreboard !== undefined) {
+      update.can_view_scoreboard = body.can_view_scoreboard ?? body.canViewScoreboard;
+    }
     return withRetry(() => request(`/users/${id}`, { method: 'PUT', body: update }), 'putUser');
   },
 

@@ -22,7 +22,7 @@ export default function AdminRefereeAccounts() {
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', full_name: '' });
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', can_view_scoreboard: false });
   const [saving, setSaving] = useState(false);
   const [errorMsg, setError] = useState('');
   const [errors, setErrors] = useState({});
@@ -74,7 +74,7 @@ export default function AdminRefereeAccounts() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ email: '', password: '', full_name: '' });
+    setForm({ email: '', password: '', full_name: '', can_view_scoreboard: false });
     setError('');
     setErrors({});
   };
@@ -82,7 +82,7 @@ export default function AdminRefereeAccounts() {
   const openEdit = (u) => {
     setModal({ id: u.id });
     // Bảng users dùng username làm email đăng nhập, không có cột email riêng
-    setForm({ email: u.username, password: '', full_name: u.full_name || '' });
+    setForm({ email: u.username, password: '', full_name: u.full_name || '', can_view_scoreboard: !!u.can_view_scoreboard });
     setError('');
     setErrors({});
   };
@@ -112,10 +112,14 @@ export default function AdminRefereeAccounts() {
           password: form.password,
           username: form.email.trim().split('@')[0],
           full_name: form.full_name?.trim() || form.email.trim().split('@')[0],
+          can_view_scoreboard: form.can_view_scoreboard,
         });
       } else {
-        // Sửa: full_name + (tùy chọn) mật khẩu mới
-        const body = { full_name: form.full_name?.trim() || form.email.split('@')[0] };
+        // Sửa: full_name + (tùy chọn) mật khẩu mới + quyền xem bảng xếp hạng
+        const body = {
+          full_name: form.full_name?.trim() || form.email.split('@')[0],
+          can_view_scoreboard: form.can_view_scoreboard,
+        };
         if (form.password) body.password = form.password;
         await api.putUser(modal.id, body);
       }
@@ -183,20 +187,26 @@ export default function AdminRefereeAccounts() {
                 <th>Tên đăng nhập (email)</th>
                 <th>Họ tên</th>
                 <th>Vai trò</th>
+                <th>Loại chấm điểm</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có tài khoản trọng tài. Bấm "Thêm tài khoản" để tạo mới.</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có tài khoản trọng tài. Bấm "Thêm tài khoản" để tạo mới.</td></tr>
               ) : (
                 filtered.map((u) => (
                   <tr key={u.id}>
                     <td>{u.username}</td>
                     <td>{u.full_name || '-'}</td>
                     <td><span className="badge badge-blue">{u.role}</span></td>
+                    <td>
+                      {u.can_view_scoreboard
+                        ? <span className="badge badge-green">Xem được BXH</span>
+                        : <span className="badge badge-blue" style={{ background: '#f1f5f9', color: '#64748b', borderColor: '#e2e8f0' }}>Chấm điểm bình thường</span>}
+                    </td>
                     <td>
                       <button type="button" className="btn btn-secondary" onClick={() => openEdit(u)}>Sửa</button>
                       <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={() => openBoards(u)}>Phân quyền bảng đấu</button>
@@ -250,6 +260,38 @@ export default function AdminRefereeAccounts() {
                 placeholder={modal !== 'add' ? 'Để trống = giữ nguyên' : 'Ít nhất 6 ký tự'}
               />
               {errors.password && <div className="form-error-text">{errors.password}</div>}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Loại chấm điểm</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontWeight: 400 }}>
+                  <input
+                    type="radio"
+                    name="can_view_scoreboard"
+                    checked={!form.can_view_scoreboard}
+                    onChange={() => setForm({ ...form, can_view_scoreboard: false })}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    <strong>Chấm điểm bình thường</strong>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Chỉ nhập phiếu điểm, không thấy Bảng xếp hạng.</div>
+                  </span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontWeight: 400 }}>
+                  <input
+                    type="radio"
+                    name="can_view_scoreboard"
+                    checked={form.can_view_scoreboard}
+                    onChange={() => setForm({ ...form, can_view_scoreboard: true })}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span>
+                    <strong>Chấm điểm + Xem bảng xếp hạng</strong>
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>Thấy thêm mục "Bảng xếp hạng" (toàn giải) trong menu trọng tài.</div>
+                  </span>
+                </label>
+              </div>
             </div>
             </div>
             <div className="form-actions">
