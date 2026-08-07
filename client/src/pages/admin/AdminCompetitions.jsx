@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -39,6 +41,8 @@ export default function AdminCompetitions() {
     if (filterActive === 'inactive') l = l.filter(c => c.is_active === false);
     return l;
   }, [list, search, filterActive]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const openAdd = () => {
     setModal('add');
@@ -140,7 +144,7 @@ export default function AdminCompetitions() {
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
-              ) : filtered.map((c) => (
+              ) : pageItems.map((c) => (
               <tr key={c.id}>
                 <td>
                   <Link to={`/admin/contents?competitionId=${c.id}`}>{c.name}</Link>
@@ -157,6 +161,7 @@ export default function AdminCompetitions() {
           </tbody>
         </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

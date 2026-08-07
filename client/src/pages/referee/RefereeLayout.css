@@ -801,3 +801,59 @@
     margin: 12mm 10mm;
   }
 }
+
+/* ─── Pagination ─────────────────────────────────────────────── */
+.referee-panel .pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 4px 4px;
+}
+.referee-panel .pagination-info {
+  font-size: 13px;
+  color: var(--text-muted, #9ca3af);
+}
+.referee-panel .pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.referee-panel .pagination-arrow {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #374151);
+  background: transparent;
+  color: var(--text-muted, #9ca3af);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.referee-panel .pagination-arrow:hover:not(:disabled) { border-color: #4b5563; color: #f9fafb; }
+.referee-panel .pagination-arrow:disabled { opacity: 0.4; cursor: not-allowed; }
+.referee-panel .pagination-page {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, #9ca3af);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.referee-panel .pagination-page:hover { border-color: #4b5563; color: #f9fafb; }
+.referee-panel .pagination-page.active {
+  background: rgba(37,99,235,0.12);
+  border-color: var(--accent, #2563eb);
+  color: #93c5fd;
+}
+.referee-panel .pagination-ellipsis {
+  color: #6b7280;
+  font-size: 13px;
+  padding: 0 4px;
+}

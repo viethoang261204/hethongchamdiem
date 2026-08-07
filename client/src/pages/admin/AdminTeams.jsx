@@ -4,6 +4,8 @@ import { api } from '../../api';
 import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -120,6 +122,8 @@ export default function AdminTeams() {
     if (filterBoard === UNASSIGNED) return compFiltered.filter(t => !t.board_id);
     return compFiltered.filter(t => t.board_id === filterBoard);
   }, [compFiltered, filterBoard]);
+
+  const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
 
   const studentsFiltered = useMemo(() => {
     if (!schoolFilter) return students;
@@ -374,7 +378,7 @@ export default function AdminTeams() {
             <tbody>
               {teamsFiltered.length === 0 ? (
                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
-              ) : teamsFiltered.map((t) => {
+              ) : teamsPage.map((t) => {
                 const compName = getCompetitionName(t.contest_content_id);
                 const mems = (t.student_ids || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
                 return (
@@ -397,6 +401,7 @@ export default function AdminTeams() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

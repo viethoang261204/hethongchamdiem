@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -40,6 +42,8 @@ export default function AdminSchools() {
     if (filterProvince) l = l.filter(x => (x.province || '') === filterProvince);
     return l;
   }, [list, search, filterLevel, filterProvince]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const provinces = useMemo(() =>
     [...new Set(list.map(s => s.province).filter(Boolean))].sort(),
@@ -179,7 +183,7 @@ export default function AdminSchools() {
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
-              ) : filtered.map((s) => (
+              ) : pageItems.map((s) => (
                 <tr key={s.id}>
                   <td>{s.name}</td>
                   <td>{levelLabel(s.level)}</td>
@@ -194,6 +198,7 @@ export default function AdminSchools() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

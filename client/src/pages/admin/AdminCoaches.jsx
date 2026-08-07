@@ -3,6 +3,8 @@ import { api } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -34,6 +36,8 @@ export default function AdminCoaches() {
       (x.email || '').toLowerCase().includes(s)
     );
   }, [list, search]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const openAdd = () => {
     setModal('add');
@@ -140,7 +144,7 @@ export default function AdminCoaches() {
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có HLV nào.</td></tr>
-              ) : filtered.map((c) => (
+              ) : pageItems.map((c) => (
                 <tr key={c.id}>
                   <td style={{ fontWeight: 600 }}>{c.name}</td>
                   <td>{c.phone || '-'}</td>
@@ -155,6 +159,7 @@ export default function AdminCoaches() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

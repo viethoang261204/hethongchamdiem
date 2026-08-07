@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { createCachedApi } from '../../apiCache';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import './RefereeLayout.css';
 
 const capi = createCachedApi(api);
@@ -65,6 +67,8 @@ export default function RefereeTeams() {
     return l;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamsInBoard, filter, search, scoresByTeam]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const stats = useMemo(() => {
     let done = 0, partial = 0, pending = 0;
@@ -133,7 +137,7 @@ export default function RefereeTeams() {
         </div>
       ) : (
         <div className="referee-grid">
-          {filtered.map((t) => {
+          {pageItems.map((t) => {
             const mems = (t.student_ids || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
             const memberNames = mems.map(m => m.full_name).join(', ');
             const isCombat = boardFormatById[t.board_id] === 'combat';
@@ -180,6 +184,7 @@ export default function RefereeTeams() {
           })}
         </div>
       )}
+      <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </div>
   );
 }

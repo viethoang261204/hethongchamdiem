@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useAuth } from '../../App';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import './RefereeLayout.css';
 
 function formatDate(iso) {
@@ -36,6 +38,8 @@ export default function RefereeScoreHistory() {
       .finally(() => setLoading(false));
   }, [user?.id]);
 
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(scores, 10);
+
   if (loading) return <p className="referee-page-title">Đang tải...</p>;
 
   return (
@@ -60,7 +64,7 @@ export default function RefereeScoreHistory() {
                 </tr>
               </thead>
               <tbody>
-                {scores.map((s) => (
+                {pageItems.map((s) => (
                   <tr key={s.id}>
                     <td>{formatDate(s.submitted_at)}</td>
                     <td>{s.team?.name || '-'}</td>
@@ -76,6 +80,7 @@ export default function RefereeScoreHistory() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
         </div>
       )}
     </div>

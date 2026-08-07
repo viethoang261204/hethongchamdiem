@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import { useAuth } from '../../App';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
@@ -71,6 +73,8 @@ export default function AdminRefereeAccounts() {
       (u.full_name || '').toLowerCase().includes(s)
     );
   }, [list, search]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const openAdd = () => {
     setModal('add');
@@ -197,7 +201,7 @@ export default function AdminRefereeAccounts() {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có tài khoản trọng tài. Bấm "Thêm tài khoản" để tạo mới.</td></tr>
               ) : (
-                filtered.map((u) => (
+                pageItems.map((u) => (
                   <tr key={u.id}>
                     <td>{u.username}</td>
                     <td>{u.full_name || '-'}</td>
@@ -218,6 +222,7 @@ export default function AdminRefereeAccounts() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

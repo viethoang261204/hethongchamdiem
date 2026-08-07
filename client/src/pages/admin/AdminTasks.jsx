@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { api, taskImageUrl } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -88,6 +90,8 @@ export default function AdminTasks() {
     }
     return l;
   }, [tasks, search, filterComp, filterContent, contents]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const contentName = (id) => {
     const c = contents.find(x => x.id === id);
@@ -300,9 +304,9 @@ export default function AdminTasks() {
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có nhiệm vụ nào</td></tr>
-              ) : filtered.map((t, idx) => (
+              ) : pageItems.map((t, idx) => (
                 <tr key={t.id}>
-                  <td>{t.order_index ?? idx + 1}</td>
+                  <td>{t.order_index ?? (page - 1) * pageSize + idx + 1}</td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{t.name}</div>
                     {t.name_en && <div style={{ fontSize: 12, color: '#94a3b8' }}>{t.name_en}</div>}
@@ -335,6 +339,7 @@ export default function AdminTasks() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

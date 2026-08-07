@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import SignatureBox from '../../components/SignaturePad';
 import './AdminLayout.css';
 
@@ -24,7 +26,11 @@ export default function AdminComplaints() {
   const [resolveModal, setResolveModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const filtered = filterStatus ? list.filter((c) => c.status === filterStatus) : list;
+  const filtered = useMemo(
+    () => (filterStatus ? list.filter((c) => c.status === filterStatus) : list),
+    [list, filterStatus]
+  );
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const openResolve = (c, status) => {
     const snap = c.score_snapshot || {};
@@ -120,7 +126,7 @@ export default function AdminComplaints() {
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có khiếu nại nào.</td></tr>
-              ) : filtered.map((c) => {
+              ) : pageItems.map((c) => {
                 const st = STATUS_BADGE[c.status] || STATUS_BADGE.pending;
                 return (
                   <tr key={c.id}>
@@ -146,6 +152,7 @@ export default function AdminComplaints() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {resolveModal && (

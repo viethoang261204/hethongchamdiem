@@ -4,6 +4,8 @@ import { api } from '../../api';
 import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import SignatureBox from '../../components/SignaturePad';
 import './AdminLayout.css';
@@ -91,6 +93,8 @@ export default function AdminScores() {
     }
     return list;
   }, [scores, filterComp, filterContent, filterBoard, search, contents]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const contentName = (id) => contents.find(c => c.id === id)?.name || id;
   const compName = (id) => competitions.find(c => c.id === id)?.name || id;
@@ -310,7 +314,7 @@ export default function AdminScores() {
                 <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có phiếu điểm</td></tr>
-              ) : filtered.map((s) => {
+              ) : pageItems.map((s) => {
                 const imgs = images[s.id] || [];
                 return (
                   <tr key={s.id}>
@@ -356,6 +360,7 @@ export default function AdminScores() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (

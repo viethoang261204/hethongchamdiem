@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -50,6 +52,8 @@ export default function AdminContentsPage() {
     }
     return l;
   }, [selectedComp, search, allContents]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(contents, 10);
 
   const selectedCompData = competitions.find(c => c.id === selectedComp);
 
@@ -211,9 +215,9 @@ export default function AdminContentsPage() {
                   <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
                 ) : contents.length === 0 ? (
                   <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có nội dung nào.</td></tr>
-                ) : contents.map((c, i) => (
+                ) : pageItems.map((c, i) => (
                   <tr key={c.id}>
-                    <td>{c.order_index ?? i + 1}</td>
+                    <td>{c.order_index ?? (page - 1) * pageSize + i + 1}</td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{c.name}</div>
                     </td>
@@ -235,6 +239,7 @@ export default function AdminContentsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
         </div>
       ) : (
         <div style={{ textAlign: 'center', padding: '48px 24px', color: '#888' }}>

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import './RefereeLayout.css';
 
 const STATUS_LABEL = {
@@ -109,6 +111,8 @@ export default function RefereeComplaints() {
     }
   };
 
+  const { pageItems: complaintsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(complaints, 10);
+
   if (loading) return <p className="referee-page-title">Đang tải...</p>;
 
   return (
@@ -191,7 +195,7 @@ export default function RefereeComplaints() {
         <div className="card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Bạn chưa gửi khiếu nại nào.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {complaints.map((c) => {
+          {complaintsPage.map((c) => {
             const st = STATUS_LABEL[c.status] || STATUS_LABEL.pending;
             return (
               <div className="ts-card" key={c.id}>
@@ -213,6 +217,7 @@ export default function RefereeComplaints() {
           })}
         </div>
       )}
+      <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
     </div>
   );
 }

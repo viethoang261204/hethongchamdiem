@@ -3,6 +3,8 @@ import { api } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import { exportToPdf, exportMultipleToPdf } from '../referee/exportPdf';
 import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
@@ -82,6 +84,7 @@ export default function AdminCombatMatches() {
   const teams = cdata?.teams || [];
   const matches = cdata?.matches || [];
   const tasks = cdata?.tasks || [];
+  const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matches, 10);
 
   const [modal, setModal] = useState(null); // 'add' | { id }
   const [form, setForm] = useState({ team_a_id: '', team_b_id: '', team_a_no: '', team_b_no: '', stage: '', group_label: '', match_no: '', board_id: '' });
@@ -438,7 +441,7 @@ export default function AdminCombatMatches() {
                 <tbody>
                   {matches.length === 0 ? (
                     <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có trận nào.</td></tr>
-                  ) : matches.map((m) => (
+                  ) : matchesPage.map((m) => (
                     <tr key={m.id}>
                       <td>
                         {m.stage || '-'}
@@ -468,6 +471,7 @@ export default function AdminCombatMatches() {
                 </tbody>
               </table>
             </div>
+            <Pagination page={matchesPageNo} pageCount={matchesPageCount} onChange={setMatchesPage} totalItems={matchesTotal} pageSize={matchesPageSize} />
           </div>
 
           {viewMatchId && (

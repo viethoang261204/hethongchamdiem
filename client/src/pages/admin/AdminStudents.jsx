@@ -3,6 +3,8 @@ import { api } from '../../api';
 import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
@@ -53,6 +55,8 @@ export default function AdminStudents() {
     if (filterGrade) l = l.filter(x => (x.grade || '') === filterGrade);
     return l;
   }, [list, search, filterGrade]);
+
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const grades = useMemo(() => [...new Set(list.map(s => s.grade).filter(Boolean))].sort(), [list]);
 
@@ -162,7 +166,7 @@ export default function AdminStudents() {
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
-              ) : filtered.map((s) => (
+              ) : pageItems.map((s) => (
               <tr key={s.id}>
                 <td>{s.full_name}</td>
                 <td>{s.grade || '-'}</td>
@@ -178,6 +182,7 @@ export default function AdminStudents() {
           </tbody>
         </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
 
       {modal && (
