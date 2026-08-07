@@ -928,6 +928,45 @@
   color: #f87171;
 }
 
+/* Nhiệm vụ nhiều mức — chọn ĐÚNG 1 trong danh sách mức đạt (label thường dài
+   nên xếp dọc, mỗi mức 1 hàng thay vì lưới 2 cột như Pass/Fail). */
+.ts-tier-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 4px;
+}
+.ts-tier-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+  background: transparent;
+  color: #d1d5db;
+  font-size: 13.5px;
+  font-family: inherit;
+  text-align: left;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.ts-tier-btn:hover { border-color: #4b5563; color: #f9fafb; }
+.ts-tier-btn.selected {
+  border-color: #2563eb;
+  background: rgba(37,99,235,0.1);
+  color: #f9fafb;
+}
+.ts-tier-btn-pts {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: #9ca3af;
+}
+.ts-tier-btn.selected .ts-tier-btn-pts { color: #93c5fd; }
+
 .ts-count-box { text-align: center; margin: 16px 0 4px; }
 .ts-count-label { font-size: 13px; font-weight: 500; margin-bottom: 10px; color: #9ca3af; }
 .ts-count-calc { margin-top: 10px; font-size: 14px; color: #9ca3af; }

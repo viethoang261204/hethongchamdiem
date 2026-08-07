@@ -9,7 +9,7 @@ const SCORING_TYPES = [
   { value: 'binary',  label: 'Tick đạt / không đạt' },
   { value: 'count',   label: 'Đếm số lượng (điểm × số lượng)' },
   { value: 'numeric', label: 'Nhập điểm tay' },
-  { value: 'tier',    label: 'Phân hạng (legacy)' },
+  { value: 'tier',    label: 'Nhiều mức đạt (chọn 1 trong nhiều mức điểm)' },
 ];
 
 const IMPORT_COLUMNS = [
@@ -21,7 +21,12 @@ const IMPORT_COLUMNS = [
   { key: 'max_count', label: 'Số lượng tối đa', required: false, example: '' },
 ];
 
-const emptyForm = {
+// 1 mức (tier) trống — { label, points }
+const emptyTier = () => ({ label: '', points: '' });
+
+// Hàm khởi tạo (không phải object tĩnh) — tránh chia sẻ chung 1 mảng
+// tier_options giữa các lần mở form "Thêm nhiệm vụ" khác nhau.
+const emptyForm = () => ({
   contest_content_id: '',
   name: '',
   name_en: '',
@@ -29,9 +34,10 @@ const emptyForm = {
   max_score: 0,
   max_count: '',
   scoring_type: 'binary',
+  tier_options: [emptyTier(), emptyTier()],
   order_index: 0,
   is_active: true,
-};
+});
 
 export default function AdminTasks() {
   const { showConfirm, showAlert } = useNotify();
@@ -98,7 +104,7 @@ export default function AdminTasks() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ ...emptyForm, contest_content_id: filterContent || (contents[0]?.id || '') });
+    setForm({ ...emptyForm(), contest_content_id: filterContent || (contents[0]?.id || '') });
     setErrors({});
     resetImageState();
   };
@@ -113,12 +119,20 @@ export default function AdminTasks() {
       max_score: t.max_score ?? 0,
       max_count: t.max_count ?? '',
       scoring_type: t.scoring_type || 'binary',
+      tier_options: t.tier_options?.length ? t.tier_options.map((o) => ({ label: o.label ?? '', points: o.points ?? '' })) : [emptyTier(), emptyTier()],
       order_index: t.order_index ?? 0,
       is_active: t.is_active !== false,
     });
     setErrors({});
     resetImageState();
   };
+
+  const addTierRow = () => setForm((f) => ({ ...f, tier_options: [...f.tier_options, emptyTier()] }));
+  const removeTierRow = (idx) => setForm((f) => ({ ...f, tier_options: f.tier_options.filter((_, i) => i !== idx) }));
+  const updateTierRow = (idx, patch) => setForm((f) => ({
+    ...f,
+    tier_options: f.tier_options.map((o, i) => (i === idx ? { ...o, ...patch } : o)),
+  }));
 
   const onPickImage = (e) => {
     const file = e.target.files?.[0];
@@ -129,12 +143,21 @@ export default function AdminTasks() {
     setRemoveImage(false);
   };
 
+  // Các mức hợp lệ (có mô tả + điểm số) — dùng chung cho validate() và save()
+  const validTierOptions = () => form.tier_options
+    .filter((o) => o.label.trim() && o.points !== '' && !Number.isNaN(Number(o.points)))
+    .map((o) => ({ label: o.label.trim(), points: Number(o.points) }));
+
   const validate = () => {
     const errs = {};
     if (!form.contest_content_id) errs.contest_content_id = 'Chưa chọn nội dung thi.';
     if (!form.name.trim()) errs.name = 'Tên nhiệm vụ không được để trống.';
-    const max = Number(form.max_score);
-    if (Number.isNaN(max) || max < 0) errs.max_score = 'Điểm tối đa phải >= 0.';
+    if (form.scoring_type === 'tier') {
+      if (validTierOptions().length < 2) errs.tier_options = 'Cần ít nhất 2 mức, mỗi mức có mô tả và điểm số.';
+    } else {
+      const max = Number(form.max_score);
+      if (Number.isNaN(max) || max < 0) errs.max_score = 'Điểm tối đa phải >= 0.';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -146,14 +169,18 @@ export default function AdminTasks() {
     }
     setSaving(true);
     try {
+      const isTier = form.scoring_type === 'tier';
+      const tierOptions = isTier ? validTierOptions() : null;
       const body = {
         contest_content_id: form.contest_content_id,
         name: form.name.trim(),
         name_en: form.name_en?.trim() || null,
         description: form.description?.trim() || null,
-        max_score: Number(form.max_score) || 0,
+        // Nhiệm vụ nhiều mức: điểm tối đa tự tính = điểm mức cao nhất, không nhập tay
+        max_score: isTier ? Math.max(0, ...tierOptions.map((o) => o.points)) : (Number(form.max_score) || 0),
         max_count: form.scoring_type === 'count' && form.max_count !== '' ? Number(form.max_count) : null,
         scoring_type: form.scoring_type,
+        tier_options: tierOptions,
         order_index: Number(form.order_index) || 0,
         is_active: !!form.is_active,
       };
@@ -283,9 +310,16 @@ export default function AdminTasks() {
                   <td style={{ fontSize: 13 }}>{contentName(t.contest_content_id)}</td>
                   <td>{SCORING_TYPES.find(s => s.value === t.scoring_type)?.label || t.scoring_type}</td>
                   <td>
-                    {t.scoring_type === 'count'
-                      ? <strong>{t.max_score ?? 0} × SL{t.max_count ? ` (tối đa ${t.max_count})` : ''}</strong>
-                      : <strong>{t.max_score ?? 0}</strong>}
+                    {t.scoring_type === 'count' ? (
+                      <strong>{t.max_score ?? 0} × SL{t.max_count ? ` (tối đa ${t.max_count})` : ''}</strong>
+                    ) : t.scoring_type === 'tier' ? (
+                      <span>
+                        <strong>{t.max_score ?? 0}</strong>
+                        <span style={{ fontSize: 12, color: '#94a3b8' }}> ({t.tier_options?.length || 0} mức)</span>
+                      </span>
+                    ) : (
+                      <strong>{t.max_score ?? 0}</strong>
+                    )}
                   </td>
                   <td>
                     {t.is_active
@@ -371,21 +405,65 @@ export default function AdminTasks() {
                     {SCORING_TYPES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">
-                    {form.scoring_type === 'count' ? 'Điểm mỗi đơn vị' : 'Điểm tối đa'}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    className={`form-input ${errors.max_score ? 'form-input-error' : ''}`}
-                    value={form.max_score}
-                    onChange={(e) => { setForm({ ...form, max_score: e.target.value }); setErrors({ ...errors, max_score: '' }); }}
-                  />
-                  {errors.max_score && <div className="form-error-text">{errors.max_score}</div>}
-                </div>
+                {form.scoring_type !== 'tier' && (
+                  <div className="form-group">
+                    <label className="form-label">
+                      {form.scoring_type === 'count' ? 'Điểm mỗi đơn vị' : 'Điểm tối đa'}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className={`form-input ${errors.max_score ? 'form-input-error' : ''}`}
+                      value={form.max_score}
+                      onChange={(e) => { setForm({ ...form, max_score: e.target.value }); setErrors({ ...errors, max_score: '' }); }}
+                    />
+                    {errors.max_score && <div className="form-error-text">{errors.max_score}</div>}
+                  </div>
+                )}
               </div>
+
+              {form.scoring_type === 'tier' && (
+                <div className="form-group">
+                  <label className="form-label">Các mức đạt <span style={{ color: '#dc2626' }}>*</span></label>
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: -4, marginBottom: 8 }}>
+                    Trọng tài sẽ chọn ĐÚNG 1 mức khi chấm. Điểm tối đa của nhiệm vụ tự tính bằng điểm mức cao nhất.
+                  </div>
+                  {form.tier_options.map((tier, idx) => (
+                    <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start' }}>
+                      <textarea
+                        className="form-input"
+                        rows={2}
+                        style={{ flex: 1 }}
+                        value={tier.label}
+                        onChange={(e) => updateTierRow(idx, { label: e.target.value })}
+                        placeholder={`Mô tả mức ${idx + 1}...`}
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="form-input"
+                        style={{ width: 90, flexShrink: 0 }}
+                        value={tier.points}
+                        onChange={(e) => updateTierRow(idx, { points: e.target.value })}
+                        placeholder="Điểm"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        style={{ flexShrink: 0 }}
+                        onClick={() => removeTierRow(idx)}
+                        disabled={form.tier_options.length <= 1}
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  ))}
+                  {errors.tier_options && <div className="form-error-text">{errors.tier_options}</div>}
+                  <button type="button" className="btn btn-secondary" onClick={addTierRow}>+ Thêm mức</button>
+                </div>
+              )}
 
               {form.scoring_type === 'count' && (
                 <div className="form-group">

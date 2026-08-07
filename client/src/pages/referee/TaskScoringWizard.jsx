@@ -52,7 +52,7 @@ export default function TaskScoringWizard({
   const bonusCfg = content?.bonus_config || DEFAULT_BONUS_CONFIG;
 
   // ── State chấm điểm ──
-  // taskState[taskId] = { qty, points, done }
+  // taskState[taskId] = { qty, points, tierLabel, done }
   const [taskState, setTaskState] = useState(() => {
     const init = {};
     for (const t of tasks) {
@@ -62,6 +62,7 @@ export default function TaskScoringWizard({
       init[t.id] = {
         qty: prevQty !== undefined ? Number(prevQty) : 0,
         points: has ? Number(prevPts) || 0 : null, // null = chưa chấm
+        tierLabel: prevCS.taskTier?.[t.id] ?? null, // nhiệm vụ nhiều mức: mức nào đã chọn
       };
     }
     return init;
@@ -140,9 +141,11 @@ export default function TaskScoringWizard({
     try {
       const taskScores = {};
       const taskQty = {};
+      const taskTier = {};
       for (const t of tasks) {
         taskScores[t.id] = taskPoints(t);
         if (t.scoring_type === 'count') taskQty[t.id] = taskState[t.id]?.qty || 0;
+        if (t.scoring_type === 'tier' && taskState[t.id]?.tierLabel) taskTier[t.id] = taskState[t.id].tierLabel;
       }
       const payload = {
         team_id: team.id,
@@ -156,6 +159,7 @@ export default function TaskScoringWizard({
         criteria_scores: {
           taskScores,
           taskQty,
+          taskTier,
           bangThi: team?.boards?.name || '',
           rerunCount: String(retryCount),
           extraReward: bonusPoints,
@@ -341,8 +345,8 @@ export default function TaskScoringWizard({
                 </div>
               )}
 
-              {/* numeric / tier: nhập điểm */}
-              {(currentTask.scoring_type === 'numeric' || currentTask.scoring_type === 'tier') && (
+              {/* numeric: nhập điểm tay */}
+              {currentTask.scoring_type === 'numeric' && (
                 <div className="ts-count-box">
                   <div className="ts-count-label">Points scored (max {currentTask.max_score})</div>
                   <div className="ts-input-stepper ts-input-stepper-xl">
@@ -367,6 +371,30 @@ export default function TaskScoringWizard({
                       setTask(currentTask.id, { points: Math.min(Number(currentTask.max_score) || 999, v + 1) });
                     }}>+</button>
                   </div>
+                </div>
+              )}
+
+              {/* tier: chọn ĐÚNG 1 trong nhiều mức đạt, mỗi mức 1 điểm số riêng */}
+              {currentTask.scoring_type === 'tier' && (
+                <div className="ts-tier-options">
+                  {(currentTask.tier_options || []).map((tier, i) => {
+                    const selected = taskState[currentTask.id]?.tierLabel === tier.label
+                      && taskState[currentTask.id]?.points === Number(tier.points);
+                    return (
+                      <button
+                        type="button"
+                        key={i}
+                        className={`ts-tier-btn ${selected ? 'selected' : ''}`}
+                        onClick={() => { setTask(currentTask.id, { points: Number(tier.points) || 0, tierLabel: tier.label }); gotoNextScreen(); }}
+                      >
+                        <span>{tier.label}</span>
+                        <span className="ts-tier-btn-pts">{tier.points} pts</span>
+                      </button>
+                    );
+                  })}
+                  {(!currentTask.tier_options || currentTask.tier_options.length === 0) && (
+                    <p style={{ color: '#9ca3af', fontSize: 13 }}>Nhiệm vụ này chưa cấu hình mức điểm — liên hệ Admin.</p>
+                  )}
                 </div>
               )}
             </div>

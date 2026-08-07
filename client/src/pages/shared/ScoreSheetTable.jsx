@@ -56,6 +56,8 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
       maxScore: t.max_score,
       round1Points: cs1.taskScores?.[t.id],
       round2Points: cs2.taskScores?.[t.id],
+      round1Tier: cs1.taskTier?.[t.id],
+      round2Tier: cs2.taskTier?.[t.id],
     }));
 
   const totalMaxScore = tasks.reduce((sum, t) => sum + (Number(t.max_score) || 0), 0);
@@ -109,8 +111,14 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
             <td className="ss-label">{r.name}</td>
             <td colSpan={3}>{r.description}</td>
             <td className="ss-center">{r.maxScore}</td>
-            <td className="ss-center"><strong>{r.round1Points ?? ''}</strong></td>
-            <td className="ss-center"><strong>{r.round2Points ?? ''}</strong></td>
+            <td className="ss-center">
+              <strong>{r.round1Points ?? ''}</strong>
+              {r.round1Tier && <div className="ss-small">{r.round1Tier}</div>}
+            </td>
+            <td className="ss-center">
+              <strong>{r.round2Points ?? ''}</strong>
+              {r.round2Tier && <div className="ss-small">{r.round2Tier}</div>}
+            </td>
           </tr>
         ))}
         <tr className="ss-row-extra">

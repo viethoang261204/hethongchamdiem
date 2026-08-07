@@ -1540,7 +1540,7 @@ router.put('/users/:id/boards', requireAdmin, h(async (req, res) => {
 // client tự build URL /api/tasks/:id/image/raw khi has_image = true
 const taskCols = (p = '') => `${p}id, ${p}contest_content_id, ${p}name, ${p}name_en, ${p}description, ${p}image_url,
   (${p}image_data is not null) as has_image, ${p}image_mime,
-  ${p}max_score, ${p}max_count, ${p}scoring_type, ${p}order_index, ${p}is_active, ${p}created_at, ${p}updated_at`;
+  ${p}max_score, ${p}max_count, ${p}scoring_type, ${p}tier_options, ${p}order_index, ${p}is_active, ${p}created_at, ${p}updated_at`;
 const TASK_COLS = taskCols();
 
 router.get('/tasks/all', h(async (_req, res) => {
@@ -1571,22 +1571,24 @@ router.get('/tasks/:id', h(async (req, res) => {
   res.json(rows[0]);
 }));
 
-const TASK_FIELDS = ['contest_content_id', 'name', 'name_en', 'description', 'image_url', 'max_score', 'max_count', 'scoring_type', 'order_index', 'is_active'];
+const TASK_FIELDS = ['contest_content_id', 'name', 'name_en', 'description', 'image_url', 'max_score', 'max_count', 'scoring_type', 'tier_options', 'order_index', 'is_active'];
 
 router.post('/tasks', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TASK_FIELDS);
   const { rows } = await query(
-    `insert into tasks (contest_content_id, name, name_en, description, image_url, max_score, max_count, scoring_type, order_index, is_active)
-     values ($1, $2, $3, $4, $5, coalesce($6, 0), $7, coalesce($8, 'binary'), coalesce($9, 0), coalesce($10, true))
+    `insert into tasks (contest_content_id, name, name_en, description, image_url, max_score, max_count, scoring_type, tier_options, order_index, is_active)
+     values ($1, $2, $3, $4, $5, coalesce($6, 0), $7, coalesce($8, 'binary'), $9::jsonb, coalesce($10, 0), coalesce($11, true))
      returning ${TASK_COLS}`,
     [b.contest_content_id, b.name, b.name_en ?? null, b.description ?? null, b.image_url ?? null,
-     b.max_score, b.max_count ?? null, b.scoring_type, b.order_index, b.is_active]
+     b.max_score, b.max_count ?? null, b.scoring_type, b.tier_options ? JSON.stringify(b.tier_options) : null,
+     b.order_index, b.is_active]
   );
   res.json(rows[0]);
 }));
 
 router.put('/tasks/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, TASK_FIELDS);
+  if (data.tier_options !== undefined) data.tier_options = data.tier_options ? JSON.stringify(data.tier_options) : null;
   const q = buildUpdate('tasks', req.params.id, data);
   if (!q) return res.json({});
   const { rows } = await query(q.text.replace('returning *', `returning ${TASK_COLS}`), q.values);

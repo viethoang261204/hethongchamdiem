@@ -141,7 +141,11 @@ create table if not exists teams (
 --   count   = đếm số lượng → điểm = số lượng × max_score (max_score là điểm MỖI đơn vị,
 --             max_count = số lượng tối đa, null = không giới hạn)
 --   numeric = trọng tài nhập điểm tay (0..max_score)
---   tier    = legacy, giữ để tương thích
+--   tier    = 1 nhiệm vụ có NHIỀU mức đạt loại trừ nhau, mỗi mức 1 điểm số riêng
+--             (vd: chạm khối = 20đ / tác động cần gạt = 30đ / đặt hoàn toàn = 50đ) —
+--             trọng tài chọn ĐÚNG 1 mức đã đạt được. Định nghĩa các mức lưu ở
+--             tier_options (jsonb: [{label, points}, ...], thứ tự = thứ tự hiện);
+--             max_score tự động = điểm mức cao nhất, không nhập tay.
 -- Ảnh nhiệm vụ lưu bytea (image_data + image_mime), serve GET /api/tasks/:id/image/raw
 create table if not exists tasks (
   id                 uuid primary key default gen_random_uuid(),
@@ -155,6 +159,7 @@ create table if not exists tasks (
   max_score          numeric(10,2) default 0,
   max_count          integer,
   scoring_type       text default 'binary' check (scoring_type in ('binary', 'tier', 'numeric', 'count')),
+  tier_options       jsonb,
   order_index        integer default 0,
   is_active          boolean default true,
   created_at         timestamptz default now(),
@@ -217,6 +222,7 @@ alter table schools add constraint schools_level_check
 alter table tasks add column if not exists image_data bytea;
 alter table tasks add column if not exists image_mime text;
 alter table tasks add column if not exists max_count integer;
+alter table tasks add column if not exists tier_options jsonb;
 alter table tasks drop constraint if exists tasks_scoring_type_check;
 alter table tasks add constraint tasks_scoring_type_check
   check (scoring_type in ('binary', 'tier', 'numeric', 'count'));
