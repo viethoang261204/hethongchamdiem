@@ -83,32 +83,37 @@ export default function RefereeTeams() {
   if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Đang tải...</p>;
 
   return (
-    <div>
-      <div className="breadcrumb" style={{ marginBottom: 14 }}>
+    <div className="referee-content-wrap">
+      <div className="breadcrumb">
         <Link to="/referee">Chấm điểm</Link>
+        <span>/</span>
+        <span>Danh sách đội thi</span>
       </div>
-      <h1 className="referee-page-title">
-        Danh sách đội{currentBoard ? ` — ${currentBoard.name}${currentBoard.age_group ? ` (${currentBoard.age_group})` : ''}` : ''}
-      </h1>
-      <p style={{ color: '#64748b', marginBottom: 20 }}>Mỗi đội thi 2 lượt độc lập — ấn vào từng lượt để chấm.</p>
+
+      <div className="referee-page-header">
+        <h1 className="referee-page-title">
+          Danh sách đội thi{currentBoard ? ` — ${currentBoard.name}${currentBoard.age_group ? ` (${currentBoard.age_group})` : ''}` : ''}
+        </h1>
+        <p className="referee-page-subtitle">Mỗi đội thi thực hiện 2 lượt chấm độc lập — chọn lượt thi tương ứng để bắt đầu chấm điểm.</p>
+      </div>
 
       {/* Stats */}
       <div className="rt-stats">
         <div className="rt-stat">
           <div className="rt-stat-value">{stats.total}</div>
-          <div className="rt-stat-label">Tổng đội</div>
+          <div className="rt-stat-label">Tổng đội thi</div>
         </div>
         <div className="rt-stat rt-stat-done">
           <div className="rt-stat-value">{stats.done}</div>
-          <div className="rt-stat-label">Xong cả 2 lượt</div>
+          <div className="rt-stat-label">Hoàn thành 2 lượt</div>
         </div>
         <div className="rt-stat rt-stat-pending">
           <div className="rt-stat-value">{stats.partial}</div>
-          <div className="rt-stat-label">Mới 1 lượt</div>
+          <div className="rt-stat-label">Mới chấm 1 lượt</div>
         </div>
         <div className="rt-stat rt-stat-pending">
           <div className="rt-stat-value">{stats.pending}</div>
-          <div className="rt-stat-label">Chưa chấm</div>
+          <div className="rt-stat-label">Chưa chấm lượt nào</div>
         </div>
       </div>
 
@@ -117,23 +122,23 @@ export default function RefereeTeams() {
         <div className="search-box">
           <input
             type="text"
-            placeholder="Tìm theo tên đội..."
+            placeholder="Tìm theo tên đội thi..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
         <select className="filter-select" value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="all">Tất cả</option>
+          <option value="all">Tất cả trạng thái</option>
           <option value="pending">Chưa chấm</option>
-          <option value="partial">Mới 1 lượt</option>
-          <option value="done">Xong cả 2 lượt</option>
+          <option value="partial">Mới chấm 1 lượt</option>
+          <option value="done">Hoàn thành cả 2 lượt</option>
         </select>
       </div>
 
       {/* Team grid */}
       {filtered.length === 0 ? (
-        <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-          {teamsInBoard.length === 0 ? `Chưa có đội nào trong ${currentBoard ? 'bảng đấu' : 'nội dung'} này.` : 'Không tìm thấy đội phù hợp.'}
+        <div className="card referee-empty-card">
+          <p>{teamsInBoard.length === 0 ? `Chưa có đội nào trong ${currentBoard ? 'bảng đấu' : 'nội dung'} này.` : 'Không tìm thấy đội phù hợp.'}</p>
         </div>
       ) : (
         <div className="referee-grid">
@@ -150,30 +155,30 @@ export default function RefereeTeams() {
                   {roundsDone(t.id) >= 2 && <span className="rt-badge rt-badge-done">✓ Xong 2 lượt</span>}
                 </div>
                 {t.boards?.name && (
-                  <p className="referee-card-members" style={{ color: '#60a5fa', fontWeight: 600 }}>
+                  <div className="card-badge" style={{ marginBottom: 6 }}>
                     {t.boards.name}{t.boards.age_group ? ` — ${t.boards.age_group}` : ''}{isCombat ? ' · Đối kháng' : ''}
-                  </p>
+                  </div>
                 )}
                 <p className="referee-card-members">
-                  {mems.length > 0 ? memberNames : <em style={{ color: '#475569' }}>Chưa có thành viên</em>}
+                  {mems.length > 0 ? memberNames : <em style={{ color: '#64748b' }}>Chưa cập nhật thành viên</em>}
                 </p>
 
                 {isCombat ? (
                   <Link
                     to={`/referee/competition/${competitionId}/content/${contentId}/region/${t.board_id}/matches`}
-                    className="btn-ghost"
+                    className="btn btn-ghost"
                     style={{ marginTop: 10, display: 'inline-flex' }}
                   >
-                    Xem trận đấu →
+                    Xem danh sách trận đấu →
                   </Link>
                 ) : (
-                  <div className="referee-card-foot" style={{ gap: 10, flexWrap: 'wrap' }}>
+                  <div className="referee-card-foot">
                     {[1, 2].map((roundNo) => {
                       const s = r[roundNo];
                       const url = `/referee/competition/${competitionId}/content/${contentId}/region/${region}/team/${t.id}/round/${roundNo}/score`;
                       return (
                         <Link key={roundNo} to={url} state={{ memberNames }} className={`rt-badge ${s ? 'rt-badge-done' : 'rt-badge-pending'}`} style={{ textDecoration: 'none' }}>
-                          {s ? `✓ Lượt ${roundNo}: ${s.score ?? '-'}đ${s.time ? ` · ${formatSecondsAsMinutes(s.time)}` : ''}` : `Chấm lượt ${roundNo}`}
+                          {s ? `✓ Lượt ${roundNo}: ${s.score ?? '-'}đ${s.time ? ` · ${formatSecondsAsMinutes(s.time)}` : ''}` : `Chấm lượt ${roundNo} →`}
                         </Link>
                       );
                     })}

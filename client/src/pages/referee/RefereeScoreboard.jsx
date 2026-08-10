@@ -185,9 +185,11 @@ export default function RefereeScoreboard() {
   if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Đang tải...</p>;
 
   return (
-    <div>
-      <h1 className="referee-page-title">Bảng xếp hạng</h1>
-      <p style={{ color: '#64748b', marginBottom: 20 }}>Toàn bộ nội dung thi và bảng đấu của cuộc thi.</p>
+    <div className="referee-content-wrap">
+      <div className="referee-page-header">
+        <h1 className="referee-page-title">Bảng xếp hạng giải đấu</h1>
+        <p className="referee-page-subtitle">Xem điểm số và xếp hạng của toàn bộ các nội dung và bảng đấu trong cuộc thi.</p>
+      </div>
 
       {competitions.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>Chưa có cuộc thi nào đang diễn ra.</div>

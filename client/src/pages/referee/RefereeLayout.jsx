@@ -27,7 +27,7 @@ export default function RefereeLayout() {
   const initials = (user?.fullName || user?.username || 'R').charAt(0).toUpperCase();
 
   return (
-    <div className="app-container nhutin-admin referee-panel">
+    <div className="app-container referee-panel">
       <aside className="sidebar">
         <div className="sidebar-header">
           <img
@@ -76,7 +76,7 @@ export default function RefereeLayout() {
           </div>
           <button type="button" className="logout-btn" onClick={handleLogout}>
             {NAV_ICONS.logout}
-            Đăng xuất
+            <span>Đăng xuất</span>
           </button>
         </div>
       </aside>
