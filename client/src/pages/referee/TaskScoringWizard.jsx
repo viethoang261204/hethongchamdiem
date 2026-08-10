@@ -134,8 +134,14 @@ export default function TaskScoringWizard({
   const setTask = (id, patch) => setTaskState(s => ({ ...s, [id]: { ...s[id], ...patch } }));
 
   const gotoNextScreen = () => {
-    if (screenIdx < screenCount - 1) setScreenIdx(i => i + 1);
-    else setStep(2);
+    if (screenIdx < screenCount - 1) {
+      setScreenIdx(i => i + 1);
+    } else {
+      // Trọng tài có thể quên tự bấm Tạm dừng — tự dừng đồng hồ khi sang
+      // phiếu tổng kết để không đếm nhầm quá thời gian thi thực tế.
+      setIsTimerRunning(false);
+      setStep(2);
+    }
   };
 
   const timeLimitText = content?.time_limit_seconds
@@ -147,6 +153,10 @@ export default function TaskScoringWizard({
     const timeSeconds = Number(timeSpent);
     if (!timeSpent || Number.isNaN(timeSeconds) || timeSeconds < 0) {
       showAlert('Please enter the completion time (in seconds).', 'error');
+      return;
+    }
+    if (!studentSigImage || !refereeSigImage) {
+      showAlert('Please collect both signatures before submitting the score sheet.', 'error');
       return;
     }
     setSubmitting(true);

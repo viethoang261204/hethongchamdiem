@@ -85,6 +85,10 @@ export default function RefereeCombatStars() {
   };
 
   const submit = async (m) => {
+    if (!form.studentSigImageA || !form.studentSigImageB || !form.refereeSigImage) {
+      showAlert('Please collect signatures from both teams and the referee before submitting.', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       const scoreA = computeScore('A');
