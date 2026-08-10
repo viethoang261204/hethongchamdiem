@@ -115,21 +115,47 @@ export default function RefereeScoreForm() {
     return (
       <div className="ts-wrapper ts-center-screen">
         <div className="ts-card ts-gate-card">
-          <div className="ts-gate-eyebrow">{content?.name} · Round {round}</div>
-          <p className="ts-gate-team">{team?.name}</p>
-          <button
-            type="button"
-            className="ts-btn ts-btn-primary ts-btn-lg ts-gate-start-btn"
-            onClick={() => setStartedAt(new Date().toISOString())}
-          >
-            ▶ BẮT ĐẦU
-          </button>
-          <p style={{ color: '#64748b', fontSize: 12.5, marginTop: 16 }}>
-            Hệ thống sẽ tự ghi nhận thời gian bắt đầu chấm lượt này.
-          </p>
-          <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost" style={{ marginTop: 20, display: 'inline-flex' }}>
-            ← Quay lại danh sách đội
-          </Link>
+          <div className="ts-gate-badge">
+            <span className="ts-gate-round">Lượt {round}</span>
+            {team?.boards?.name && <span className="ts-gate-board">{team.boards.name}</span>}
+          </div>
+          
+          <div className="ts-gate-eyebrow">{content?.name}</div>
+          <h2 className="ts-gate-team">{team?.name}</h2>
+          
+          {memberNames && (
+            <div className="ts-gate-members">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <span>Thành viên: <strong>{memberNames}</strong></span>
+            </div>
+          )}
+
+          <div className="ts-gate-action">
+            <button
+              type="button"
+              className="ts-btn ts-btn-primary ts-btn-xl ts-gate-start-btn"
+              onClick={() => setStartedAt(new Date().toISOString())}
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              BẮT ĐẦU LƯỢT THI {round}
+            </button>
+            <p className="ts-gate-hint">
+              ⏱ Hệ thống sẽ tự động ghi nhận thời gian bắt đầu chấm điểm lượt thi này.
+            </p>
+          </div>
+
+          <div className="ts-gate-footer">
+            <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost">
+              ← Quay lại danh sách đội
+            </Link>
+          </div>
         </div>
       </div>
     );

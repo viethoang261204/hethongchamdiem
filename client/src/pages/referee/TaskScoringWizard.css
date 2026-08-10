@@ -1,1020 +1,1043 @@
 /* ═══════════════════════════════════════════════════════════════
-   Task Scoring Wizard — flat enterprise assessment UI
-   Palette: bg #111827 · card #1F2937 · border #374151 · text #F9FAFB
-   secondary #9CA3AF · accent #2563EB (only accent color in the system)
+   Task Scoring Wizard — Tablet & Touch First Professional UI
+   Palette: Dark Slate bg #0f172a · Card #1e293b · Border #334155
+   Text #f8fafc · Muted #94a3b8 · Accent #2563eb · Success #10b981
    ═══════════════════════════════════════════════════════════════ */
 
-.referee-panel .ts-wrapper {
-  max-width: 760px;
+/* Container chính nâng max-width cho màn hình Tablet (lên tới 1280px) */
+.referee-panel .ts-wrapper.ts-tablet-layout {
+  max-width: 1240px;
   margin: 0 auto;
-  padding-bottom: 100px;
+  padding-bottom: 60px;
 }
 
-/* Màn chờ / thông báo 1-thẻ (BẮT ĐẦU, không tìm thấy, đã có phiếu...) — căn
-   giữa cả ngang lẫn dọc trong viewport thay vì trôi nổi ở góc trên-trái của
-   1 vùng nội dung rất rộng (nhìn trống/lệch trên màn hình lớn). */
+/* Center screen layout cho màn hình Gate Bắt đầu / Kết quả */
 .referee-panel .ts-wrapper.ts-center-screen {
-  min-height: calc(100vh - 160px);
+  min-height: calc(100vh - 120px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding-bottom: 0;
 }
-.referee-panel .ts-gate-card {
-  text-align: center;
-  padding: 40px;
-  width: 100%;
-  max-width: 420px;
-}
-.referee-panel .ts-gate-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 8px;
-}
-.referee-panel .ts-gate-team {
-  font-size: 20px;
-  font-weight: 700;
-  color: #f9fafb;
-  letter-spacing: -0.01em;
-  margin: 0 0 24px;
-}
-.referee-panel .ts-gate-start-btn {
-  width: 100%;
-  font-size: 14px;
-}
 
-/* ─── Loading ────────────────────────────────────────────────── */
-.referee-panel .ts-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  color: #9ca3af;
-  gap: 16px;
-}
-
-.referee-panel .ts-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #374151;
-  border-top-color: #2563eb;
-  border-radius: 50%;
-  animation: ts-spin 0.7s linear infinite;
-}
-
-@keyframes ts-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* ─── Header ─────────────────────────────────────────────────── */
+/* ─── Header Sticky Top Bar ───────────────────────────────────── */
 .referee-panel .ts-header {
   position: sticky;
-  top: 0;
+  top: 12px;
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   padding: 14px 20px;
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 8px;
-  margin: 0 0 16px;
+  background: rgba(30, 41, 59, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  margin: 0 0 20px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
 }
 
 .referee-panel .ts-back {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
-  background: transparent;
-  border: 1px solid #374151;
-  color: #9ca3af;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #334155;
+  color: #94a3b8;
   text-decoration: none;
   flex-shrink: 0;
-  transition: border-color 0.15s, color 0.15s;
+  transition: all 0.2s ease;
 }
-.referee-panel .ts-back:hover { border-color: #4b5563; color: #f9fafb; }
-.referee-panel .ts-back svg { width: 18px; height: 18px; }
+.referee-panel .ts-back:hover {
+  border-color: #3b82f6;
+  color: #ffffff;
+  background: rgba(59, 130, 246, 0.15);
+}
+.referee-panel .ts-back svg { width: 22px; height: 22px; }
 
 .referee-panel .ts-header-info { flex: 1; min-width: 0; }
 .referee-panel .ts-team-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #f9fafb;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 17px;
+  font-weight: 700;
+  color: #f8fafb;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .referee-panel .ts-content-name {
-  font-size: 12.5px;
-  color: #9ca3af;
-  margin-top: 2px;
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 3px;
 }
 
 .referee-panel .ts-header-score {
   text-align: right;
-  background: transparent;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  padding: 6px 14px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid #3b82f6;
+  border-radius: 10px;
+  padding: 6px 18px;
   flex-shrink: 0;
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.2);
 }
 .referee-panel .ts-score-label {
   font-size: 10px;
-  color: #9ca3af;
+  color: #60a5fa;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-weight: 700;
 }
 .referee-panel .ts-score-value {
-  font-size: 19px;
-  font-weight: 700;
-  color: #f9fafb;
-  line-height: 1.3;
+  font-size: 24px;
+  font-weight: 800;
+  color: #38bdf8;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 
-/* ─── Stepper ────────────────────────────────────────────────── */
+/* ─── Stepper Nav Bar ────────────────────────────────────────── */
 .referee-panel .ts-stepper {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 0;
+  gap: 12px;
+  margin-bottom: 20px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px 16px;
 }
 
 .referee-panel .ts-step {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-  cursor: default;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-.referee-panel .ts-step.done { cursor: pointer; }
+.referee-panel .ts-step:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
 
 .referee-panel .ts-step-num {
-  width: 22px; height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 12px;
+  font-weight: 700;
+  font-size: 13px;
   background: transparent;
-  border: 1.5px solid #4b5563;
-  color: #9ca3af;
+  border: 2px solid #475569;
+  color: #94a3b8;
   flex-shrink: 0;
 }
 .referee-panel .ts-step.active .ts-step-num {
   background: #2563eb;
   border-color: #2563eb;
-  color: #fff;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
 }
 .referee-panel .ts-step.done .ts-step-num {
-  background: transparent;
+  background: #10b981;
   border-color: #10b981;
-  color: #10b981;
+  color: #ffffff;
 }
 
 .referee-panel .ts-step-label {
-  font-size: 12.5px;
-  color: #9ca3af;
-  font-weight: 500;
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 600;
 }
-.referee-panel .ts-step.active .ts-step-label { color: #f9fafb; font-weight: 600; }
-.referee-panel .ts-step.done .ts-step-label { color: #9ca3af; }
+.referee-panel .ts-step.active .ts-step-label {
+  color: #f8fafb;
+}
 
 .referee-panel .ts-step-line {
-  height: 1px;
-  flex: 0 0 24px;
-  background: #374151;
-}
-
-/* ─── Card ───────────────────────────────────────────────────── */
-.referee-panel .ts-card {
-  background: #1f2937;
-  border-radius: 8px;
-  border: 1px solid #374151;
-  padding: 24px;
-}
-
-.referee-panel .ts-fade-in { animation: ts-fade 0.15s ease; }
-@keyframes ts-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.referee-panel .ts-card-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #f9fafb;
-  margin: 0 0 18px 0;
-}
-
-/* ─── Form grid ──────────────────────────────────────────────── */
-.referee-panel .ts-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.referee-panel .ts-form-row.ts-full { grid-column: 1 / -1; }
-
-.referee-panel .ts-label {
-  display: block;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: #9ca3af;
-  margin-bottom: 6px;
-}
-.referee-panel .ts-req { color: #ef4444; }
-.referee-panel .ts-hint {
-  font-size: 12px;
-  color: #9ca3af;
-  margin-top: 6px;
-}
-.referee-panel .ts-hint strong { color: #d1d5db; }
-
-.referee-panel .ts-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  background: #111827;
-  color: #f9fafb;
-  transition: border-color 0.15s;
-  box-sizing: border-box;
-  min-height: 40px;
-}
-.referee-panel .ts-input::placeholder { color: #6b7280; }
-.referee-panel .ts-input:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
-}
-.referee-panel .ts-input-lg {
-  font-size: 16px;
-  font-weight: 600;
-  min-height: 44px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ─── Stepper input (+/-) ────────────────────────────────────── */
-.referee-panel .ts-input-stepper {
-  display: grid;
-  grid-template-columns: 40px 1fr 40px;
-  gap: 8px;
-  align-items: stretch;
-}
-.referee-panel .ts-input-stepper button {
-  background: transparent;
-  border: 1px solid #374151;
-  color: #d1d5db;
-  border-radius: 6px;
-  font-size: 18px;
-  font-weight: 600;
-  cursor: pointer;
-  min-height: 40px;
-  transition: border-color 0.15s, background 0.15s;
-  font-family: inherit;
-}
-.referee-panel .ts-input-stepper button:hover {
-  border-color: #4b5563;
-  background: rgba(255,255,255,0.03);
-}
-.referee-panel .ts-input-stepper input {
-  border: 1px solid #374151;
-  border-radius: 6px;
-  background: #111827;
-  color: #f9fafb;
-  font-size: 16px;
-  font-weight: 600;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  min-height: 40px;
-  width: 100%;
-  box-sizing: border-box;
-  -moz-appearance: textfield;
-}
-.referee-panel .ts-input-stepper input::-webkit-outer-spin-button,
-.referee-panel .ts-input-stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-
-.referee-panel .ts-input-stepper-lg button { min-height: 52px; font-size: 20px; }
-.referee-panel .ts-input-stepper-lg input { min-height: 52px; font-size: 20px; }
-
-.referee-panel .ts-quick-btns {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-.referee-panel .ts-quick-btns button {
+  height: 2px;
   flex: 1;
-  padding: 10px;
-  background: transparent;
-  border: 1px solid #374151;
-  color: #d1d5db;
-  border-radius: 6px;
-  font-weight: 500;
-  font-size: 13.5px;
-  cursor: pointer;
-  min-height: 40px;
-  font-family: inherit;
-  transition: border-color 0.15s, background 0.15s;
+  background: #334155;
 }
-.referee-panel .ts-quick-btns button:hover { border-color: #4b5563; background: rgba(255,255,255,0.03); }
-.referee-panel .ts-quick-btns .ts-quick-full {
-  border-color: #10b981;
-  color: #10b981;
-}
-.referee-panel .ts-quick-btns .ts-quick-full:hover { background: rgba(16,185,129,0.08); }
 
-/* ─── Footer / buttons ───────────────────────────────────────── */
-.referee-panel .ts-footer {
+/* ─── Tablet Split Pane Layout (2 Cột) ───────────────────────── */
+.ts-split-container {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Cột trái Sidebar Tablet */
+.ts-sidebar-pane {
+  position: sticky;
+  top: 86px;
+}
+
+.ts-sidebar-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.ts-sidebar-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 14px;
+}
+
+/* Đồng hồ bấm giờ tích hợp (Stopwatch Widget) */
+.ts-stopwatch-widget {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 18px;
+  text-align: center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.ts-stopwatch-display {
   display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  padding-top: 18px;
-  margin-top: 18px;
-  border-top: 1px solid #374151;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
-.referee-panel .ts-btn {
+.ts-stopwatch-digits {
+  font-size: 32px;
+  font-weight: 800;
+  font-family: 'Courier New', Courier, monospace;
+  color: #10b981;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
+}
+
+.ts-stopwatch-sec {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ts-stopwatch-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ts-timer-btn {
+  flex: 1;
+  min-height: 42px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 9px 18px;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.ts-timer-btn.start {
+  background: #2563eb;
+  color: #ffffff;
+}
+.ts-timer-btn.start:hover { background: #1d4ed8; }
+
+.ts-timer-btn.pause {
+  background: #ef4444;
+  color: #ffffff;
+}
+.ts-timer-btn.pause:hover { background: #dc2626; }
+
+.ts-timer-btn.reset {
+  flex: 0 0 42px;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #334155;
+  color: #94a3b8;
+  font-size: 18px;
+}
+.ts-timer-btn.reset:hover { border-color: #475569; color: #ffffff; }
+
+.ts-timer-apply-btn {
+  width: 100%;
+  padding: 8px 10px;
   border-radius: 6px;
-  font-size: 13.5px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ts-timer-apply-btn:hover {
+  background: rgba(16, 185, 129, 0.25);
+  color: #ffffff;
+}
+
+/* Progress bar */
+.ts-progress-wrap {
+  margin-bottom: 16px;
+}
+.ts-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+.ts-progress-info strong { color: #38bdf8; }
+
+.ts-progress {
+  height: 6px;
+  background: #0f172a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ts-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
+  border-radius: 3px;
+  transition: width 0.25s ease;
+}
+
+/* Danh sách nhiệm vụ dạng Nav Pill rộng trên Tablet */
+.ts-task-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100vh - 420px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.ts-task-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  width: 100%;
+}
+.ts-task-nav-item:hover {
+  border-color: #475569;
+  color: #f8fafb;
+  background: rgba(255, 255, 255, 0.04);
+}
+.ts-task-nav-item.active {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.15);
+  color: #ffffff;
+}
+.ts-task-nav-item.done {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.ts-tnav-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ts-task-nav-item.active .ts-tnav-num {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+.ts-task-nav-item.done .ts-tnav-num {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+.ts-tnav-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ts-tnav-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ts-tnav-score {
+  font-size: 11px;
+  color: #64748b;
+}
+.ts-task-nav-item.active .ts-tnav-score { color: #93c5fd; }
+.ts-task-nav-item.done .ts-tnav-score { color: #34d399; }
+
+.ts-tnav-check {
+  color: #10b981;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+/* Cột phải Main Focus Pane */
+.ts-focus-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.ts-task-top-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ts-task-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #38bdf8;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.ts-task-max-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.ts-task-name {
+  font-size: 24px;
+  font-weight: 800;
+  color: #f8fafb;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.ts-task-name-en {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-bottom: 14px;
+  font-style: italic;
+}
+
+.ts-task-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #334155;
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+/* Ảnh minh hoạ Nhiệm vụ */
+.ts-task-image-wrap {
+  margin: 0 0 20px;
+  text-align: center;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid #334155;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.ts-task-image-wrap .ts-task-image {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+/* ─── Touch Scoring Inputs (Pass/Fail, Stepper, Presets) ─────── */
+
+/* BINARY: Pass/Fail Card Cực Lớn */
+.ts-bigbtns-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 24px 0 10px;
+}
+
+.ts-bigbtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  min-height: 130px;
+  border-radius: 14px;
+  border: 2px solid #334155;
+  background: rgba(15, 23, 42, 0.6);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.ts-bigbtn:hover {
+  border-color: #475569;
+  color: #f8fafb;
+}
+
+.ts-bigbtn-icon {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ts-bigbtn-text {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.ts-bigbtn-pts {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.ts-bigbtn-pass.selected {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #34d399;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+}
+
+.ts-bigbtn-fail.selected {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+  color: #f87171;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.25);
+}
+
+/* COUNT & NUMERIC: Stepper Kích thước Siêu Lớn cho Touch */
+.ts-count-box {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 20px;
+  text-align: center;
+  margin: 20px 0 10px;
+}
+
+.ts-count-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 14px;
+}
+
+.ts-input-stepper-xl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.ts-input-stepper-xl button {
+  width: 58px;
+  height: 58px;
+  font-size: 26px;
+  font-weight: 800;
+  border-radius: 12px;
+  background: #1e293b;
+  border: 2px solid #334155;
+  color: #f8fafb;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+.ts-input-stepper-xl button:hover {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.ts-input-stepper-xl input {
+  width: 100px;
+  height: 58px;
+  font-size: 26px;
+  font-weight: 800;
+  text-align: center;
+  border-radius: 12px;
+  background: #0f172a;
+  border: 2px solid #334155;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
+/* Phím Chip tăng/giảm nhanh cho Tablet */
+.ts-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ts-quick-chips button {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.ts-quick-chips button:hover {
+  border-color: #3b82f6;
+  color: #ffffff;
+  background: rgba(59, 130, 246, 0.15);
+}
+.ts-quick-chips .ts-chip-full {
+  border-color: #10b981;
+  color: #34d399;
+}
+.ts-quick-chips .ts-chip-full:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.ts-count-calc {
+  margin-top: 16px;
+  font-size: 15px;
+  color: #94a3b8;
+}
+.ts-count-calc strong {
+  font-size: 20px;
+  color: #38bdf8;
+  margin-left: 6px;
+}
+
+/* TIER: Các mức chọn độc lập */
+.ts-tier-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0 10px;
+}
+
+.ts-tier-btn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 2px solid #334155;
+  background: rgba(15, 23, 42, 0.6);
+  color: #cbd5e1;
+  font-size: 15px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ts-tier-btn:hover {
+  border-color: #475569;
+  color: #f8fafb;
+}
+
+.ts-tier-radio {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.ts-tier-label {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.ts-tier-btn-pts {
+  font-size: 15px;
+  font-weight: 800;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.ts-tier-btn.selected {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.15);
+  color: #ffffff;
+}
+.ts-tier-btn.selected .ts-tier-radio {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+.ts-tier-btn.selected .ts-tier-btn-pts {
+  color: #38bdf8;
+}
+
+/* Thanh điều hướng task */
+.ts-task-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #334155;
+}
+
+/* ─── Step 2: Màn hình Xác nhận & Ký tên Chuẩn ─────────────── */
+.ts-sheet-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.ts-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #334155;
+  margin-bottom: 24px;
+}
+
+.ts-sheet-sub {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+.ts-sheet-sub strong { color: #f8fafb; }
+
+.ts-sheet-total-badge {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1.5px solid #10b981;
+  border-radius: 12px;
+  padding: 10px 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ts-st-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #34d399;
+  letter-spacing: 0.08em;
+}
+.ts-st-val {
+  font-size: 28px;
+  font-weight: 800;
+  color: #10b981;
+  line-height: 1.2;
+}
+
+.ts-sheet-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 28px;
+}
+.ts-sheet-table th {
+  background: rgba(15, 23, 42, 0.6);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 14px;
+  border-bottom: 1px solid #334155;
+}
+.ts-sheet-table td {
+  padding: 14px;
+  border-bottom: 1px solid #334155;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+.ts-sheet-table .ts-col-qty { text-align: center; width: 100px; }
+.ts-sheet-table .ts-col-pts { text-align: right; width: 120px; }
+
+.ts-sheet-total td {
+  font-size: 16px;
+  font-weight: 800;
+  color: #f8fafb;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 16px 14px;
+}
+
+/* Grid Form Xác nhận & Ô Ký Tên Tablet 2 Cột */
+.ts-sheet-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.ts-sheet-form-grid .ts-form-row.ts-full {
+  grid-column: 1 / -1;
+}
+
+.ts-time-input-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.ts-time-input-group input { flex: 1; }
+
+.ts-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+.ts-req { color: #ef4444; }
+
+.ts-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #334155;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  background: #0f172a;
+  color: #f8fafb;
+  box-sizing: border-box;
+  min-height: 48px;
+  transition: border-color 0.15s;
+}
+.ts-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+.ts-input-lg {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Action Footer */
+.ts-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid #334155;
+}
+
+/* Nút bấm chung */
+.ts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   text-decoration: none;
   border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-  min-height: 38px;
-  min-width: 88px;
+  transition: all 0.15s ease;
+  min-height: 46px;
   white-space: nowrap;
 }
-.referee-panel .ts-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ts-btn-primary { background: #2563eb; color: #ffffff; }
+.ts-btn-primary:hover:not(:disabled) { background: #1d4ed8; }
 
-.referee-panel .ts-btn-primary {
-  background: #2563eb;
-  color: #fff;
+.ts-btn-secondary {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
 }
-.referee-panel .ts-btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.ts-btn-secondary:hover:not(:disabled) { border-color: #475569; color: #ffffff; }
 
-.referee-panel .ts-btn-secondary {
+.ts-btn-ghost {
   background: transparent;
-  color: #d1d5db;
-  border: 1px solid #374151;
+  color: #94a3b8;
+  border: 1px solid #334155;
 }
-.referee-panel .ts-btn-secondary:hover:not(:disabled) { border-color: #4b5563; color: #f9fafb; }
+.ts-btn-ghost:hover:not(:disabled) { color: #f8fafb; border-color: #475569; }
 
-.referee-panel .ts-btn-ghost {
-  background: transparent;
-  color: #9ca3af;
-  border: 1px solid transparent;
+.ts-btn-lg { min-height: 52px; font-size: 16px; padding: 14px 28px; }
+.ts-btn-xl { min-height: 58px; font-size: 17px; padding: 16px 36px; border-radius: 12px; }
+
+/* Màn hình Gate Start Card */
+.ts-gate-card {
+  text-align: center;
+  padding: 44px 36px;
+  width: 100%;
+  max-width: 520px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
 }
-.referee-panel .ts-btn-ghost:hover:not(:disabled) { color: #f9fafb; background: rgba(255,255,255,0.04); }
 
-.referee-panel .ts-btn-sm { padding: 6px 12px; min-height: 32px; font-size: 12.5px; }
-.referee-panel .ts-btn-lg { padding: 11px 24px; font-size: 14.5px; min-height: 44px; }
-
-/* ─── Step 1: Tasks ──────────────────────────────────────────── */
-.referee-panel .ts-task-header {
+.ts-gate-badge {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 8px;
   margin-bottom: 12px;
 }
-.referee-panel .ts-task-header .ts-card-title { margin: 0; }
-
-.referee-panel .ts-progress {
-  position: relative;
-  height: 4px;
-  background: #374151;
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.referee-panel .ts-progress-bar {
-  position: absolute;
-  top: 0; left: 0; bottom: 0;
+.ts-gate-round {
   background: #2563eb;
-  transition: width 0.2s;
-}
-.referee-panel .ts-progress-text {
-  display: block;
+  color: #ffffff;
   font-size: 12px;
-  color: #9ca3af;
-  margin-top: 4px;
-  text-align: right;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+.ts-gate-board {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
 }
 
-/* Focus mode (1 task at a time) */
-.referee-panel .ts-task-focus { padding-top: 8px; }
-.referee-panel .ts-task-counter {
-  font-size: 11px;
-  color: #9ca3af;
+.ts-gate-eyebrow {
+  font-size: 13px;
+  color: #38bdf8;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   margin-bottom: 6px;
 }
-.referee-panel .ts-task-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: #f9fafb;
-  margin: 0 0 4px 0;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
-}
-.referee-panel .ts-task-name-en {
-  font-size: 13px;
-  color: #9ca3af;
-  margin-bottom: 12px;
-}
-.referee-panel .ts-task-desc {
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: #9ca3af;
-  background: transparent;
-  border: none;
-  padding: 0;
-  border-radius: 0;
-  margin: 0 0 16px 0;
+.ts-gate-team {
+  font-size: 26px;
+  font-weight: 800;
+  color: #f8fafb;
+  margin: 0 0 16px;
 }
 
-.referee-panel .ts-task-image {
-  width: 100%;
-  max-height: 240px;
-  border-radius: 6px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.02);
-  margin-bottom: 16px;
-  border: 1px solid #374151;
+.ts-gate-members {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.referee-panel .ts-task-image img {
-  max-width: 100%;
-  max-height: 240px;
-  object-fit: contain;
-  display: block;
-}
-.referee-panel .ts-task-image-empty {
-  flex-direction: column;
   gap: 8px;
-  color: #6b7280;
-  font-size: 13px;
-  padding: 32px;
-}
-.referee-panel .ts-task-image-empty svg { width: 32px; height: 32px; opacity: 0.5; }
-
-.referee-panel .ts-task-input-row { margin-bottom: 20px; }
-
-.referee-panel .ts-task-nav {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 20px;
-  margin-bottom: 16px;
-}
-.referee-panel .ts-task-nav .ts-btn { flex: 0 0 auto; min-width: 110px; }
-
-/* Pill index — nhỏ gọn, phẳng, chỉ để nhảy nhanh giữa các nhiệm vụ */
-.referee-panel .ts-task-index {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding-top: 12px;
-  border-top: 1px solid #374151;
-}
-.referee-panel .ts-task-pill {
-  width: 28px; height: 28px;
-  border-radius: 4px;
-  background: transparent;
-  border: 1px solid #374151;
-  color: #9ca3af;
-  font-weight: 600;
-  font-size: 11.5px;
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.15s, color 0.15s;
-}
-.referee-panel .ts-task-pill:hover { border-color: #4b5563; color: #f9fafb; }
-.referee-panel .ts-task-pill.active {
-  border-color: #2563eb;
-  color: #2563eb;
-}
-.referee-panel .ts-task-pill.filled {
-  color: #10b981;
-  border-color: #10b981;
-}
-.referee-panel .ts-task-pill.filled.active {
-  border-color: #2563eb;
-  color: #2563eb;
-}
-
-/* All tasks list */
-.referee-panel .ts-task-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 2px;
-  margin-bottom: 16px;
-}
-.referee-panel .ts-task-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: transparent;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  transition: border-color 0.15s;
-}
-.referee-panel .ts-task-row:hover { border-color: #4b5563; }
-
-.referee-panel .ts-task-row-num {
-  width: 26px; height: 26px;
-  border-radius: 4px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid #374151;
-  color: #9ca3af;
-  font-weight: 600;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.referee-panel .ts-task-row-img {
-  width: 56px; height: 56px;
-  border-radius: 4px;
-  object-fit: cover;
-  background: rgba(255,255,255,0.02);
-  flex-shrink: 0;
-  border: 1px solid #374151;
-}
-.referee-panel .ts-task-row-img-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-}
-.referee-panel .ts-task-row-img-empty svg { width: 22px; height: 22px; }
-.referee-panel .ts-task-row-body { flex: 1; min-width: 0; }
-.referee-panel .ts-task-row-name {
   font-size: 14px;
-  font-weight: 600;
-  color: #f9fafb;
-  margin-bottom: 2px;
-}
-.referee-panel .ts-task-row-desc {
-  font-size: 12px;
-  color: #9ca3af;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.referee-panel .ts-task-row-meta {
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 2px;
-}
-.referee-panel .ts-task-row-meta strong { color: #9ca3af; }
-
-.referee-panel .ts-task-row-input input {
-  width: 76px;
-  height: 40px;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  background: #111827;
-  color: #f9fafb;
-  font-size: 15px;
-  font-weight: 600;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  -moz-appearance: textfield;
-}
-.referee-panel .ts-task-row-input input::-webkit-outer-spin-button,
-.referee-panel .ts-task-row-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.referee-panel .ts-task-row-input input:focus {
-  outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid #334155;
+  padding: 10px 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
 }
 
-/* ─── Step 2: Summary ────────────────────────────────────────── */
-.referee-panel .ts-summary {
-  background: transparent;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  padding: 4px 16px;
-  margin-bottom: 18px;
-}
-.referee-panel .ts-summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #374151;
-  font-size: 13.5px;
-  color: #9ca3af;
-}
-.referee-panel .ts-summary-row:last-child { border-bottom: none; }
-.referee-panel .ts-summary-row strong { color: #f9fafb; font-size: 14px; }
-.referee-panel .ts-summary-total {
-  border-top: 1px solid #4b5563;
-  margin-top: 4px;
-  padding: 14px 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-.referee-panel .ts-summary-total strong {
-  color: #f9fafb;
-  font-size: 22px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.referee-panel .ts-detail {
-  background: transparent;
-  border: 1px solid #374151;
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin-bottom: 18px;
-}
-.referee-panel .ts-detail summary {
-  cursor: pointer;
-  font-size: 13px;
-  color: #9ca3af;
-  font-weight: 500;
-  list-style: none;
-  padding: 4px 0;
-  user-select: none;
-}
-.referee-panel .ts-detail summary::-webkit-details-marker { display: none; }
-.referee-panel .ts-detail summary::before {
-  content: '▸ ';
-  display: inline-block;
-  transition: transform 0.2s;
-  color: #6b7280;
-  margin-right: 4px;
-}
-.referee-panel .ts-detail[open] summary::before { transform: rotate(90deg); }
-
-.referee-panel .ts-detail-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-.referee-panel .ts-detail-table th,
-.referee-panel .ts-detail-table td {
-  padding: 8px 10px;
-  text-align: left;
-  font-size: 13px;
-  border-bottom: 1px solid #374151;
-}
-.referee-panel .ts-detail-table th {
-  color: #9ca3af;
-  font-weight: 600;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.referee-panel .ts-detail-table td strong { color: #f9fafb; }
-
-/* ─── Success screen ─────────────────────────────────────────── */
-.referee-panel .ts-success {
-  text-align: center;
-  padding: 56px 24px;
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 8px;
-  max-width: 440px;
-  margin: 40px auto;
-}
-.referee-panel .ts-success-icon {
-  width: 52px; height: 52px;
-  margin: 0 auto 16px;
-  border-radius: 50%;
-  background: rgba(16,185,129,0.12);
-  border: 1.5px solid #10b981;
-  color: #10b981;
-  font-size: 24px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.referee-panel .ts-success strong { color: #f9fafb; font-size: 16px; }
-.referee-panel .ts-success p { color: #9ca3af; margin-top: 8px; font-size: 13.5px; }
-
-/* ─── Referee Teams: stats + filter ──────────────────────────── */
-.referee-panel .rt-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 18px;
-}
-.referee-panel .rt-stat {
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 8px;
-  padding: 14px;
-  text-align: center;
-}
-.referee-panel .rt-stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #f9fafb;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.referee-panel .rt-stat-label {
-  font-size: 11px;
-  color: #9ca3af;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-top: 4px;
-  font-weight: 500;
-}
-.referee-panel .rt-stat-done { border-color: #1f3d33; }
-.referee-panel .rt-stat-done .rt-stat-value { color: #10b981; }
-.referee-panel .rt-stat-pending { border-color: #3f2f1a; }
-.referee-panel .rt-stat-pending .rt-stat-value { color: #f59e0b; }
-
-.referee-panel .referee-card.is-done {
-  border-color: #1f3d33;
-  background: #1a2b25;
-}
-.referee-panel .referee-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.referee-panel .referee-card-head h3 { margin: 0; flex: 1; }
-.referee-panel .rt-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 4px;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.referee-panel .rt-badge-done {
-  background: rgba(16,185,129,0.12);
-  color: #10b981;
-  border: 1px solid rgba(16,185,129,0.3);
-}
-.referee-panel .rt-badge-pending {
-  background: transparent;
-  color: #9ca3af;
-  border: 1px solid #374151;
-  cursor: pointer;
-}
-.referee-panel .rt-badge-pending:hover { border-color: #4b5563; color: #f9fafb; }
-.referee-panel .rt-badge-rejected {
-  background: rgba(239,68,68,0.1);
-  color: #f87171;
-  border: 1px solid rgba(239,68,68,0.3);
-}
-.referee-panel .referee-card-members {
-  font-size: 12px;
-  color: #9ca3af;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin: 0 0 4px 0;
-}
-.referee-panel .referee-card-foot {
-  display: flex;
-  gap: 6px;
-  font-size: 12px;
-  color: #10b981;
-  padding-top: 8px;
-  border-top: 1px solid #374151;
-  font-weight: 500;
-}
-.referee-panel .referee-card-foot strong { color: #f9fafb; font-size: 13px; }
-
-/* ─── Responsive (tablet portrait + mobile) ─────────────────── */
-@media (max-width: 768px) {
-  .referee-panel .ts-form-grid { grid-template-columns: 1fr; }
-  .referee-panel .rt-stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .referee-panel .rt-stat { padding: 10px 6px; }
-  .referee-panel .rt-stat-value { font-size: 20px; }
-  .referee-panel .ts-step-label { display: none; }
-  .referee-panel .ts-stepper { gap: 4px; }
-  .referee-panel .ts-step { flex: 0 0 auto; }
-  .referee-panel .ts-team-name { font-size: 14px; }
-  .referee-panel .ts-content-name { display: none; }
-  .referee-panel .ts-task-name { font-size: 18px; }
-  .referee-panel .ts-card { padding: 18px; }
-  .referee-panel .ts-task-image { max-height: 180px; }
-  .referee-panel .ts-task-image img { max-height: 180px; }
-  .referee-panel .ts-task-row { flex-wrap: wrap; }
-  .referee-panel .ts-task-row-img { width: 44px; height: 44px; }
-  .referee-panel .ts-task-row-input input { width: 66px; }
-}
-
-@media (max-width: 480px) {
-  .referee-panel .ts-task-image { max-height: 150px; }
-  .referee-panel .ts-task-image img { max-height: 150px; }
-  .referee-panel .ts-task-row-input { width: 100%; }
-  .referee-panel .ts-task-row-input input { width: 100%; }
-}
-
-/* ─── Touch improvements (tablet) ───────────────────────────── */
-@media (pointer: coarse) {
-  .referee-panel .ts-btn { min-height: 44px; }
-  .referee-panel .ts-input { min-height: 44px; font-size: 16px; }
-  .referee-panel .ts-task-pill { width: 32px; height: 32px; }
-  .referee-panel .filter-select { min-height: 44px; }
-  .referee-panel .referee-card { padding: 18px; }
-}
-
-/* ─── Board / edit chips ─────────────────────────────────────── */
-.ts-board-chip, .ts-edit-chip {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  vertical-align: middle;
-  border: 1px solid transparent;
-}
-.ts-board-chip { background: transparent; border-color: #374151; color: #9ca3af; }
-.ts-edit-chip { background: rgba(245,158,11,0.1); color: #f59e0b; border-color: rgba(245,158,11,0.3); }
-
-/* Ảnh minh hoạ nhiệm vụ — khung nhẹ, không chiếm hết trang (max-height 400,
-   width co lại và căn giữa thay vì full-bleed theo bề ngang thẻ) */
-.ts-task-image-wrap {
-  margin: 4px auto 16px;
-  text-align: center;
-  background: #fff;
-  border-radius: 6px;
-  padding: 10px;
-  border: 1px solid #374151;
-  max-width: 480px;
-}
-.ts-task-image-wrap .ts-task-image {
-  max-width: 100%;
-  max-height: 400px;
-  min-height: 100px;
-  border-radius: 4px;
-  object-fit: contain;
-}
-
-/* Đánh giá Đạt/Không đạt — segmented control 2 lựa chọn, không phải nút hành
-   động to màu mè (đây là công cụ đánh giá, không phải nút "bấm để chơi"). */
-.ts-bigbtns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin: 16px 0 4px;
-  padding: 3px;
-  background: #111827;
-  border: 1px solid #374151;
-  border-radius: 6px;
-}
-.ts-bigbtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #9ca3af;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.ts-bigbtn:hover { color: #d1d5db; }
-.ts-bigbtn-pts { font-size: 12px; font-weight: 500; opacity: 0.8; }
-.ts-bigbtn-pass.selected {
-  background: rgba(16,185,129,0.12);
-  border-color: #10b981;
-  color: #10b981;
-}
-.ts-bigbtn-fail.selected {
-  background: rgba(239,68,68,0.1);
-  border-color: #ef4444;
-  color: #f87171;
-}
-
-/* Nhiệm vụ nhiều mức — chọn ĐÚNG 1 trong danh sách mức đạt (label thường dài
-   nên xếp dọc, mỗi mức 1 hàng thay vì lưới 2 cột như Pass/Fail). */
-.ts-tier-options {
+.ts-gate-action {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 16px 0 4px;
+  gap: 12px;
+  align-items: center;
 }
-.ts-tier-btn {
+.ts-gate-start-btn { width: 100%; }
+.ts-gate-hint { font-size: 13px; color: #94a3b8; margin: 0; }
+
+.ts-gate-footer { margin-top: 24px; }
+
+/* Success Card */
+.ts-success {
+  text-align: center;
+  padding: 60px 32px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 20px;
+  max-width: 480px;
+  margin: 60px auto;
+}
+.ts-success-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  border: 2px solid #10b981;
+  color: #10b981;
+  font-size: 32px;
+  font-weight: 800;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
-  border-radius: 6px;
-  border: 1px solid #374151;
-  background: transparent;
-  color: #d1d5db;
-  font-size: 13.5px;
-  font-family: inherit;
-  text-align: left;
-  line-height: 1.4;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-.ts-tier-btn:hover { border-color: #4b5563; color: #f9fafb; }
-.ts-tier-btn.selected {
-  border-color: #2563eb;
-  background: rgba(37,99,235,0.1);
-  color: #f9fafb;
-}
-.ts-tier-btn-pts {
-  flex-shrink: 0;
-  font-weight: 700;
-  font-size: 13px;
-  color: #9ca3af;
-}
-.ts-tier-btn.selected .ts-tier-btn-pts { color: #93c5fd; }
-
-.ts-count-box { text-align: center; margin: 16px 0 4px; }
-.ts-count-label { font-size: 13px; font-weight: 500; margin-bottom: 10px; color: #9ca3af; }
-.ts-count-calc { margin-top: 10px; font-size: 14px; color: #9ca3af; }
-.ts-count-calc strong { font-size: 17px; color: #f9fafb; }
-.ts-count-max { font-size: 12px; opacity: 0.7; }
-
-.ts-input-stepper-xl { justify-content: center; }
-.ts-input-stepper-xl button {
-  width: 52px;
-  height: 52px;
-  font-size: 22px;
-  border-radius: 6px;
-}
-.ts-input-stepper-xl input {
-  width: 80px;
-  height: 52px;
-  font-size: 22px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.ts-sheet-sub { font-size: 13px; color: #9ca3af; margin: -6px 0 12px; }
-.ts-sheet-table { width: 100%; }
-.ts-sheet-table .ts-col-qty { text-align: center; width: 90px; }
-.ts-sheet-table .ts-col-pts { text-align: right; width: 80px; }
-.ts-sheet-total td {
-  font-weight: 700;
-  font-size: 15px;
-  border-top: 1px solid #4b5563;
-  padding-top: 10px;
-}
-.ts-not-scored { font-size: 12px; color: #f59e0b; }
-.ts-hint-inline { font-size: 12px; color: #9ca3af; font-weight: 400; }
-
-/* ─── Bảng xếp hạng (trọng tài) ──────────────────────────────── */
-.referee-panel .rt-rank {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  background: transparent;
-  border: 1px solid #374151;
-  color: #9ca3af;
 }
-.referee-panel .rt-rank-1 { border-color: #f59e0b; color: #f59e0b; }
-.referee-panel .rt-rank-2 { border-color: #9ca3af; color: #d1d5db; }
-.referee-panel .rt-rank-3 { border-color: #b45309; color: #d97706; }
+
+/* ─── Responsive Adjustments ──────────────────────────────────── */
+
+/* Trên màn hình tablet dạng đứng hoặc nhỏ hơn (width < 900px): chuyển về 1 cột */
+@media (max-width: 899px) {
+  .ts-split-container {
+    grid-template-columns: 1fr;
+  }
+  .ts-sidebar-pane {
+    position: static;
+  }
+  .ts-sheet-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .ts-task-nav-list {
+    max-height: 200px;
+  }
+}
+
+@media (max-width: 640px) {
+  .referee-panel .ts-header {
+    flex-wrap: wrap;
+  }
+  .ts-bigbtns-container {
+    grid-template-columns: 1fr;
+  }
+  .ts-footer {
+    flex-direction: column;
+  }
+  .ts-footer .ts-btn {
+    width: 100%;
+  }
+}

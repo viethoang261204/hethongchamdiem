@@ -2,11 +2,11 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import './SignaturePad.css';
 
 /**
- * Ô ký tên cảm ứng cho iPad/điện thoại.
+ * Ô ký tên cảm ứng chuyên nghiệp tối ưu cho Tablet/iPad & Mobile.
  *
  * <SignatureBox label="Học sinh ký" value={dataUrl} onChange={setDataUrl} />
- *   - Hiện chữ ký (ảnh) nếu đã ký, bấm vào mở modal canvas để ký/ký lại
- *   - value là data URL PNG (nền trong suốt), '' = chưa ký
+ *   - Hiện preview chữ ký nếu đã ký kèm mốc "✓ Đã ký tên"
+ *   - Bấm vào mở modal canvas retina nét mượt để ký hoặc ký lại bằng tay / Apple Pencil
  */
 
 function SignatureModal({ title, onClose, onConfirm }) {
@@ -15,19 +15,20 @@ function SignatureModal({ title, onClose, onConfirm }) {
   const lastRef = useRef(null);
   const [isEmpty, setIsEmpty] = useState(true);
 
-  // Canvas theo devicePixelRatio cho nét mượt trên màn retina
+  // Khởi tạo Canvas theo devicePixelRatio để đường nét cực kỳ sắc nét trên iPad Retina
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#1e293b';
+    ctx.strokeStyle = '#0f172a';
   }, []);
 
   const getPos = (e) => {
@@ -37,8 +38,7 @@ function SignatureModal({ title, onClose, onConfirm }) {
 
   const onPointerDown = useCallback((e) => {
     e.preventDefault();
-    // setPointerCapture có thể ném lỗi (pointer không active) trên vài trình duyệt
-    try { canvasRef.current.setPointerCapture(e.pointerId); } catch (_) { /* bỏ qua */ }
+    try { canvasRef.current.setPointerCapture(e.pointerId); } catch (_) { /* browser fallback */ }
     drawingRef.current = true;
     lastRef.current = getPos(e);
   }, []);
@@ -58,12 +58,11 @@ function SignatureModal({ title, onClose, onConfirm }) {
 
   const onPointerUp = useCallback((e) => {
     if (!drawingRef.current) return;
-    // Chấm 1 điểm (tap) cũng tính là nét
     const ctx = canvasRef.current.getContext('2d');
     const pos = getPos(e);
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 1.2, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e293b';
+    ctx.arc(pos.x, pos.y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
     ctx.fill();
     drawingRef.current = false;
     setIsEmpty(false);
@@ -84,22 +83,40 @@ function SignatureModal({ title, onClose, onConfirm }) {
   return (
     <div className="sigpad-overlay" onClick={onClose}>
       <div className="sigpad-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="sigpad-title">{title}</div>
-        <div className="sigpad-hint">Ký bằng ngón tay hoặc bút cảm ứng vào khung bên dưới</div>
-        <canvas
-          ref={canvasRef}
-          className="sigpad-canvas"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        />
+        <div className="sigpad-header">
+          <div>
+            <div className="sigpad-title">{title}</div>
+            <div className="sigpad-hint">Ký bằng ngón tay hoặc bút cảm ứng Stylus / Apple Pencil vào khung bên dưới</div>
+          </div>
+          <button type="button" className="sigpad-close-btn" onClick={onClose} aria-label="Đóng">✕</button>
+        </div>
+
+        <div className="sigpad-canvas-wrapper">
+          <canvas
+            ref={canvasRef}
+            className="sigpad-canvas"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+          />
+          <div className="sigpad-baseline">
+            <span>Đường ký tên / Signature Baseline</span>
+          </div>
+        </div>
+
         <div className="sigpad-actions">
-          <button type="button" className="sigpad-btn sigpad-btn-ghost" onClick={onClose}>Hủy</button>
-          <button type="button" className="sigpad-btn sigpad-btn-ghost" onClick={clear}>Ký lại</button>
-          <button type="button" className="sigpad-btn sigpad-btn-primary" onClick={confirm} disabled={isEmpty}>
-            ✓ Xác nhận chữ ký
+          <button type="button" className="sigpad-btn sigpad-btn-ghost" onClick={clear}>
+            ↺ Ký lại
           </button>
+          <div className="sigpad-actions-right">
+            <button type="button" className="sigpad-btn sigpad-btn-ghost" onClick={onClose}>
+              Hủy
+            </button>
+            <button type="button" className="sigpad-btn sigpad-btn-primary" onClick={confirm} disabled={isEmpty}>
+              ✓ Xác nhận chữ ký
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -110,19 +127,32 @@ export default function SignatureBox({ label, value, onChange, required = false 
   const [open, setOpen] = useState(false);
   return (
     <div className="sigbox">
-      <div className="sigbox-label">
-        {label} {required && <span style={{ color: '#ef4444' }}>*</span>}
+      <div className="sigbox-header">
+        <span className="sigbox-label">
+          {label} {required && <span className="sigbox-req">*</span>}
+        </span>
+        {value ? (
+          <span className="sigbox-status signed">✓ Đã ký tên</span>
+        ) : (
+          <span className="sigbox-status pending">✍ Chưa ký</span>
+        )}
       </div>
       <button type="button" className={`sigbox-area ${value ? 'signed' : ''}`} onClick={() => setOpen(true)}>
         {value ? (
           <img src={value} alt="Chữ ký" className="sigbox-img" />
         ) : (
-          <span className="sigbox-placeholder">✍ Bấm để ký</span>
+          <div className="sigbox-placeholder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            <span>Bấm vào đây để ký tên cảm ứng</span>
+          </div>
         )}
       </button>
       {value && (
         <button type="button" className="sigbox-clear" onClick={() => onChange('')}>
-          Xóa chữ ký
+          ✕ Xóa & ký lại
         </button>
       )}
       {open && (
@@ -135,3 +165,4 @@ export default function SignatureBox({ label, value, onChange, required = false 
     </div>
   );
 }
+
