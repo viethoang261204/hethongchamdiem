@@ -58,7 +58,7 @@ export default function RefereeScoreForm() {
     <div className="ts-wrapper ts-center-screen">
       <div className="ts-loading">
         <div className="ts-spinner" />
-        <p>Đang tải phiếu chấm...</p>
+        <p>Loading score sheet...</p>
       </div>
     </div>
   );
@@ -66,9 +66,9 @@ export default function RefereeScoreForm() {
   if (notFound) return (
     <div className="ts-wrapper ts-center-screen">
       <div className="ts-card ts-gate-card">
-        <p style={{ color: '#f87171' }}>Không tìm thấy đội hoặc nội dung thi.</p>
+        <p style={{ color: '#f87171' }}>Team or content not found.</p>
         <a href={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>
-          ← Quay lại
+          ← Back
         </a>
       </div>
     </div>
@@ -82,13 +82,13 @@ export default function RefereeScoreForm() {
     return (
       <div className="ts-wrapper ts-center-screen">
         <div className="ts-card ts-gate-card">
-          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Đội này đã có phiếu điểm lượt {round}.</p>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>This team already has a score sheet for round {round}.</p>
           <p style={{ color: '#94a3b8', marginBottom: 20 }}>
-            Sau khi gửi, trọng tài không thể sửa lại phiếu. Nếu chấm nhầm, vui lòng liên hệ admin.
+            Once submitted, referees can no longer edit the sheet. If it was scored by mistake, please contact the admin.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link to={`/referee/history/${existingScore.id}`} className="ts-btn ts-btn-secondary">Xem phiếu đã chấm</Link>
-            <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost">← Quay lại danh sách đội</Link>
+            <Link to={`/referee/history/${existingScore.id}`} className="ts-btn ts-btn-secondary">View submitted sheet</Link>
+            <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost">← Back to team list</Link>
           </div>
         </div>
       </div>
@@ -116,13 +116,13 @@ export default function RefereeScoreForm() {
       <div className="ts-wrapper ts-center-screen">
         <div className="ts-card ts-gate-card">
           <div className="ts-gate-badge">
-            <span className="ts-gate-round">Lượt {round}</span>
+            <span className="ts-gate-round">Round {round}</span>
             {team?.boards?.name && <span className="ts-gate-board">{team.boards.name}</span>}
           </div>
-          
+
           <div className="ts-gate-eyebrow">{content?.name}</div>
           <h2 className="ts-gate-team">{team?.name}</h2>
-          
+
           {memberNames && (
             <div className="ts-gate-members">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
@@ -131,7 +131,7 @@ export default function RefereeScoreForm() {
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                 <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
-              <span>Thành viên: <strong>{memberNames}</strong></span>
+              <span>Members: <strong>{memberNames}</strong></span>
             </div>
           )}
 
@@ -144,16 +144,16 @@ export default function RefereeScoreForm() {
               <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
                 <path d="M8 5v14l11-7z"/>
               </svg>
-              BẮT ĐẦU LƯỢT THI {round}
+              START ROUND {round}
             </button>
             <p className="ts-gate-hint">
-              ⏱ Hệ thống sẽ tự động ghi nhận thời gian bắt đầu chấm điểm lượt thi này.
+              ⏱ The system will automatically record the start time and arena entry time for this round.
             </p>
           </div>
 
           <div className="ts-gate-footer">
             <Link to={`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`} className="ts-btn ts-btn-ghost">
-              ← Quay lại danh sách đội
+              ← Back to team list
             </Link>
           </div>
         </div>

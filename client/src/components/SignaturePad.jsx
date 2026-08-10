@@ -86,9 +86,9 @@ function SignatureModal({ title, onClose, onConfirm }) {
         <div className="sigpad-header">
           <div>
             <div className="sigpad-title">{title}</div>
-            <div className="sigpad-hint">Ký bằng ngón tay hoặc bút cảm ứng Stylus / Apple Pencil vào khung bên dưới</div>
+            <div className="sigpad-hint">Sign with your finger or a stylus / Apple Pencil in the box below</div>
           </div>
-          <button type="button" className="sigpad-close-btn" onClick={onClose} aria-label="Đóng">✕</button>
+          <button type="button" className="sigpad-close-btn" onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         <div className="sigpad-canvas-wrapper">
@@ -101,20 +101,20 @@ function SignatureModal({ title, onClose, onConfirm }) {
             onPointerCancel={onPointerUp}
           />
           <div className="sigpad-baseline">
-            <span>Đường ký tên / Signature Baseline</span>
+            <span>Signature Baseline</span>
           </div>
         </div>
 
         <div className="sigpad-actions">
           <button type="button" className="sigpad-btn sigpad-btn-ghost" onClick={clear}>
-            ↺ Ký lại
+            ↺ Sign again
           </button>
           <div className="sigpad-actions-right">
             <button type="button" className="sigpad-btn sigpad-btn-ghost" onClick={onClose}>
-              Hủy
+              Cancel
             </button>
             <button type="button" className="sigpad-btn sigpad-btn-primary" onClick={confirm} disabled={isEmpty}>
-              ✓ Xác nhận chữ ký
+              ✓ Confirm Signature
             </button>
           </div>
         </div>
@@ -132,27 +132,27 @@ export default function SignatureBox({ label, value, onChange, required = false 
           {label} {required && <span className="sigbox-req">*</span>}
         </span>
         {value ? (
-          <span className="sigbox-status signed">✓ Đã ký tên</span>
+          <span className="sigbox-status signed">✓ Signed</span>
         ) : (
-          <span className="sigbox-status pending">✍ Chưa ký</span>
+          <span className="sigbox-status pending">✍ Not signed</span>
         )}
       </div>
       <button type="button" className={`sigbox-area ${value ? 'signed' : ''}`} onClick={() => setOpen(true)}>
         {value ? (
-          <img src={value} alt="Chữ ký" className="sigbox-img" />
+          <img src={value} alt="Signature" className="sigbox-img" />
         ) : (
           <div className="sigbox-placeholder">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
               <path d="M12 20h9"/>
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
-            <span>Bấm vào đây để ký tên cảm ứng</span>
+            <span>Tap here to sign</span>
           </div>
         )}
       </button>
       {value && (
         <button type="button" className="sigbox-clear" onClick={() => onChange('')}>
-          ✕ Xóa & ký lại
+          ✕ Clear & sign again
         </button>
       )}
       {open && (

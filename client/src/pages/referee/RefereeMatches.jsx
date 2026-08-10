@@ -32,9 +32,9 @@ export default function RefereeMatches() {
   }, [data]);
 
   const roundLabel = (roundNo, total) => {
-    if (roundNo === total) return 'Chung kết';
-    if (roundNo === total - 1) return 'Bán kết';
-    return `Vòng ${roundNo}`;
+    if (roundNo === total) return 'Final';
+    if (roundNo === total - 1) return 'Semifinal';
+    return `Round ${roundNo}`;
   };
 
   const recordResult = async (match, winnerId, isDraw) => {
@@ -43,13 +43,13 @@ export default function RefereeMatches() {
       await api.putMatchResult(match.id, { winnerId, isDraw });
       load();
     } catch (e) {
-      showAlert(e.message || 'Lỗi khi ghi kết quả.', 'error');
+      showAlert(e.message || 'Failed to record result.', 'error');
     } finally {
       setSavingId(null);
     }
   };
 
-  if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Đang tải...</p>;
+  if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Loading...</p>;
 
   const totalRounds = rounds.length ? Math.max(...rounds.map(([r]) => r)) : 0;
 
@@ -58,12 +58,12 @@ export default function RefereeMatches() {
       <div className="breadcrumb" style={{ marginBottom: 14 }}>
         <Link to="/referee">Chấm điểm</Link>
       </div>
-      <h1 className="referee-page-title">Trận đấu — Đối kháng</h1>
-      <p style={{ color: '#64748b', marginBottom: 20 }}>Ấn chọn đội thắng (hoặc hòa nếu cần đấu lại) cho từng trận.</p>
+      <h1 className="referee-page-title">Matches — Combat</h1>
+      <p style={{ color: '#64748b', marginBottom: 20 }}>Select the winning team (or draw if a rematch is needed) for each match.</p>
 
       {rounds.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>
-          Chưa có nhánh đấu cho bảng này — vui lòng liên hệ admin để tạo nhánh.
+          No bracket for this board yet — please contact the admin to create one.
         </div>
       ) : (
         rounds.map(([roundNo, matches]) => (
@@ -77,16 +77,16 @@ export default function RefereeMatches() {
                   <div key={m.id} className="ts-task-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                       <strong style={{ color: '#f1f5f9' }}>
-                        {m.team_a_name || (ready ? '—' : 'Chờ đội')} vs {m.team_b_name || (ready ? '—' : 'Chờ đội')}
+                        {m.team_a_name || (ready ? '—' : 'Awaiting team')} vs {m.team_b_name || (ready ? '—' : 'Awaiting team')}
                       </strong>
                       {done && (
                         <span className="rt-badge rt-badge-done">
-                          {m.is_draw ? 'Hòa — cần đấu lại' : `Thắng: ${m.winner_name}`}
+                          {m.is_draw ? 'Draw — rematch needed' : `Winner: ${m.winner_name}`}
                         </span>
                       )}
                     </div>
                     {!ready ? (
-                      <span className="ts-hint">Chưa đủ 2 đội (đang chờ kết quả vòng trước).</span>
+                      <span className="ts-hint">Not enough teams yet (waiting on the previous round's result).</span>
                     ) : (
                       <div className="ts-bigbtns" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
                         <button
@@ -95,7 +95,7 @@ export default function RefereeMatches() {
                           disabled={savingId === m.id}
                           onClick={() => recordResult(m, m.team_a_id, false)}
                         >
-                          {m.team_a_name} thắng
+                          {m.team_a_name} wins
                         </button>
                         <button
                           type="button"
@@ -103,7 +103,7 @@ export default function RefereeMatches() {
                           disabled={savingId === m.id}
                           onClick={() => recordResult(m, m.team_b_id, false)}
                         >
-                          {m.team_b_name} thắng
+                          {m.team_b_name} wins
                         </button>
                         <button
                           type="button"
@@ -111,7 +111,7 @@ export default function RefereeMatches() {
                           disabled={savingId === m.id}
                           onClick={() => recordResult(m, null, true)}
                         >
-                          Hòa
+                          Draw
                         </button>
                       </div>
                     )}
@@ -125,9 +125,9 @@ export default function RefereeMatches() {
 
       {data?.bracket_resolved && data.placements.length > 0 && (
         <div className="ts-card">
-          <h3 className="ts-card-title">Kết quả chung cuộc</h3>
+          <h3 className="ts-card-title">Final Results</h3>
           <table className="ts-detail-table">
-            <thead><tr><th>Hạng</th><th>Đội</th></tr></thead>
+            <thead><tr><th>Rank</th><th>Team</th></tr></thead>
             <tbody>
               {data.placements.map((p) => {
                 const name = data.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name

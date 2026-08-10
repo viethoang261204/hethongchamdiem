@@ -7,14 +7,14 @@ import { exportToPdf } from './exportPdf';
 import './InventionTrailScoreForm.css';
 
 const TASKS = [
-  { id: 'compass',     name: 'La bàn',              nameEn: 'Compass',               maxScore: 50,  description: 'Hình chiếu thẳng đứng của kim đô thăng hàng với miếng màu vàng bên dưới.' },
-  { id: 'papermaking', name: 'Làm giấy',             nameEn: 'Papermaking',           maxScore: 60,  description: 'Tờ giấy rời hoàn toàn khỏi bảng trên và nằm trên bảng dưới.' },
-  { id: 'gunpower',    name: 'Thuốc súng',           nameEn: 'Gunpower',              maxScore: 40,  description: 'Viên đạn rời hoàn toàn vào khung vuông và chạm vào mặt đáy.' },
-  { id: 'printing',    name: 'In chữ rời',           nameEn: 'Movable-Type printing', maxScore: 40,  maxScoreNote: '40/lượt', description: 'Khối chữ được đặt vào vị trí nam châm và cả hai nam châm đều hút chặt.' },
-  { id: 'seismoscope', name: 'Máy đo địa chấn',      nameEn: 'Seismoscope',           maxScore: 40,  description: 'Viên bi thép rơi vào khung bao quanh phía dưới (không chạm vào mặt đáy hoặc mặt sàn).' },
-  { id: 'pyramid',     name: 'Kim tự tháp',          nameEn: 'Pyramid',               maxScore: 60,  description: 'Kim tự tháp được đặt trên bệ thứ hai và đáy chỉ chạm bệ này.' },
-  { id: 'greatwall',   name: 'Vạn lý trường thành',  nameEn: 'GreatWall',             maxScore: 60,  description: 'Vật liệu xây dựng được đặt lên trên Vạn Lý Trường Thành và chỉ chạm vào mô hình này.' },
-  { id: 'bonus_task',  name: 'Nhiệm vụ thưởng',      nameEn: 'Bonus task',            maxScore: 100, description: 'Được thông báo ngay trong cuộc thi đấu.' },
+  { id: 'compass',     name: 'Compass',               maxScore: 50,  description: "The compass needle's vertical projection aligns with the yellow marker below." },
+  { id: 'papermaking', name: 'Papermaking',           maxScore: 60,  description: 'The sheet of paper fully separates from the upper board and rests on the lower board.' },
+  { id: 'gunpower',    name: 'Gunpowder',             maxScore: 40,  description: 'The ball falls completely into the square frame and touches the bottom surface.' },
+  { id: 'printing',    name: 'Movable-Type Printing', maxScore: 40,  maxScoreNote: '40/round', description: 'The type block is placed at the magnet position and both magnets hold it firmly.' },
+  { id: 'seismoscope', name: 'Seismoscope',           maxScore: 40,  description: 'The steel ball falls into the surrounding frame below (without touching the bottom or the floor).' },
+  { id: 'pyramid',     name: 'Pyramid',               maxScore: 60,  description: 'The pyramid is placed on the second platform, with its base touching only this platform.' },
+  { id: 'greatwall',   name: 'Great Wall',            maxScore: 60,  description: 'The building material is placed on top of the Great Wall and touches only this model.' },
+  { id: 'bonus_task',  name: 'Bonus Task',            maxScore: 100, description: 'Announced during the match.' },
 ];
 
 export default function InventionTrailScoreForm({ team, content, competitionId, contentId, region, memberNames }) {
@@ -61,8 +61,8 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
   const handleExportPdf = async () => {
     setExporting(true);
     try {
-      const teamName = (team?.name || 'phieu').replace(/\s+/g, '-').toLowerCase();
-      await exportToPdf(sheetRef, `phieu-cham-diem-invention-trail-${teamName}`);
+      const teamName = (team?.name || 'sheet').replace(/\s+/g, '-').toLowerCase();
+      await exportToPdf(sheetRef, `score-sheet-invention-trail-${teamName}`);
     } finally {
       setExporting(false);
     }
@@ -72,7 +72,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
     e.preventDefault();
     const timeSeconds = Number(timeSpent);
     if (!timeSpent || Number.isNaN(timeSeconds) || timeSeconds < 0) {
-      showAlert('Vui lòng nhập Thời gian hoàn thành (tính bằng giây).', 'error');
+      showAlert('Please enter the completion time (in seconds).', 'error');
       return;
     }
     setSubmitting(true);
@@ -104,7 +104,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
         navigate(`/referee/competition/${competitionId}/content/${contentId}/region/${region}/teams`);
       }, 2000);
     } catch (err) {
-      showAlert(err.message || 'Gửi điểm thất bại', 'error');
+      showAlert(err.message || 'Failed to submit score', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -116,8 +116,8 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
     return (
       <div className="it-success">
         <div className="it-success-icon">✓</div>
-        <strong>Gửi điểm thành công!</strong>
-        <p>Đang quay lại danh sách đội...</p>
+        <strong>Score submitted successfully!</strong>
+        <p>Returning to the team list...</p>
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
     <div className="it-wrapper">
       {/* ── Toolbar (không in) ── */}
       <div className="it-toolbar no-print">
-        <a href={backUrl} className="btn-ghost">← Quay lại danh sách đội</a>
+        <a href={backUrl} className="btn-ghost">← Back to team list</a>
         <div className="it-toolbar-right">
           <button type="button" className="it-btn-print" onClick={handleExportPdf} disabled={exporting}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -134,7 +134,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            {exporting ? 'Đang xuất...' : 'Tải PDF'}
+            {exporting ? 'Exporting...' : 'Download PDF'}
           </button>
         </div>
       </div>
@@ -146,11 +146,11 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
           {/* Header */}
           <div className="it-header">
             <div className="it-header-title">
-              <div className="it-title-main">PHIẾU CHẤM ĐIỂM</div>
+              <div className="it-title-main">SCORE SHEET</div>
               <div className="it-title-sub">Scoring Sheet of Inventions Trail</div>
             </div>
             <div className="it-header-round">
-              Lượt thi
+              Round
               <input
                 className="it-inline-input"
                 value={round}
@@ -165,11 +165,11 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
           <table className="it-info-table">
             <tbody>
               <tr>
-                <td className="it-info-label">STT</td>
+                <td className="it-info-label">No.</td>
                 <td className="it-info-value" style={{ flex: 1 }}></td>
-                <td className="it-info-label">Đội</td>
+                <td className="it-info-label">Team</td>
                 <td className="it-info-value" style={{ flex: 2, fontWeight: 700 }}>{team?.name}</td>
-                <td className="it-info-label">Bảng thi</td>
+                <td className="it-info-label">Board</td>
                 <td className="it-info-value">
                   <input
                     className="it-inline-input"
@@ -184,17 +184,17 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
           </table>
 
           {/* Phụ lục */}
-          <div className="it-phu-luc">Phụ lục: <span className="it-phu-luc-line"></span></div>
+          <div className="it-phu-luc">Appendix: <span className="it-phu-luc-line"></span></div>
 
           {/* Score table */}
           <table className="it-score-table">
             <thead>
               <tr>
-                <th className="it-col-task">Nhiệm vụ</th>
-                <th className="it-col-desc">Mô tả nhiệm vụ</th>
-                <th className="it-col-max">Điểm tối đa</th>
-                <th className="it-col-stt">STT</th>
-                <th className="it-col-achieved">Điểm đạt</th>
+                <th className="it-col-task">Task</th>
+                <th className="it-col-desc">Task Description</th>
+                <th className="it-col-max">Max Score</th>
+                <th className="it-col-stt">No.</th>
+                <th className="it-col-achieved">Score Achieved</th>
               </tr>
             </thead>
             <tbody>
@@ -202,7 +202,6 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
                 <tr key={task.id}>
                   <td className="it-task-name">
                     <div>{task.name}</div>
-                    <div className="it-task-name-en">({task.nameEn})</div>
                   </td>
                   <td className="it-task-desc">{task.description}</td>
                   <td className="it-task-max">{task.maxScoreNote || task.maxScore}</td>
@@ -224,13 +223,12 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
               {/* Extra reward */}
               <tr className="it-row-extra">
                 <td className="it-task-name">
-                  <div>Điểm thưởng</div>
-                  <div className="it-task-name-en">(Extra reward)</div>
+                  <div>Bonus Points</div>
                 </td>
                 <td className="it-task-desc">
-                  40 – 10 × Số lần Chạy lại (&gt; 0)
+                  40 – 10 × Number of Reruns (&gt; 0)
                   <div style={{ marginTop: 4 }} className="no-print">
-                    <span style={{ fontSize: 12, color: '#64748b' }}>Số lần chạy lại: </span>
+                    <span style={{ fontSize: 12, color: '#64748b' }}>Reruns: </span>
                     <input
                       type="number"
                       min={0}
@@ -242,7 +240,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
                     />
                   </div>
                   <div className="print-only" style={{ fontSize: 12 }}>
-                    Số lần chạy lại: {rerunCount || '___'}
+                    Reruns: {rerunCount || '___'}
                   </div>
                 </td>
                 <td className="it-task-max"></td>
@@ -254,14 +252,14 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
 
               {/* Total */}
               <tr className="it-row-total">
-                <td colSpan={3} className="it-total-label">Tổng điểm (Total Score)</td>
+                <td colSpan={3} className="it-total-label">Total Score</td>
                 <td></td>
                 <td className="it-total-value">{totalScore > 0 ? totalScore : ''}</td>
               </tr>
 
               {/* Time */}
               <tr className="it-row-time">
-                <td colSpan={3} className="it-total-label">Thời gian (Time Spent)</td>
+                <td colSpan={3} className="it-total-label">Time Spent</td>
                 <td></td>
                 <td className="it-total-value">
                   <input
@@ -270,7 +268,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
                     className="it-score-input"
                     value={timeSpent}
                     onChange={e => setTimeSpent(e.target.value)}
-                    placeholder="Số giây"
+                    placeholder="Seconds"
                     required
                     style={{ width: '100%' }}
                   />
@@ -281,37 +279,36 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
 
           {/* Xác nhận điểm */}
           <div className="it-confirm-section">
-            <div className="it-confirm-title">Xác nhận điểm (Score Confirmation)</div>
+            <div className="it-confirm-title">Score Confirmation</div>
             <div className="it-confirm-text">
-              Tôi xác nhận rằng các điểm số ghi trên là chính xác, hợp lệ và phản ánh đúng kết quả của trận đấu.<br/>
-              Tôi không có ý kiến thắc mắc. <em>(I hereby confirm that the scores recorded above are accurate, valid, and reflect the true results of the match. I have no objections.)</em>
+              I hereby confirm that the scores recorded above are accurate, valid, and reflect the true results of the match. I have no objections.
             </div>
             <table className="it-sign-table">
               <tbody>
                 <tr>
-                  <td className="it-sign-label">Thành viên đội thi (Team members):</td>
+                  <td className="it-sign-label">Team Members:</td>
                   <td className="it-sign-value">
                     <input
                       type="text"
                       className="it-sign-input"
                       value={teamMembers}
                       onChange={e => setTeamMembers(e.target.value)}
-                      placeholder="Tên thành viên..."
+                      placeholder="Member names..."
                     />
                   </td>
-                  <td className="it-sign-label">Trọng tài (Referee):</td>
+                  <td className="it-sign-label">Referee:</td>
                   <td className="it-sign-value">
                     <input
                       type="text"
                       className="it-sign-input"
                       value={refereeSignature}
                       onChange={e => setRefereeSignature(e.target.value)}
-                      placeholder="Tên trọng tài..."
+                      placeholder="Referee name..."
                     />
                   </td>
                 </tr>
                 <tr>
-                  <td className="it-sign-label">Ghi chú (Remarks)</td>
+                  <td className="it-sign-label">Remarks</td>
                   <td colSpan={3} className="it-sign-value">
                     <input
                       type="text"
@@ -323,7 +320,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
                   </td>
                 </tr>
                 <tr>
-                  <td className="it-sign-label">Trọng tài trưởng (Chief referee):</td>
+                  <td className="it-sign-label">Chief Referee:</td>
                   <td className="it-sign-value">
                     <input
                       type="text"
@@ -333,7 +330,7 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
                       placeholder="..."
                     />
                   </td>
-                  <td className="it-sign-label">Thư ký (Scorekeeper):</td>
+                  <td className="it-sign-label">Scorekeeper:</td>
                   <td className="it-sign-value">
                     <input
                       type="text"
@@ -351,9 +348,9 @@ export default function InventionTrailScoreForm({ team, content, competitionId, 
 
         {/* Submit buttons */}
         <div className="it-actions no-print">
-          <a href={backUrl} className="it-btn-cancel">Hủy</a>
+          <a href={backUrl} className="it-btn-cancel">Cancel</a>
           <button type="submit" className="it-btn-submit" disabled={submitting}>
-            {submitting ? 'Đang gửi...' : 'Gửi điểm'}
+            {submitting ? 'Submitting...' : 'Submit Score'}
           </button>
         </div>
       </form>
