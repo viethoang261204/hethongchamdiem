@@ -34,7 +34,6 @@ export default function RefereeSelect() {
     navigate(`/referee/competition/${selectedComp.id}/content/${selectedContent.id}/region/${boardId}/teams`);
   };
 
-  // Bảng đối kháng không chấm theo nhiệm vụ — dẫn sang màn "Trận đấu" để ghi thắng/thua
   const goToBoard = (board) => {
     if (board.ranking_format === 'combat') {
       navigate(`/referee/competition/${selectedComp.id}/content/${selectedContent.id}/region/${board.id}/matches`);
@@ -43,9 +42,6 @@ export default function RefereeSelect() {
     }
   };
 
-  // 2 nội dung đối kháng riêng (Fly Smart Cup / Battle of Stars) có bảng điểm
-  // và luồng nhập điểm hoàn toàn khác — đi thẳng vào màn hình riêng, bỏ qua
-  // bước chọn bảng đấu (server đã tự lọc trận theo referee_boards).
   const selectContent = async (c) => {
     setSelectedContent(c);
     if (c.content_format === 'combat_drone') {
@@ -62,11 +58,8 @@ export default function RefereeSelect() {
         capi.getBoards(c.id),
         api.getMyBoards().catch(() => []),
       ]);
-      // Chỉ được phân quyền vào một số bảng cụ thể → chỉ hiện các bảng đó.
-      // Chưa được phân quyền bảng nào (mảng rỗng) → coi như chưa giới hạn, hiện tất cả.
       const allowed = myBoardIds.length ? contentBoards.filter(b => myBoardIds.includes(b.id)) : contentBoards;
       if (allowed.length === 0) {
-        // Nội dung này không có bảng đấu (hoặc không có bảng nào được phân quyền) → vào thẳng danh sách đội
         navigate(`/referee/competition/${selectedComp.id}/content/${c.id}/region/all/teams`);
         return;
       }
@@ -92,23 +85,42 @@ export default function RefereeSelect() {
   };
 
   return (
-    <div>
-      <h1 className="referee-page-title">Chấm điểm</h1>
-      <div className="referee-steps">
-        <span className={`step ${step === 'competition' ? 'active' : ''}`}>1. Chọn cuộc thi</span>
-        <span className={`step ${step === 'content' ? 'active' : ''}`}>2. Chọn nội dung</span>
-        <span className={`step ${step === 'board' ? 'active' : ''}`}>3. Chọn bảng đấu</span>
+    <div className="referee-content-wrap">
+      <div className="referee-page-header">
+        <h1 className="referee-page-title">Cổng Trọng Tài Chấm Điểm</h1>
+        <p className="referee-page-subtitle">Chọn cuộc thi, nội dung thi đấu và bảng đấu để tiến hành chấm điểm cho các đội thi.</p>
       </div>
+
+      {/* Stepper progress */}
+      <div className="referee-steps">
+        <div className={`step ${step === 'competition' ? 'active' : ''}`}>
+          <span className="step-num">1</span>
+          <span>Chọn cuộc thi</span>
+        </div>
+        <div className={`step ${step === 'content' ? 'active' : ''}`}>
+          <span className="step-num">2</span>
+          <span>Chọn nội dung</span>
+        </div>
+        <div className={`step ${step === 'board' ? 'active' : ''}`}>
+          <span className="step-num">3</span>
+          <span>Chọn bảng đấu</span>
+        </div>
+      </div>
+
       {step !== 'competition' && (
-        <button type="button" className="btn-ghost" onClick={back} style={{ marginBottom: '1rem' }}>← Quay lại</button>
+        <button type="button" className="btn btn-ghost" onClick={back} style={{ marginBottom: 20 }}>
+          ← Quay lại bước trước
+        </button>
       )}
 
       {step === 'competition' && (
         <div className="referee-grid">
           {competitions.filter(c => c.is_active !== false).map((c) => (
             <button key={c.id} type="button" className="referee-card" onClick={() => selectCompetition(c)}>
+              <div className="card-badge">Cuộc thi</div>
               <h3>{c.name}</h3>
-              <p>{c.location} · {c.start_date}</p>
+              <p>{c.location || 'Địa điểm chưa cập nhật'} · {c.start_date || 'Thời gian chưa cập nhật'}</p>
+              <div className="card-action">Bắt đầu chọn nội dung →</div>
             </button>
           ))}
         </div>
@@ -118,8 +130,10 @@ export default function RefereeSelect() {
         <div className="referee-grid">
           {contents.map((c) => (
             <button key={c.id} type="button" className="referee-card" onClick={() => selectContent(c)} disabled={boardsLoading}>
+              <div className="card-badge">Nội dung</div>
               <h3>{c.name}</h3>
-              <p>{c.description}</p>
+              <p>{c.description || 'Chưa có mô tả chi tiết'}</p>
+              <div className="card-action">Chọn bảng đấu & chấm điểm →</div>
             </button>
           ))}
         </div>
@@ -128,13 +142,17 @@ export default function RefereeSelect() {
       {step === 'board' && selectedContent && (
         <div className="referee-grid">
           <button type="button" className="referee-card" onClick={() => goToTeams('all')}>
-            <h3>Tất cả bảng</h3>
-            <p>Xem tất cả đội bạn được phân công trong nội dung này</p>
+            <div className="card-badge">Tất cả</div>
+            <h3>Tất cả các bảng đấu</h3>
+            <p>Xem toàn bộ danh sách các đội thi được phân công</p>
+            <div className="card-action">Xem toàn bộ đội thi →</div>
           </button>
           {boards.map((b) => (
             <button key={b.id} type="button" className="referee-card" onClick={() => goToBoard(b)}>
-              <h3>{b.name}{b.ranking_format === 'combat' && <span className="ts-board-chip">Đối kháng</span>}</h3>
-              <p>{b.age_group || ''}</p>
+              <div className="card-badge">{b.ranking_format === 'combat' ? 'Đối kháng' : 'Đo lường'}</div>
+              <h3>{b.name}</h3>
+              <p>{b.age_group ? `Lứa tuổi: ${b.age_group}` : 'Chưa có lứa tuổi'}</p>
+              <div className="card-action">Vào bảng đấu →</div>
             </button>
           ))}
         </div>
@@ -142,3 +160,4 @@ export default function RefereeSelect() {
     </div>
   );
 }
+

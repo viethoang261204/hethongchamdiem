@@ -7,9 +7,9 @@ import Pagination from '../../components/Pagination';
 import './RefereeLayout.css';
 
 const STATUS_LABEL = {
-  pending: { label: 'Đang chờ', className: 'rt-badge-pending' },
-  resolved: { label: 'Đã xử lý', className: 'rt-badge-done' },
-  rejected: { label: 'Từ chối', className: 'rt-badge-rejected' },
+  pending: { label: 'Đang chờ xử lý', className: 'rt-badge-pending' },
+  resolved: { label: 'Đã xử lý ✓', className: 'rt-badge-done' },
+  rejected: { label: 'Đã từ chối ✗', className: 'rt-badge-rejected' },
 };
 
 function formatDate(iso) {
@@ -17,10 +17,6 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-// "Khiếu nại bảng điểm" — trọng tài chọn 1 phiếu điểm (đo lường) hoặc 1 trận
-// đối kháng đã chấm, gửi yêu cầu khiếu nại kèm lý do; admin xử lý ở
-// /admin/complaints. Đây là luồng riêng, không phải ô "Kiến nghị" đã có sẵn
-// ngay trên phiếu điểm (ô đó chỉ là ghi chú, không ai theo dõi xử lý).
 export default function RefereeComplaints() {
   const { user } = useAuth();
   const { showAlert } = useNotify();
@@ -90,9 +86,9 @@ export default function RefereeComplaints() {
   }, [contentId]);
 
   const submit = async () => {
-    if (targetType === 'score' && !scoreId) { showAlert('Chọn 1 phiếu điểm để khiếu nại.', 'error'); return; }
-    if (targetType === 'combat' && !combatMatchId) { showAlert('Chọn 1 trận đối kháng để khiếu nại.', 'error'); return; }
-    if (!message.trim()) { showAlert('Nhập lý do khiếu nại.', 'error'); return; }
+    if (targetType === 'score' && !scoreId) { showAlert('Vui lòng chọn 1 phiếu điểm để khiếu nại.', 'error'); return; }
+    if (targetType === 'combat' && !combatMatchId) { showAlert('Vui lòng chọn 1 trận đối kháng để khiếu nại.', 'error'); return; }
+    if (!message.trim()) { showAlert('Vui lòng nhập lý do khiếu nại.', 'error'); return; }
 
     setSubmitting(true);
     try {
@@ -101,7 +97,7 @@ export default function RefereeComplaints() {
         combat_match_id: targetType === 'combat' ? combatMatchId : undefined,
         message: message.trim(),
       });
-      showAlert('Đã gửi khiếu nại.', 'success');
+      showAlert('Đã gửi yêu cầu khiếu nại thành công.', 'success');
       setScoreId(''); setCombatMatchId(''); setMessage('');
       load();
     } catch (e) {
@@ -113,103 +109,163 @@ export default function RefereeComplaints() {
 
   const { pageItems: complaintsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(complaints, 10);
 
-  if (loading) return <p className="referee-page-title">Đang tải...</p>;
+  if (loading) return (
+    <div className="referee-loading-container">
+      <div className="ts-spinner" />
+      <p>Đang tải dữ liệu khiếu nại...</p>
+    </div>
+  );
 
   return (
-    <div>
-      <h1 className="referee-page-title">Khiếu nại bảng điểm</h1>
-      <p style={{ color: '#64748b', marginBottom: 24 }}>Gửi yêu cầu khiếu nại về 1 phiếu điểm đã chấm — admin sẽ xem và phản hồi.</p>
+    <div className="referee-content-wrap">
+      <div className="referee-page-header">
+        <h1 className="referee-page-title">Khiếu nại bảng điểm</h1>
+        <p className="referee-page-subtitle">Gửi yêu cầu khiếu nại trực tiếp về phiếu điểm hoặc trận đấu — Ban quản trị sẽ xem xét và phản hồi.</p>
+      </div>
 
-      <div className="ts-card" style={{ marginBottom: 24 }}>
-        <h3 className="ts-card-title" style={{ marginBottom: 12 }}>Gửi khiếu nại mới</h3>
+      {/* Form Tạo khiếu nại mới */}
+      <div className="card referee-form-card">
+        <div className="card-header">
+          <h2 className="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Gửi yêu cầu khiếu nại mới
+          </h2>
+        </div>
 
-        <div className="ts-bigbtns" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 16 }}>
-          <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${targetType === 'score' ? 'selected' : ''}`} onClick={() => setTargetType('score')}>
+        {/* Modern Segmented Tab Bar */}
+        <div className="tab-segmented">
+          <button
+            type="button"
+            className={`tab-item ${targetType === 'score' ? 'active' : ''}`}
+            onClick={() => setTargetType('score')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
             Phiếu điểm đo lường
           </button>
-          <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${targetType === 'combat' ? 'selected' : ''}`} onClick={() => setTargetType('combat')}>
+          <button
+            type="button"
+            className={`tab-item ${targetType === 'combat' ? 'active' : ''}`}
+            onClick={() => setTargetType('combat')}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
             Trận đối kháng
           </button>
         </div>
 
         {targetType === 'score' ? (
           <div className="form-group">
-            <label className="ts-label">Chọn phiếu điểm</label>
-            <select className="ts-input form-select" value={scoreId} onChange={(e) => setScoreId(e.target.value)}>
-              <option value="">-- Chọn phiếu điểm --</option>
+            <label className="form-label">Chọn phiếu điểm cần khiếu nại <span className="required">*</span></label>
+            <select className="form-select ts-input" value={scoreId} onChange={(e) => setScoreId(e.target.value)}>
+              <option value="">-- Chọn phiếu điểm trong lịch sử --</option>
               {myScores.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.team?.name || '—'} · {contentNames[s.contest_content_id] || s.contest_content_id} · Lượt {s.round} · {formatDate(s.submitted_at)}
+                  Đội: {s.team?.name || '—'} · {contentNames[s.contest_content_id] || s.contest_content_id} · Lượt {s.round} ({s.score ?? 0}đ) · {formatDate(s.submitted_at)}
                 </option>
               ))}
             </select>
-            {myScores.length === 0 && <div className="ts-hint">Bạn chưa gửi phiếu điểm nào.</div>}
+            {myScores.length === 0 && <div className="form-hint">Bạn chưa nhập phiếu điểm nào.</div>}
           </div>
         ) : (
-          <>
-            <div className="ts-form-grid">
-              <div className="ts-form-row">
-                <label className="ts-label">Cuộc thi</label>
-                <select className="ts-input form-select" value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
-                  <option value="">-- Chọn cuộc thi --</option>
-                  {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="ts-form-row">
-                <label className="ts-label">Nội dung đối kháng</label>
-                <select className="ts-input form-select" value={contentId} onChange={(e) => setContentId(e.target.value)} disabled={!competitionId}>
-                  <option value="">-- Chọn nội dung --</option>
-                  {combatContents.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label">Cuộc thi</label>
+              <select className="form-select ts-input" value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
+                <option value="">-- Chọn cuộc thi --</option>
+                {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
             </div>
             <div className="form-group">
-              <label className="ts-label">Chọn trận đấu</label>
-              <select className="ts-input form-select" value={combatMatchId} onChange={(e) => setCombatMatchId(e.target.value)} disabled={!contentId || matchesLoading}>
-                <option value="">{matchesLoading ? 'Đang tải...' : '-- Chọn trận --'}</option>
+              <label className="form-label">Nội dung đối kháng</label>
+              <select className="form-select ts-input" value={contentId} onChange={(e) => setContentId(e.target.value)} disabled={!competitionId}>
+                <option value="">-- Chọn nội dung --</option>
+                {combatContents.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group form-full">
+              <label className="form-label">Chọn trận đấu <span className="required">*</span></label>
+              <select className="form-select ts-input" value={combatMatchId} onChange={(e) => setCombatMatchId(e.target.value)} disabled={!contentId || matchesLoading}>
+                <option value="">{matchesLoading ? 'Đang tải danh sách trận...' : '-- Chọn trận đấu --'}</option>
                 {combatMatches.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.team_a?.name || '—'} vs {m.team_b?.name || '—'}{m.stage ? ` · ${m.stage}` : ''}
                   </option>
                 ))}
               </select>
-              {contentId && !matchesLoading && combatMatches.length === 0 && <div className="ts-hint">Nội dung này chưa có trận nào.</div>}
             </div>
-          </>
+          </div>
         )}
 
-        <div className="form-group" style={{ marginTop: 12 }}>
-          <label className="ts-label">Lý do khiếu nại</label>
-          <textarea className="ts-input" rows={3} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Mô tả cụ thể vấn đề bạn muốn khiếu nại..." />
+        <div className="form-group" style={{ marginTop: 16 }}>
+          <label className="form-label">Lý do khiếu nại chi tiết <span className="required">*</span></label>
+          <textarea
+            className="form-input ts-input"
+            rows={4}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Mô tả chi tiết sai sót về điểm số, thời gian, hoặc sự cố trọng tài cần làm rõ..."
+          />
         </div>
 
-        <div className="ts-footer">
-          <button type="button" className="ts-btn ts-btn-primary ts-btn-lg" onClick={submit} disabled={submitting}>
-            {submitting ? 'Đang gửi...' : '✓ Gửi khiếu nại'}
+        <div className="form-actions">
+          <button type="button" className="btn btn-primary btn-lg" onClick={submit} disabled={submitting}>
+            {submitting ? 'Đang gửi...' : '✓ Gửi yêu cầu khiếu nại'}
           </button>
         </div>
       </div>
 
-      <h3 className="ts-card-title" style={{ marginBottom: 12 }}>Khiếu nại đã gửi ({complaints.length})</h3>
+      {/* Danh sách Khiếu nại đã gửi */}
+      <div className="referee-section-header">
+        <h3 className="referee-section-title">Khiếu nại đã gửi ({complaints.length})</h3>
+      </div>
+
       {complaints.length === 0 ? (
-        <div className="card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>Bạn chưa gửi khiếu nại nào.</div>
+        <div className="card referee-empty-card">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="40" height="40">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
+          </svg>
+          <p>Bạn chưa gửi yêu cầu khiếu nại nào.</p>
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="complaints-list">
           {complaintsPage.map((c) => {
             const st = STATUS_LABEL[c.status] || STATUS_LABEL.pending;
             return (
-              <div className="ts-card" key={c.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+              <div className="card complaint-card" key={c.id}>
+                <div className="complaint-card-head">
                   <div>
-                    <strong style={{ color: '#f1f5f9' }}>{c.team_name || '—'}</strong>
-                    <div style={{ color: '#64748b', fontSize: 13 }}>{c.content_name}{c.score_round ? ` · Lượt ${c.score_round}` : ''} · {formatDate(c.created_at)}</div>
+                    <h4 className="complaint-team">{c.team_name || 'Đội thi / Trận đấu'}</h4>
+                    <div className="complaint-meta">
+                      <span>{c.content_name}</span>
+                      {c.score_round && <span className="meta-badge">Lượt {c.score_round}</span>}
+                      <span>• {formatDate(c.created_at)}</span>
+                    </div>
                   </div>
                   <span className={`rt-badge ${st.className}`}>{st.label}</span>
                 </div>
-                <p style={{ marginTop: 10, color: '#cbd5e1', fontSize: 14 }}>{c.message}</p>
+
+                <div className="complaint-body">
+                  <p>{c.message}</p>
+                </div>
+
                 {c.status !== 'pending' && (
-                  <div style={{ marginTop: 8, padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: 8, fontSize: 13, color: '#94a3b8' }}>
-                    Phản hồi từ admin: {c.resolution_note || '(không có ghi chú)'}
+                  <div className="complaint-reply">
+                    <div className="reply-header">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      <strong>Phản hồi từ Ban quản trị (Admin):</strong>
+                    </div>
+                    <p>{c.resolution_note || '(Không có ghi chú thêm)'}</p>
                   </div>
                 )}
               </div>
@@ -221,3 +277,4 @@ export default function RefereeComplaints() {
     </div>
   );
 }
+
