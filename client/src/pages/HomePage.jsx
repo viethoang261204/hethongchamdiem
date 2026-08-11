@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { formatSecondsAsMinutes } from '../lib/time';
 import './HomePage.css';
 
 export default function HomePage() {
   const [competitions, setCompetitions] = useState([]);
   const [leaderboards, setLeaderboards] = useState({});
-  const [loading, setLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -37,8 +35,6 @@ export default function HomePage() {
         setLeaderboards(boards);
       } catch (e) {
         console.error(e);
-      } finally {
-        setLoading(false);
       }
     }
     load();
@@ -62,13 +58,6 @@ export default function HomePage() {
   }, []);
 
   const entries = Object.values(leaderboards);
-
-  const rankBadge = (i) => {
-    if (i === 0) return <span className="rank-badge gold">1</span>;
-    if (i === 1) return <span className="rank-badge silver">2</span>;
-    if (i === 2) return <span className="rank-badge bronze">3</span>;
-    return <span className="rank-num">{i + 1}</span>;
-  };
 
   const tickerItems = [
     'ENJOY AI SCORING SYSTEM',
@@ -280,148 +269,6 @@ export default function HomePage() {
             </div>
             <div className="features-line" />
           </div>
-        </div>
-      </section>
-
-      {/* LEADERBOARD */}
-      <section className="bxh-section">
-        <div className="container">
-          <div className="bxh-section-header">
-            <div className="bxh-section-label">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="bxh-section-icon">
-                <path d="M2 14V6M6 14V2M10 14V4M14 14V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              LEADERBOARD
-            </div>
-            <h2 className="bxh-title">Live Rankings</h2>
-            <p className="bxh-desc">
-              Real-time results by category across all active competitions
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="bxh-loading-wrap">
-              <div className="bxh-spinner" />
-              <p className="bxh-loading-text">Loading results...</p>
-            </div>
-          ) : (
-            <>
-              {competitions.length === 0 && (
-                <div className="bxh-empty-wrap">
-                  <div className="bxh-empty-graphic">
-                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                      <rect x="4" y="4" width="72" height="72" rx="12" stroke="#1e293b" strokeWidth="2"/>
-                      <path d="M24 56V28L36 16L48 28V56" stroke="#334155" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <path d="M44 40L52 48" stroke="#334155" strokeWidth="2" strokeLinecap="round"/>
-                      <circle cx="36" cy="36" r="8" stroke="#475569" strokeWidth="2"/>
-                    </svg>
-                  </div>
-                  <p className="bxh-empty">No active competitions</p>
-                  <p className="bxh-empty-sub">Check back soon for live results and rankings.</p>
-                </div>
-              )}
-              {competitions.map((comp) => {
-                const compEntries = entries
-                  .filter(e => e.content.competition_id === comp.id)
-                  .sort((a, b) => (a.content.order || 0) - (b.content.order || 0));
-                return (
-                  <div key={comp.id} className="comp-block">
-                    <div className="comp-header">
-                      <div className="comp-meta-left">
-                        <div className="comp-icon-wrap">
-                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 13.5L4.5 17L6.5 11L2 7.5H7.5L10 2Z"
-                              fill="#f59e0b" opacity="0.15" stroke="#f59e0b" strokeWidth="1.2" strokeLinejoin="round"/>
-                          </svg>
-                        </div>
-                        <div className="comp-info">
-                          <h3 className="comp-name">{comp.name}</h3>
-                          <div className="comp-chips">
-                            {comp.location && (
-                              <span className="comp-chip">
-                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                  <circle cx="5" cy="4" r="2" stroke="currentColor" strokeWidth="1"/>
-                                  <path d="M5 10C5 10 2 7 2 4C2 2 3.5 1 5 1C6.5 1 8 2 8 4C8 7 5 10 5 10Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                                </svg>
-                                {comp.location}
-                              </span>
-                            )}
-                            {(comp.start_date || comp.end_date) && (
-                              <span className="comp-chip">
-                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                  <rect x="1" y="2" width="8" height="7" rx="1" stroke="currentColor" strokeWidth="1"/>
-                                  <line x1="1" y1="4.5" x2="9" y2="4.5" stroke="currentColor" strokeWidth="1"/>
-                                  <line x1="3.5" y1="1" x2="3.5" y2="3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                                  <line x1="6.5" y1="1" x2="6.5" y2="3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                                </svg>
-                                {comp.start_date}{comp.end_date ? ` – ${comp.end_date}` : ''}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="comp-count-badge">
-                        {compEntries.reduce((s, e) => s + (e.list?.length || 0), 0)} teams
-                      </div>
-                    </div>
-
-                    <div className="comp-body">
-                      {compEntries.length === 0 && (
-                        <div className="comp-no-content">No categories available for this competition.</div>
-                      )}
-                      <div className="contents-grid">
-                        {compEntries.map(({ content, list }) => (
-                          <div key={content.id} className="content-card">
-                            <div className="content-card-top">
-                              <div className="content-card-label">
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="content-card-bar" />
-                                {content.name}
-                              </div>
-                              <div className="content-card-meta">{list.length} teams</div>
-                            </div>
-                            {list.length === 0 ? (
-                              <div className="content-no-score">
-                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                  <circle cx="10" cy="10" r="8" stroke="#334155" strokeWidth="1.2"/>
-                                  <line x1="7" y1="10" x2="13" y2="10" stroke="#334155" strokeWidth="1.2" strokeLinecap="round"/>
-                                </svg>
-                                No scores yet
-                              </div>
-                            ) : (
-                              <table className="content-table">
-                                <thead>
-                                  <tr>
-                                    <th className="th-rank">#</th>
-                                    <th className="th-team">Team</th>
-                                    <th className="th-time">Time</th>
-                                    <th className="th-score">Score</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {list.slice(0, 10).map((row, i) => (
-                                    <tr key={row.id} className={i < 3 ? `top-row top-${i + 1}` : ''}>
-                                      <td className="rank-cell">{rankBadge(i)}</td>
-                                      <td className="team-cell">{row.teams?.name || row.team?.name || '—'}</td>
-                                      <td className="time-cell">{formatSecondsAsMinutes(row.time) || '—'}</td>
-                                      <td className="score-cell">
-                                        <span className={`score-badge${i === 0 ? ' score-gold' : i === 1 ? ' score-silver' : i === 2 ? ' score-bronze' : ''}`}>
-                                          {row.score ?? '—'}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
         </div>
       </section>
 

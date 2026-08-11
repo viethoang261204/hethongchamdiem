@@ -229,8 +229,11 @@ function GenericSheet({ score, content, sheetRef }) {
  *              Nếu không truyền, mặc định chỉ có [score].
  *   content  — object nội dung thi (có templateType, scoreSheetTemplate)
  *   backLink — element nút quay lại (Link hoặc button)
+ *   variant  — 'referee' bọc phiếu (nền trắng) trong khung kính tối cho hợp
+ *              giao diện dark của referee panel; bỏ trống = style mặc định
+ *              (admin, nền sáng) — không đổi gì để giữ nguyên trang admin.
  */
-export default function ScoreDetailView({ score, scores, content, backLink }) {
+export default function ScoreDetailView({ score, scores, content, backLink, variant }) {
   const sheetRef = useRef(null);
   const [exporting, setExporting] = useState(false);
   const allScores = scores && scores.length ? scores : (score ? [score] : []);
@@ -248,6 +251,12 @@ export default function ScoreDetailView({ score, scores, content, backLink }) {
     }
   };
 
+  const sheet = isInventionTrail
+    ? <InventionTrailSheet score={score} sheetRef={sheetRef} />
+    : isTaskWizard
+      ? <ScoreSheetTable scores={allScores} content={content} sheetRef={sheetRef} />
+      : <GenericSheet score={score} content={content} sheetRef={sheetRef} />;
+
   return (
     <div>
       {/* Toolbar */}
@@ -263,12 +272,11 @@ export default function ScoreDetailView({ score, scores, content, backLink }) {
         </button>
       </div>
 
-      {isInventionTrail
-        ? <InventionTrailSheet score={score} sheetRef={sheetRef} />
-        : isTaskWizard
-          ? <ScoreSheetTable scores={allScores} content={content} sheetRef={sheetRef} />
-          : <GenericSheet score={score} content={content} sheetRef={sheetRef} />
-      }
+      {variant === 'referee' ? (
+        <div className="ref-sheet-frame">
+          <div className="ref-sheet-scroll">{sheet}</div>
+        </div>
+      ) : sheet}
     </div>
   );
 }

@@ -39,13 +39,16 @@ export default function RefereeScoreDetail() {
   if (!score) return <p className="referee-page-title">Không tìm thấy phiếu điểm.</p>;
 
   return (
-    <ScoreDetailView
-      score={score}
-      scores={scores}
-      content={content}
-      backLink={
-        <Link to="/referee/history" className="btn-ghost">← Quay lại lịch sử</Link>
-      }
-    />
+    <div className="referee-content-wrap">
+      <ScoreDetailView
+        score={score}
+        scores={scores}
+        content={content}
+        variant="referee"
+        backLink={
+          <Link to="/referee/history" className="btn btn-ghost">← Quay lại lịch sử</Link>
+        }
+      />
+    </div>
   );
 }

@@ -471,6 +471,27 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ─── Score Sheet frame (RefereeScoreDetail) ─────────────────── */
+/* Bọc phiếu điểm nền trắng (mẫu in .ss-sheet, dùng chung với admin) trong
+   1 khung kính tối cho hợp giao diện dark — không đụng vào .ss-sheet để
+   giữ nguyên hình dạng khi xuất PDF và khi admin xem cùng component. */
+.ref-sheet-frame {
+  background: rgba(19, 27, 46, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+}
+
+.ref-sheet-scroll {
+  overflow-x: auto;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+}
+
 .card-badge {
   display: inline-block;
   font-size: 11px;
