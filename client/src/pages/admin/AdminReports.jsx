@@ -16,7 +16,6 @@ export default function AdminReports() {
 
   const [selectedComp, setSelectedComp] = useState('');
   const [selectedContent, setSelectedContent] = useState('');
-  const [groupBy, setGroupBy] = useState('school'); // school | coach
   const [rows, setRows] = useState(null);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState(null);
@@ -45,7 +44,8 @@ export default function AdminReports() {
     }
   };
 
-  // Gộp theo đội (tổng cả 2 lượt), rồi nhóm theo trường hoặc HLV
+  // Gộp theo đội (tổng cả 2 lượt), rồi nhóm theo trường/trung tâm — mỗi đội
+  // luôn thuộc 1 trường/trung tâm nên đây là cách nhóm duy nhất, không cần chọn.
   const groups = useMemo(() => {
     if (!rows) return [];
     const byTeam = new Map();
@@ -55,7 +55,6 @@ export default function AdminReports() {
           team_id: r.team_id,
           team_name: r.team_name,
           school: r.schools?.name || 'Chưa có trường',
-          coach: r.coaches?.name || 'Chưa có HLV',
           content_name: r.content_name,
           contest_content_id: r.contest_content_id,
           total_score: 0,
@@ -69,10 +68,9 @@ export default function AdminReports() {
       t.rounds += 1;
     }
     const teams = Array.from(byTeam.values());
-    const key = groupBy === 'coach' ? 'coach' : 'school';
     const byGroup = new Map();
     for (const t of teams) {
-      const g = t[key];
+      const g = t.school;
       if (!byGroup.has(g)) byGroup.set(g, []);
       byGroup.get(g).push(t);
     }
@@ -82,7 +80,7 @@ export default function AdminReports() {
         teams: teamsList.sort((a, b) => b.total_score - a.total_score),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows, groupBy]);
+  }, [rows]);
 
   const compName = competitions.find((c) => c.id === selectedComp)?.name || '';
   const contentName = contents.find((c) => c.id === selectedContent)?.name || 'Tất cả nội dung';
@@ -130,7 +128,7 @@ export default function AdminReports() {
       <div className="page-header no-print">
         <div>
           <h1 className="page-title">Báo cáo điểm</h1>
-          <p className="page-subtitle">Lọc theo trường/trung tâm hoặc huấn luyện viên, tải PDF chi tiết phiếu điểm ngay trong từng nhóm</p>
+          <p className="page-subtitle">Chọn nội dung để xem theo từng trường/trung tâm, tải PDF chi tiết phiếu điểm ngay trong từng nhóm</p>
         </div>
       </div>
 
@@ -152,13 +150,6 @@ export default function AdminReports() {
               {contentsForComp.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-          <div className="form-group" style={{ marginBottom: 0, minWidth: 200 }}>
-            <label className="form-label">Nhóm theo</label>
-            <select className="form-input form-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
-              <option value="school">Trung tâm (trường)</option>
-              <option value="coach">Huấn luyện viên</option>
-            </select>
-          </div>
           <button type="button" className="btn btn-primary" onClick={loadReport} disabled={!selectedComp || rowsLoading} style={{ alignSelf: 'flex-end' }}>
             {rowsLoading ? 'Đang tải...' : 'Xem báo cáo'}
           </button>
@@ -170,9 +161,9 @@ export default function AdminReports() {
       {rows && (
         <div className="report-page">
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
-            <h2 style={{ margin: 0 }}>Báo cáo điểm — {compName}</h2>
+            <h2 style={{ margin: 0, color: '#0f172a' }}>Báo cáo điểm — {compName}</h2>
             <p style={{ color: '#64748b', margin: '4px 0 0' }}>
-              {contentName} · Nhóm theo {groupBy === 'coach' ? 'huấn luyện viên' : 'trung tâm'} · Xem lúc {new Date().toLocaleString('vi-VN')}
+              {contentName} · Nhóm theo trung tâm · Xem lúc {new Date().toLocaleString('vi-VN')}
             </p>
           </div>
 
