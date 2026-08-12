@@ -54,16 +54,15 @@ export default function RefereeSelect() {
     }
     setBoardsLoading(true);
     try {
-      const [contentBoards, myBoardIds] = await Promise.all([
-        capi.getBoards(c.id),
-        api.getMyBoards().catch(() => []),
-      ]);
-      const allowed = myBoardIds.length ? contentBoards.filter(b => myBoardIds.includes(b.id)) : contentBoards;
-      if (allowed.length === 0) {
+      // Phân quyền trọng tài giờ theo (Nội dung × Field), áp dụng ở tầng dữ
+      // liệu (server tự lọc đội/trận theo field khi trọng tài mở danh sách) —
+      // không cần lọc bảng đấu ở bước chọn này nữa, hiện đủ mọi bảng để chọn.
+      const contentBoards = await capi.getBoards(c.id);
+      if (contentBoards.length === 0) {
         navigate(`/referee/competition/${selectedComp.id}/content/${c.id}/region/all/teams`);
         return;
       }
-      setBoards(allowed);
+      setBoards(contentBoards);
       setStep('board');
     } catch (e) {
       console.error(e);

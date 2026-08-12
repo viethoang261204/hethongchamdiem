@@ -18,8 +18,10 @@ export default function AdminRefereeAccounts() {
   const { showConfirm, showAlert } = useNotify();
   const { user } = useAuth();
   const { data, loading, error, reload, setData } = useApiLoader(() => api.getUsers('referee'), []);
-  const { data: boardsData } = useApiLoader(() => api.getAllBoards(), []);
-  const allBoards = boardsData || [];
+  const { data: contentsData } = useApiLoader(() => api.getAllContents(), []);
+  const allContents = contentsData || [];
+  const { data: fieldsData } = useApiLoader(() => api.getFields(), []);
+  const allFields = fieldsData || [];
   const list = data || [];
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
@@ -29,37 +31,56 @@ export default function AdminRefereeAccounts() {
   const [errorMsg, setError] = useState('');
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [boardsModal, setBoardsModal] = useState(null); // { user, selected: Set, loading, saving }
+  const [permModal, setPermModal] = useState(null); // { user, selected: Set<"contentId:fieldId">, loading, saving }
   const SECURITY_CODE = '26122004';
 
-  const openBoards = async (u) => {
-    setBoardsModal({ user: u, selected: new Set(), loading: true, saving: false });
+  const permKey = (contentId, fieldId) => `${contentId}:${fieldId}`;
+
+  const openPerms = async (u) => {
+    setPermModal({ user: u, selected: new Set(), loading: true, saving: false });
     try {
-      const ids = await api.getUserBoards(u.id);
-      setBoardsModal({ user: u, selected: new Set(ids), loading: false, saving: false });
+      const items = await api.getUserPermissions(u.id);
+      const selected = new Set(items.map((it) => permKey(it.contest_content_id, it.field_id)));
+      setPermModal({ user: u, selected, loading: false, saving: false });
     } catch (e) {
       showAlert(e.message || 'Không tải được danh sách phân quyền.', 'error');
-      setBoardsModal(null);
+      setPermModal(null);
     }
   };
 
-  const toggleBoard = (boardId) => {
-    setBoardsModal((m) => {
+  const togglePerm = (contentId, fieldId) => {
+    setPermModal((m) => {
       const selected = new Set(m.selected);
-      if (selected.has(boardId)) selected.delete(boardId); else selected.add(boardId);
+      const key = permKey(contentId, fieldId);
+      if (selected.has(key)) selected.delete(key); else selected.add(key);
       return { ...m, selected };
     });
   };
 
-  const saveBoards = async () => {
-    setBoardsModal((m) => ({ ...m, saving: true }));
+  const toggleAllFieldsForContent = (contentId, allChecked) => {
+    setPermModal((m) => {
+      const selected = new Set(m.selected);
+      for (const f of allFields) {
+        const key = permKey(contentId, f.id);
+        if (allChecked) selected.delete(key); else selected.add(key);
+      }
+      return { ...m, selected };
+    });
+  };
+
+  const savePerms = async () => {
+    setPermModal((m) => ({ ...m, saving: true }));
     try {
-      await api.putUserBoards(boardsModal.user.id, [...boardsModal.selected]);
-      setBoardsModal(null);
-      showAlert('Đã lưu phân quyền bảng đấu.', 'success');
+      const items = [...permModal.selected].map((key) => {
+        const [contest_content_id, field_id] = key.split(':');
+        return { contest_content_id, field_id };
+      });
+      await api.putUserPermissions(permModal.user.id, items);
+      setPermModal(null);
+      showAlert('Đã lưu phân quyền.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi khi lưu phân quyền.', 'error');
-      setBoardsModal((m) => ({ ...m, saving: false }));
+      setPermModal((m) => ({ ...m, saving: false }));
     }
   };
 
@@ -213,7 +234,7 @@ export default function AdminRefereeAccounts() {
                     </td>
                     <td>
                       <button type="button" className="btn btn-secondary" onClick={() => openEdit(u)}>Sửa</button>
-                      <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={() => openBoards(u)}>Phân quyền bảng đấu</button>
+                      <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={() => openPerms(u)}>Phân quyền Nội dung × Field</button>
                       <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(u.id)}>Xóa</button>
                     </td>
                   </tr>
@@ -307,40 +328,62 @@ export default function AdminRefereeAccounts() {
         </div>
       )}
 
-      {boardsModal && (
-        <div className="modal-overlay" onClick={() => !boardsModal.saving && setBoardsModal(null)}>
-          <div className="form-modal" onClick={(e) => e.stopPropagation()}>
+      {permModal && (
+        <div className="modal-overlay" onClick={() => !permModal.saving && setPermModal(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
             <div className="form-modal-header">
-              <h3 className="form-modal-title">Phân quyền bảng đấu — {boardsModal.user.full_name || boardsModal.user.username}</h3>
-              <button type="button" className="form-modal-close" onClick={() => setBoardsModal(null)} aria-label="Đóng">×</button>
+              <h3 className="form-modal-title">Phân quyền Nội dung × Field — {permModal.user.full_name || permModal.user.username}</h3>
+              <button type="button" className="form-modal-close" onClick={() => setPermModal(null)} aria-label="Đóng">×</button>
             </div>
             <div className="form-modal-body">
               <p style={{ marginBottom: 16, color: '#374151' }}>
-                Chọn các bảng đấu mà trọng tài này được phép chấm điểm. Nếu không chọn bảng nào, trọng tài sẽ thấy và chấm được <strong>tất cả</strong> các đội (chưa giới hạn).
+                Đánh dấu ô (Nội dung, Field) mà trọng tài này được phép chấm điểm/ghi kết quả. Nếu 1 Nội dung không có ô nào được đánh dấu, trọng tài sẽ thấy và chấm được <strong>tất cả</strong> Field của nội dung đó (chưa giới hạn).
               </p>
-              {boardsModal.loading ? (
+              {permModal.loading ? (
                 <p style={{ textAlign: 'center', padding: 24 }}>Đang tải...</p>
-              ) : allBoards.length === 0 ? (
-                <p style={{ color: '#888' }}>Chưa có bảng đấu nào trong hệ thống.</p>
+              ) : allContents.length === 0 || allFields.length === 0 ? (
+                <p style={{ color: '#888' }}>Cần có ít nhất 1 Nội dung thi và 1 Field trong hệ thống trước.</p>
               ) : (
-                <div className="checkbox-list">
-                  {allBoards.map((b) => (
-                    <label key={b.id}>
-                      <input
-                        type="checkbox"
-                        checked={boardsModal.selected.has(b.id)}
-                        onChange={() => toggleBoard(b.id)}
-                      />
-                      {' '}{b.name}{b.age_group ? ` — ${b.age_group}` : ''}
-                    </label>
-                  ))}
+                <div className="table-container" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Nội dung</th>
+                        {allFields.map((f) => <th key={f.id} style={{ textAlign: 'center' }}>{f.name}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allContents.map((c) => {
+                        const allChecked = allFields.every((f) => permModal.selected.has(permKey(c.id, f.id)));
+                        return (
+                          <tr key={c.id}>
+                            <td>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600 }}>
+                                <input type="checkbox" checked={allChecked} onChange={() => toggleAllFieldsForContent(c.id, allChecked)} />
+                                {c.name}
+                              </label>
+                            </td>
+                            {allFields.map((f) => (
+                              <td key={f.id} style={{ textAlign: 'center' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={permModal.selected.has(permKey(c.id, f.id))}
+                                  onChange={() => togglePerm(c.id, f.id)}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
             <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setBoardsModal(null)} disabled={boardsModal.saving}>Hủy</button>
-              <button type="button" className="btn btn-primary" onClick={saveBoards} disabled={boardsModal.loading || boardsModal.saving}>
-                {boardsModal.saving ? 'Đang lưu...' : 'Lưu phân quyền'}
+              <button type="button" className="btn btn-secondary" onClick={() => setPermModal(null)} disabled={permModal.saving}>Hủy</button>
+              <button type="button" className="btn btn-primary" onClick={savePerms} disabled={permModal.loading || permModal.saving}>
+                {permModal.saving ? 'Đang lưu...' : 'Lưu phân quyền'}
               </button>
             </div>
           </div>

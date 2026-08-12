@@ -511,12 +511,16 @@ const FIELDS_JSON = `case when fl.id is null then null
   else json_build_object('id', fl.id, 'name', fl.name) end`;
 
 router.get('/contents/:contentId/teams', h(async (req, res) => {
-  // Trọng tài đã được gán bảng đấu cụ thể → chỉ thấy đội thuộc các bảng đó.
-  // Chưa được gán bảng nào (mảng rỗng) → coi như chưa giới hạn, thấy tất cả.
-  let assignedBoardIds = null;
+  // Trọng tài được phân quyền theo (Nội dung × Field) — nếu đã có gán field
+  // cho ĐÚNG nội dung này thì chỉ thấy đội thuộc các field đó. Chưa gán field
+  // nào cho nội dung này (mảng rỗng) → coi như chưa giới hạn, thấy tất cả.
+  let assignedFieldIds = null;
   if (req.user?.role === 'referee') {
-    const { rows: rb } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
-    if (rb.length) assignedBoardIds = rb.map((r) => r.board_id);
+    const { rows: rf } = await query(
+      'select field_id from referee_content_fields where referee_id = $1 and contest_content_id = $2',
+      [req.user.id, req.params.contentId]
+    );
+    if (rf.length) assignedFieldIds = rf.map((r) => r.field_id);
   }
   const { rows } = await query(
     `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${FIELDS_JSON} as fields
@@ -526,9 +530,9 @@ router.get('/contents/:contentId/teams', h(async (req, res) => {
      left join coaches co on co.id = t.coach_id
      left join fields fl on fl.id = t.field_id
      where t.contest_content_id = $1
-       ${assignedBoardIds ? 'and t.board_id = any($2::uuid[])' : ''}
+       ${assignedFieldIds ? 'and t.field_id = any($2::uuid[])' : ''}
      order by t.order_index`,
-    assignedBoardIds ? [req.params.contentId, assignedBoardIds] : [req.params.contentId]
+    assignedFieldIds ? [req.params.contentId, assignedFieldIds] : [req.params.contentId]
   );
   res.json(rows);
 }));
@@ -701,15 +705,18 @@ router.post('/scores', requireAuth, h(async (req, res) => {
   // Referee chỉ được chấm dưới tên chính mình; admin được chỉ định referee_id bất kỳ
   const refereeId = req.user.role === 'admin' ? (b.referee_id ?? null) : req.user.id;
 
-  // Nếu referee đã được gán bảng đấu cụ thể, chỉ cho chấm đội thuộc bảng đó
+  // Nếu referee đã được gán field cụ thể cho nội dung này, chỉ cho chấm đội thuộc field đó
   if (req.user.role !== 'admin') {
-    const { rows: assigned } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
+    const { rows: assigned } = await query(
+      'select field_id from referee_content_fields where referee_id = $1 and contest_content_id = $2',
+      [req.user.id, b.contest_content_id]
+    );
     if (assigned.length) {
-      const { rows: teamRows } = await query('select board_id from teams where id = $1', [b.team_id]);
-      const teamBoardId = teamRows[0]?.board_id;
-      const allowed = teamBoardId && assigned.some((a) => a.board_id === teamBoardId);
+      const { rows: teamRows } = await query('select field_id from teams where id = $1', [b.team_id]);
+      const teamFieldId = teamRows[0]?.field_id;
+      const allowed = teamFieldId && assigned.some((a) => a.field_id === teamFieldId);
       if (!allowed) {
-        return res.status(403).json({ error: 'Bạn không được phân quyền chấm điểm đội thuộc bảng đấu này.' });
+        return res.status(403).json({ error: 'Bạn không được phân quyền chấm điểm đội thuộc sân thi đấu này.' });
       }
     }
   }
@@ -1038,9 +1045,10 @@ async function clearDownstream(tx, contentId, boardId, match) {
   );
 }
 
-// Ghi kết quả 1 trận (admin, hoặc trọng tài được phân quyền bảng đó qua
-// referee_boards). Sửa lại kết quả 1 trận đã từng tiến vòng sẽ cascade xóa
-// các trận vòng sau bị ảnh hưởng để tránh dữ liệu nhánh sai lệch.
+// Ghi kết quả 1 trận (admin, hoặc trọng tài được phân quyền theo Nội dung ×
+// Field qua referee_content_fields — đủ quyền nếu field của 1 trong 2 đội
+// khớp field được gán). Sửa lại kết quả 1 trận đã từng tiến vòng sẽ cascade
+// xóa các trận vòng sau bị ảnh hưởng để tránh dữ liệu nhánh sai lệch.
 router.put('/matches/:id/result', requireAuth, h(async (req, res) => {
   const { rows: mRows } = await query('select * from matches where id = $1', [req.params.id]);
   const match = mRows[0];
@@ -1050,9 +1058,15 @@ router.put('/matches/:id/result', requireAuth, h(async (req, res) => {
   }
 
   if (req.user.role !== 'admin') {
-    const { rows: assigned } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
-    if (assigned.length && !assigned.some((a) => a.board_id === match.board_id)) {
-      return res.status(403).json({ error: 'Bạn không được phân quyền ghi kết quả bảng đấu này.' });
+    const { rows: assigned } = await query(
+      'select field_id from referee_content_fields where referee_id = $1 and contest_content_id = $2',
+      [req.user.id, match.contest_content_id]
+    );
+    if (assigned.length) {
+      const { rows: teamFieldRows } = await query('select field_id from teams where id = any($1::uuid[])', [[match.team_a_id, match.team_b_id]]);
+      const allowedFieldIds = assigned.map((a) => a.field_id);
+      const ok = teamFieldRows.some((t) => t.field_id && allowedFieldIds.includes(t.field_id));
+      if (!ok) return res.status(403).json({ error: 'Bạn không được phân quyền ghi kết quả trận đấu này.' });
     }
   }
 
@@ -1109,17 +1123,22 @@ const COMBAT_MATCH_NESTED = `
 `;
 
 router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
-  let assignedBoardIds = null;
+  // Phân quyền theo (Nội dung × Field) — rỗng cho nội dung này = chưa giới
+  // hạn, thấy tất cả trận (kể cả trận chưa gán field).
+  let assignedFieldIds = null;
   if (req.user?.role === 'referee') {
-    const { rows: rb } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
-    if (rb.length) assignedBoardIds = rb.map((r) => r.board_id);
+    const { rows: rf } = await query(
+      'select field_id from referee_content_fields where referee_id = $1 and contest_content_id = $2',
+      [req.user.id, req.params.contentId]
+    );
+    if (rf.length) assignedFieldIds = rf.map((r) => r.field_id);
   }
   const { rows } = await query(
     `${COMBAT_MATCH_NESTED}
      where cm.contest_content_id = $1
-       ${assignedBoardIds ? 'and cm.board_id = any($2::uuid[])' : ''}
+       ${assignedFieldIds ? 'and cm.field_id = any($2::uuid[])' : ''}
      order by cm.created_at`,
-    assignedBoardIds ? [req.params.contentId, assignedBoardIds] : [req.params.contentId]
+    assignedFieldIds ? [req.params.contentId, assignedFieldIds] : [req.params.contentId]
   );
   res.json(rows);
 }));
@@ -1142,9 +1161,9 @@ router.post('/contents/:contentId/combat-matches', requireAdmin, h(async (req, r
   res.json(rows[0]);
 }));
 
-// Sửa chi tiết trận (admin, hoặc trọng tài được phân quyền board đó qua
-// referee_boards) — nhập điểm/hiệp/luân lưu (drone) hoặc điểm task 2 đội
-// (stars), ghi thắng/thua/hòa.
+// Sửa chi tiết trận (admin, hoặc trọng tài được phân quyền theo Nội dung ×
+// Field qua referee_content_fields) — nhập điểm/hiệp/luân lưu (drone) hoặc
+// điểm task 2 đội (stars), ghi thắng/thua/hòa.
 router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
   const { rows: mRows } = await query(
     `select cm.*, cc.content_format from combat_matches cm
@@ -1156,9 +1175,12 @@ router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
   if (!match) return res.status(404).json({ error: 'Không tìm thấy trận đấu.' });
 
   if (req.user.role !== 'admin') {
-    const { rows: assigned } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
-    if (assigned.length && !assigned.some((a) => a.board_id === match.board_id)) {
-      return res.status(403).json({ error: 'Bạn không được phân quyền ghi kết quả bảng đấu này.' });
+    const { rows: assigned } = await query(
+      'select field_id from referee_content_fields where referee_id = $1 and contest_content_id = $2',
+      [req.user.id, match.contest_content_id]
+    );
+    if (assigned.length && !assigned.some((a) => a.field_id === match.field_id)) {
+      return res.status(403).json({ error: 'Bạn không được phân quyền ghi kết quả trận đấu này.' });
     }
   }
 
@@ -1533,28 +1555,39 @@ router.delete('/users/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Bảng đấu mà TÔI (trọng tài đang đăng nhập) được phân quyền — rỗng = chưa giới hạn
-router.get('/me/boards', requireAuth, h(async (req, res) => {
-  const { rows } = await query('select board_id from referee_boards where referee_id = $1', [req.user.id]);
-  res.json(rows.map((r) => r.board_id));
+// Phân quyền (Nội dung × Field) của TÔI (trọng tài đang đăng nhập) — rỗng
+// cho 1 nội dung = chưa giới hạn field nào trong nội dung đó.
+router.get('/me/permissions', requireAuth, h(async (req, res) => {
+  const { rows } = await query(
+    'select contest_content_id, field_id from referee_content_fields where referee_id = $1',
+    [req.user.id]
+  );
+  res.json(rows);
 }));
 
-// Phân quyền trọng tài theo bảng đấu (referee_boards) — rỗng = chưa giới hạn
-router.get('/users/:id/boards', requireAdmin, h(async (req, res) => {
-  const { rows } = await query('select board_id from referee_boards where referee_id = $1', [req.params.id]);
-  res.json(rows.map((r) => r.board_id));
+// Phân quyền (Nội dung × Field) đã gán cho 1 trọng tài — admin xem
+router.get('/users/:id/permissions', requireAdmin, h(async (req, res) => {
+  const { rows } = await query(
+    'select contest_content_id, field_id from referee_content_fields where referee_id = $1',
+    [req.params.id]
+  );
+  res.json(rows);
 }));
 
-router.put('/users/:id/boards', requireAdmin, h(async (req, res) => {
-  const boardIds = Array.isArray(req.body?.board_ids) ? [...new Set(req.body.board_ids)] : [];
-  await query('delete from referee_boards where referee_id = $1', [req.params.id]);
-  if (boardIds.length) {
+// Ghi đè toàn bộ phân quyền (Nội dung × Field) của 1 trọng tài — body:
+// { items: [{ contest_content_id, field_id }, ...] }
+router.put('/users/:id/permissions', requireAdmin, h(async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+  const valid = items.filter((it) => it && it.contest_content_id && it.field_id);
+  await query('delete from referee_content_fields where referee_id = $1', [req.params.id]);
+  if (valid.length) {
     await query(
-      'insert into referee_boards (referee_id, board_id) select $1, unnest($2::uuid[])',
-      [req.params.id, boardIds]
+      `insert into referee_content_fields (referee_id, contest_content_id, field_id)
+       select $1, unnest($2::uuid[]), unnest($3::uuid[])`,
+      [req.params.id, valid.map((it) => it.contest_content_id), valid.map((it) => it.field_id)]
     );
   }
-  res.json({ ok: true, board_ids: boardIds });
+  res.json({ ok: true, items: valid });
 }));
 
 // ============================================================

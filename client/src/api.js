@@ -411,16 +411,17 @@ export const api = {
 
   deleteUser: (id) => withRetry(() => request(`/users/${id}`, { method: 'DELETE' }), 'deleteUser'),
 
-  // Phân quyền trọng tài theo bảng đấu — trả về mảng board_id (rỗng = chưa giới hạn)
-  getUserBoards: (userId) => withRetry(() => request(`/users/${userId}/boards`), 'getUserBoards'),
+  // Phân quyền trọng tài theo (Nội dung × Field) — trả về mảng
+  // {contest_content_id, field_id} (rỗng cho 1 nội dung = chưa giới hạn field nào trong nội dung đó)
+  getUserPermissions: (userId) => withRetry(() => request(`/users/${userId}/permissions`), 'getUserPermissions'),
 
-  // Bảng đấu của chính trọng tài đang đăng nhập (dùng ở bước chọn bảng đấu)
-  getMyBoards: () => withRetry(() => request('/me/boards'), 'getMyBoards'),
+  // Phân quyền của chính trọng tài đang đăng nhập
+  getMyPermissions: () => withRetry(() => request('/me/permissions'), 'getMyPermissions'),
 
-  putUserBoards: (userId, boardIds) => withRetry(() => request(`/users/${userId}/boards`, {
+  putUserPermissions: (userId, items) => withRetry(() => request(`/users/${userId}/permissions`, {
     method: 'PUT',
-    body: { board_ids: boardIds },
-  }), 'putUserBoards'),
+    body: { items },
+  }), 'putUserPermissions'),
 
   // ============================================================
   // Tasks

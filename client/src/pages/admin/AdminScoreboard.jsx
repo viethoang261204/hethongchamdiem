@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import { computeGroupStandings } from '../../lib/battleScoring';
+import { computeDroneStandings } from '../../lib/droneScoring';
 import './AdminLayout.css';
 
 function MeasurementTable({ teams }) {
@@ -94,6 +96,71 @@ function CombatBracket({ data }) {
   );
 }
 
+// BXH theo Board (Division tuổi) cho Battle of Stars / Fly Smart Cup — tính từ
+// TẤT CẢ trận của nội dung (không lọc theo Group vòng tròn), vì các Group có
+// thể ghép nhiều Board lại với nhau để đủ số đội thi đấu; khi xếp hạng để trao
+// giải thì vẫn phải tách riêng theo từng Board. BXH theo Group (giữ nguyên,
+// không đổi) vẫn xem ở trang "Trận đối kháng".
+function CombatBoardTable({ standings, isStars }) {
+  if (standings.length === 0) return <p style={{ padding: 16, color: '#888' }}>Chưa có đội nào ở Division này.</p>;
+  return (
+    <div className="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style={{ width: 60 }}>Hạng</th>
+            <th>Đội</th>
+            <th style={{ width: 70 }}>Trận</th>
+            <th style={{ width: 60 }}>W</th>
+            <th style={{ width: 60 }}>D</th>
+            <th style={{ width: 60 }}>L</th>
+            {isStars ? (
+              <>
+                <th style={{ width: 100 }}>Match Points</th>
+                <th style={{ width: 100 }}>Total Score</th>
+                <th style={{ width: 90 }}>Meteor</th>
+                <th style={{ width: 90 }}>Direct Win</th>
+                <th style={{ width: 80 }}>Retries</th>
+              </>
+            ) : (
+              <>
+                <th style={{ width: 90 }}>Points</th>
+                <th style={{ width: 110 }}>Highest Points</th>
+              </>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((s) => (
+            <tr key={s.teamId}>
+              <td><span className={`rank-badge rank-${s.rank}`}>{s.rank}</span></td>
+              <td>{s.teamName}</td>
+              <td>{s.played}</td>
+              <td>{s.wins}</td>
+              <td>{s.draws}</td>
+              <td>{s.losses}</td>
+              {isStars ? (
+                <>
+                  <td><strong>{s.matchPoints}</strong></td>
+                  <td>{s.totalScore}</td>
+                  <td>{s.meteorCompleted}</td>
+                  <td>{s.directWins}</td>
+                  <td>{s.retries}</td>
+                </>
+              ) : (
+                <>
+                  <td><strong>{s.points}</strong></td>
+                  <td>{s.highestPoints}</td>
+                </>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function AdminScoreboard() {
   const [selectedComp, setSelectedComp] = useState('');
   const [selectedContent, setSelectedContent] = useState('');
@@ -116,23 +183,50 @@ export default function AdminScoreboard() {
     [selectedContent]
   );
   const boards = boardsData || [];
+  const selectedContentObj = contents.find((c) => c.id === selectedContent) || null;
+  const isCombatContent = selectedContentObj?.content_format === 'combat_stars' || selectedContentObj?.content_format === 'combat_drone';
+  const isStarsContent = selectedContentObj?.content_format === 'combat_stars';
+
   // Đội chưa được phân bảng — không nằm trong hệ thống xếp hạng theo bảng, hiện riêng
+  // (chỉ áp dụng nội dung chấm điểm đo lường — combat dùng combat_matches riêng).
   const { data: flatScoreboard } = useApiLoader(
-    async () => selectedContent ? await api.getScoreboard(selectedContent) : [],
-    [selectedContent]
+    async () => selectedContent && !isCombatContent ? await api.getScoreboard(selectedContent) : [],
+    [selectedContent, isCombatContent]
   );
   const unassignedRows = (flatScoreboard || []).filter((s) => !s.boards?.id);
+
+  // Battle of Stars / Fly Smart Cup: lấy toàn bộ đội + trận của nội dung, tính
+  // BXH theo Board ngay tại client (không qua route /ranking — route đó chỉ
+  // phục vụ content_format='scoring').
+  const { data: combatData, loading: combatLoading, error: combatError, reload: combatReload } = useApiLoader(async () => {
+    if (!selectedContent || !isCombatContent) return null;
+    const [teams, matches] = await Promise.all([api.getTeams(selectedContent), api.getCombatMatches(selectedContent)]);
+    return { teams, matches };
+  }, [selectedContent, isCombatContent]);
+
+  const combatBoardStandings = useMemo(() => {
+    if (!isCombatContent || !combatData) return {};
+    const result = {};
+    for (const b of boards) {
+      const boardTeams = combatData.teams.filter((t) => t.board_id === b.id);
+      result[b.id] = isStarsContent
+        ? computeGroupStandings(boardTeams, combatData.matches)
+        : computeDroneStandings(boardTeams, combatData.matches);
+    }
+    return result;
+  }, [isCombatContent, isStarsContent, combatData, boards]);
+  const combatUnassignedTeams = isCombatContent && combatData ? combatData.teams.filter((t) => !t.board_id) : [];
 
   useEffect(() => { setSelectedContent(''); }, [selectedComp]);
   useEffect(() => { setSelectedBoard(''); }, [selectedContent]);
 
   useEffect(() => {
-    if (!selectedContent || boards.length === 0) { setRankings({}); return; }
+    if (!selectedContent || boards.length === 0 || isCombatContent) { setRankings({}); return; }
     setRankingsLoading(true);
     Promise.all(boards.map((b) => api.getRanking(selectedContent, b.id).then((r) => [b.id, r]).catch(() => [b.id, null])))
       .then((pairs) => setRankings(Object.fromEntries(pairs)))
       .finally(() => setRankingsLoading(false));
-  }, [selectedContent, boards]);
+  }, [selectedContent, boards, isCombatContent]);
 
   const visibleBoards = selectedBoard ? boards.filter((b) => b.id === selectedBoard) : boards;
 
@@ -191,7 +285,26 @@ export default function AdminScoreboard() {
             </div>
           </div>
 
-          {rankingsLoading ? (
+          {isCombatContent ? (
+            combatLoading ? (
+              <div className="card" style={{ padding: 24, textAlign: 'center' }}>Đang tải...</div>
+            ) : combatError ? (
+              <ErrorBox error={combatError} onRetry={combatReload} />
+            ) : visibleBoards.length === 0 ? (
+              <div className="card" style={{ padding: 24, textAlign: 'center', color: '#888' }}>Nội dung này chưa có bảng đấu nào.</div>
+            ) : visibleBoards.map((b) => (
+              <div className="card" key={b.id} style={{ marginBottom: 20 }}>
+                <div className="card-header">
+                  <h3 className="card-title">
+                    {b.name}{b.age_group ? ` — ${b.age_group}` : ''}
+                    <span className="badge badge-blue" style={{ marginLeft: 8 }}>{isStarsContent ? 'Battle of Stars' : 'Fly Smart Cup'}</span>
+                  </h3>
+                  <span className="page-subtitle">{(combatBoardStandings[b.id] || []).length} đội</span>
+                </div>
+                <CombatBoardTable standings={combatBoardStandings[b.id] || []} isStars={isStarsContent} />
+              </div>
+            ))
+          ) : rankingsLoading ? (
             <div className="card" style={{ padding: 24, textAlign: 'center' }}>Đang tải...</div>
           ) : visibleBoards.length === 0 ? (
             <div className="card" style={{ padding: 24, textAlign: 'center', color: '#888' }}>Nội dung này chưa có bảng đấu nào.</div>
@@ -218,6 +331,23 @@ export default function AdminScoreboard() {
               </div>
             );
           })}
+
+          {isCombatContent && combatUnassignedTeams.length > 0 && (
+            <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card-header">
+                <h3 className="card-title">Chưa gán Division</h3>
+                <span className="page-subtitle">{combatUnassignedTeams.length} đội</span>
+              </div>
+              <div className="table-container">
+                <table>
+                  <thead><tr><th>Đội</th></tr></thead>
+                  <tbody>
+                    {combatUnassignedTeams.map((t) => <tr key={t.id}><td>{t.name}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {unassignedRows.length > 0 && (
             <div className="card" style={{ marginBottom: 20 }}>

@@ -280,7 +280,16 @@ export default function AdminCombatMatches() {
   };
 
   // ── Teams & Groups (Battle of Stars + Fly Smart Cup) — gán Group/Bảng đấu cho từng đội ──
-  const groupNames = useMemo(() => Array.from(new Set(teams.map((t) => t.combat_group).filter(Boolean))).sort(), [teams]);
+  // Nhãn Group luôn theo mẫu "Group N" (số) — cho phép chọn tay từng đội vào
+  // đúng Group qua dropdown, hoặc tạo Group mới ngay tại đó.
+  const GROUP_LABEL_RE = /^Group\s+(\d+)$/i;
+  const groupNumbers = useMemo(() => {
+    const nums = teams
+      .map((t) => { const m = t.combat_group && t.combat_group.match(GROUP_LABEL_RE); return m ? Number(m[1]) : null; })
+      .filter((n) => n != null);
+    return Array.from(new Set(nums)).sort((a, b) => a - b);
+  }, [teams]);
+  const nextGroupNumber = groupNumbers.length ? groupNumbers[groupNumbers.length - 1] + 1 : 1;
 
   const updateTeamGroup = async (teamId, combat_group) => {
     try {
@@ -289,6 +298,11 @@ export default function AdminCombatMatches() {
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
     }
+  };
+
+  const assignTeamGroup = (teamId, value) => {
+    if (value === '__new__') updateTeamGroup(teamId, `Group ${nextGroupNumber}`);
+    else updateTeamGroup(teamId, value || null);
   };
 
   // Chia TẤT CẢ đội của nội dung đang chọn thành N bảng đều nhau (lệch tối đa 1
@@ -315,7 +329,7 @@ export default function AdminCombatMatches() {
       let cursor = 0;
       for (let g = 0; g < n; g++) {
         const size = base + (g < remainder ? 1 : 0);
-        const label = `Bảng ${String.fromCharCode(65 + g)}`;
+        const label = `Group ${g + 1}`;
         for (let i = 0; i < size; i++) {
           const team = shuffled[cursor++];
           await api.putTeam(team.id, { combat_group: label });
@@ -565,7 +579,7 @@ export default function AdminCombatMatches() {
                 </button>
               </div>
               <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
-                Gán mỗi đội vào 1 Group/Bảng đấu — các đội cùng Group sẽ thi đấu vòng tròn với nhau. Có thể gán tay từng đội bên dưới, hoặc bấm "Phân chia bảng tự động" để hệ thống tự chia đều + bốc thăm ngẫu nhiên. Đội thi được tạo/sửa ở module Teams; ở đây chỉ gán Group.
+                Gán mỗi đội vào 1 Group — các đội cùng Group sẽ thi đấu vòng tròn với nhau (có thể gồm nhiều Division/Bảng tuổi khác nhau nếu cần ghép cho đủ số đội). Chọn tay Group cho từng đội bên dưới, hoặc bấm "Phân chia bảng tự động" để hệ thống tự chia đều + bốc thăm ngẫu nhiên. Đội thi được tạo/sửa ở module Teams; ở đây chỉ gán Group.
               </p>
               <div className="table-container">
                 <table>
@@ -573,7 +587,7 @@ export default function AdminCombatMatches() {
                     <tr>
                       <th>Đội</th>
                       <th>Division</th>
-                      <th>Group/Bảng đấu</th>
+                      <th>Group</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -584,25 +598,24 @@ export default function AdminCombatMatches() {
                         <td style={{ fontWeight: 600 }}>{t.name}</td>
                         <td>{t.boards?.name || '-'}</td>
                         <td>
-                          <input
-                            list="combat-group-options"
-                            className="form-input"
+                          <select
+                            className="form-input form-select"
                             style={{ maxWidth: 180 }}
-                            defaultValue={t.combat_group || ''}
-                            placeholder="VD: Bảng A"
-                            onBlur={(e) => {
-                              const v = e.target.value.trim();
-                              if (v !== (t.combat_group || '')) updateTeamGroup(t.id, v || null);
-                            }}
-                          />
+                            value={t.combat_group && GROUP_LABEL_RE.test(t.combat_group) ? t.combat_group : (t.combat_group ? '__other__' : '')}
+                            onChange={(e) => assignTeamGroup(t.id, e.target.value)}
+                          >
+                            <option value="">-- Chưa gán --</option>
+                            {groupNumbers.map((n) => <option key={n} value={`Group ${n}`}>{`Group ${n}`}</option>)}
+                            <option value="__new__">+ Tạo Group {nextGroupNumber}</option>
+                            {t.combat_group && !GROUP_LABEL_RE.test(t.combat_group) && (
+                              <option value="__other__" disabled>{t.combat_group} (tên cũ)</option>
+                            )}
+                          </select>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <datalist id="combat-group-options">
-                  {groupNames.map((g) => <option key={g} value={g} />)}
-                </datalist>
               </div>
             </div>
           )}

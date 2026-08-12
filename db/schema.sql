@@ -456,6 +456,23 @@ create index if not exists idx_teams_combat_group on teams(contest_content_id, c
 alter table combat_matches add column if not exists field_id uuid references fields(id) on delete set null;
 create index if not exists idx_combat_matches_field on combat_matches(field_id);
 
+-- Phân quyền trọng tài theo (Nội dung thi × Field/sân thi đấu) — THAY THẾ
+-- hoàn toàn cơ chế referee_boards cũ (bảng referee_boards vẫn giữ nguyên
+-- trong DB để không mất dữ liệu lịch sử, nhưng KHÔNG còn route nào đọc/ghi
+-- nó nữa — xem server/routes.cjs). Trọng tài chỉ thấy/chấm được đội (qua
+-- teams.field_id) và trận đối kháng (qua combat_matches.field_id) thuộc
+-- field đã gán, trong ĐÚNG nội dung thi đã gán. Rỗng cho 1 nội dung = chưa
+-- giới hạn field nào trong nội dung đó (thấy tất cả field của nội dung đó).
+create table if not exists referee_content_fields (
+  referee_id          uuid not null references users(id) on delete cascade,
+  contest_content_id  uuid not null references contest_contents(id) on delete cascade,
+  field_id            uuid not null references fields(id) on delete cascade,
+  created_at          timestamptz default now(),
+  primary key (referee_id, contest_content_id, field_id)
+);
+create index if not exists idx_referee_content_fields_content on referee_content_fields(contest_content_id);
+create index if not exists idx_referee_content_fields_field on referee_content_fields(field_id);
+
 
 -- ============================================================
 -- 2. INDEXES

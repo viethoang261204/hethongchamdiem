@@ -123,25 +123,42 @@ export function computeGroupStandings(teams, matches) {
     });
   }
 
+  // Chỉ cần MỘT bên nằm trong `teams` truyền vào là tính — cho phép gọi hàm
+  // này với `teams` = các đội thuộc 1 Division (Bảng tuổi) trong khi `matches`
+  // = TẤT CẢ trận của nội dung (không lọc theo Group), để lấy đúng full record
+  // của từng đội kể cả khi Group của họ có ghép chung nhiều Division (đối thủ
+  // khác Division không có trong `teams` vẫn không sao — record của đội đang
+  // xét vẫn được cộng đủ, chỉ đối thủ đó không có dòng riêng ở bảng này).
   for (const m of matches) {
-    if (!stats.has(m.team_a_id) || !stats.has(m.team_b_id)) continue;
+    const aIn = stats.has(m.team_a_id);
+    const bIn = stats.has(m.team_b_id);
+    if (!aIn && !bIn) continue;
     const a = sideFromDetails(m.details, 'A');
     const b = sideFromDetails(m.details, 'B');
     const { result, scoreA, scoreB } = determineGroupMatchResult(a, b);
 
-    const sA = stats.get(m.team_a_id);
-    const sB = stats.get(m.team_b_id);
-    sA.played++; sB.played++;
-    sA.totalScore += scoreA.taskScore; sB.totalScore += scoreB.taskScore;
-    if (scoreA.meteorCompleted) sA.meteorCompleted++;
-    if (scoreB.meteorCompleted) sB.meteorCompleted++;
-    sA.retries += scoreA.retryCount; sB.retries += scoreB.retryCount;
-    if (a.directWin) sA.directWins++;
-    if (b.directWin) sB.directWins++;
-
-    if (result === 'A') { sA.wins++; sB.losses++; sA.matchPoints += 3; }
-    else if (result === 'B') { sB.wins++; sA.losses++; sB.matchPoints += 3; }
-    else { sA.draws++; sB.draws++; sA.matchPoints += 1; sB.matchPoints += 1; }
+    if (aIn) {
+      const sA = stats.get(m.team_a_id);
+      sA.played++;
+      sA.totalScore += scoreA.taskScore;
+      if (scoreA.meteorCompleted) sA.meteorCompleted++;
+      sA.retries += scoreA.retryCount;
+      if (a.directWin) sA.directWins++;
+      if (result === 'A') { sA.wins++; sA.matchPoints += 3; }
+      else if (result === 'B') { sA.losses++; }
+      else { sA.draws++; sA.matchPoints += 1; }
+    }
+    if (bIn) {
+      const sB = stats.get(m.team_b_id);
+      sB.played++;
+      sB.totalScore += scoreB.taskScore;
+      if (scoreB.meteorCompleted) sB.meteorCompleted++;
+      sB.retries += scoreB.retryCount;
+      if (b.directWin) sB.directWins++;
+      if (result === 'B') { sB.wins++; sB.matchPoints += 3; }
+      else if (result === 'A') { sB.losses++; }
+      else { sB.draws++; sB.matchPoints += 1; }
+    }
   }
 
   const standings = Array.from(stats.values());
