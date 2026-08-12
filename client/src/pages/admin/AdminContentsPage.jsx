@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../../api';
+import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
@@ -54,6 +55,15 @@ export default function AdminContentsPage() {
   }, [selectedComp, search, allContents]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(contents, 10);
+
+  // Trang khác (Đội thi, Phiếu điểm...) đọc danh sách nội dung qua cache
+  // (capi.getAllContents) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
+  const refreshContents = async () => {
+    clearApiCache('getAllContents');
+    setData(null);
+    const updated = await api.getAllContents();
+    setData((prev) => prev ? { ...prev, allContents: updated } : prev);
+  };
 
   const selectedCompData = competitions.find(c => c.id === selectedComp);
 
@@ -121,9 +131,7 @@ export default function AdminContentsPage() {
         await api.putContent(modal.id, body);
       }
       setModal(null);
-      setData(null);
-      const updated = await api.getAllContents();
-      setData((prev) => prev ? { ...prev, allContents: updated } : prev);
+      await refreshContents();
       showAlert('Đã lưu.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
@@ -147,9 +155,7 @@ export default function AdminContentsPage() {
     try {
       await api.deleteContent(deleteConfirm.id);
       setDeleteConfirm(null);
-      setData(null);
-      const updated = await api.getAllContents();
-      setData((prev) => prev ? { ...prev, allContents: updated } : prev);
+      await refreshContents();
       showAlert('Đã xóa.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
@@ -409,7 +415,7 @@ export default function AdminContentsPage() {
           templateFilename="mau-noi-dung-thi.xlsx"
           notePrereq='Tên cuộc thi phải khớp đúng 1 cuộc thi đã có sẵn. Định dạng chấm điểm để trống = "Chấm điểm"; nếu điền thì phải đúng "Chấm điểm", "Đối kháng — Fly Smart Cup" hoặc "Đối kháng — Battle of Stars".'
           onImport={(rows) => api.importContents(rows)}
-          onDone={async () => { setData(null); const updated = await api.getAllContents(); setData((prev) => prev ? { ...prev, allContents: updated } : prev); }}
+          onDone={refreshContents}
           onClose={() => setImportOpen(false)}
         />
       )}

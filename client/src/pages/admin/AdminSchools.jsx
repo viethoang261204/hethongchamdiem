@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
+import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
@@ -50,6 +51,15 @@ export default function AdminSchools() {
     [list]
   );
 
+  // Trang khác (Học sinh, Đội thi...) đọc danh sách trường qua cache
+  // (capi.getSchools) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
+  const refreshSchools = async () => {
+    clearApiCache('getSchools');
+    setData(null);
+    const updated = await api.getSchools();
+    setData(updated);
+  };
+
   const openAdd = () => {
     setModal('add');
     setForm({ name: '', level: 'THPT', province: '', district: '' });
@@ -96,9 +106,7 @@ export default function AdminSchools() {
         });
       }
       setModal(null);
-      setData(null);
-      const updated = await api.getSchools();
-      setData(updated);
+      await refreshSchools();
       showAlert('Đã lưu.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
@@ -120,9 +128,7 @@ export default function AdminSchools() {
     try {
       await api.deleteSchool(deleteConfirm.id);
       setDeleteConfirm(null);
-      setData(null);
-      const updated = await api.getSchools();
-      setData(updated);
+      await refreshSchools();
       showAlert('Đã xóa.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
@@ -293,7 +299,7 @@ export default function AdminSchools() {
           templateFilename="mau-truong-hoc.xlsx"
           notePrereq="Cấp học phải là một trong: MN, TH, THCS, THPT."
           onImport={(rows) => api.importSchools(rows)}
-          onDone={async () => { setData(null); const updated = await api.getSchools(); setData(updated); }}
+          onDone={refreshSchools}
           onClose={() => setImportOpen(false)}
         />
       )}

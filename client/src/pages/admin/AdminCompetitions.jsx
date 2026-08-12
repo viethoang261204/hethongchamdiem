@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
@@ -29,7 +30,9 @@ export default function AdminCompetitions() {
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, securityCode: '' }
   const SECURITY_CODE = '26122004';
 
-  const load = async () => reload();
+  // Trang khác (Đội thi, Phiếu điểm...) đọc danh sách cuộc thi qua cache
+  // (capi.getCompetitions) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
+  const load = async () => { clearApiCache('getCompetitions'); reload(); };
 
   const filtered = useMemo(() => {
     let l = list;

@@ -233,7 +233,10 @@ export default function AdminScores() {
     try {
       await api.uploadScoreImage({ scoreId, file });
       clearApiCache();
-      await loadImagesFor(scoreId);
+      const imgs = await loadImagesFor(scoreId);
+      // Modal "Ảnh phiếu điểm" đang mở cho đúng phiếu này → cập nhật luôn,
+      // không cần đóng/mở lại mới thấy ảnh mới.
+      setImageModal((m) => (m && m.scoreId === scoreId) ? { ...m, images: imgs } : m);
       showAlert('Đã tải ảnh lên.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi upload.', 'error');
@@ -248,6 +251,12 @@ export default function AdminScores() {
     try {
       await api.deleteScoreImage(img.id, img.storage_path);
       clearApiCache();
+      const scoreId = img.score_id || imageModal?.scoreId;
+      if (scoreId) {
+        const imgs = await loadImagesFor(scoreId);
+        // Modal đang mở vẫn hiện ảnh vừa xóa nếu không cập nhật lại state ở đây.
+        setImageModal((m) => (m && m.scoreId === scoreId) ? { ...m, images: imgs } : m);
+      }
       showAlert('Đã xóa ảnh.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
