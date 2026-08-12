@@ -405,7 +405,7 @@ export default function AdminTeams() {
                 <th>HLV</th>
                 <th>Field</th>
                 <th>Học sinh</th>
-                <th></th>
+                <th style={{ minWidth: 220 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -423,11 +423,13 @@ export default function AdminTeams() {
                     <td>{t.boards?.name || '-'}</td>
                     <td>{t.coaches?.name || '-'}</td>
                     <td>{t.fields?.name || '-'}</td>
-                    <td>{mems.length > 0 ? mems.map(m => m.full_name).join(', ') : '-'}</td>
+                    <td style={{ maxWidth: 220 }}>{mems.length > 0 ? mems.map(m => m.full_name).join(', ') : '-'}</td>
                     <td>
-                      <Link to={`/admin/competitions/${getCompetitionId(t.contest_content_id)}/contents/${t.contest_content_id}/scoreboard`} className="btn btn-secondary" style={{ marginRight: 8 }}>Điểm</Link>
-                      <button type="button" className="btn btn-secondary" onClick={() => openEdit(t)}>Sửa</button>
-                      <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(t.id)}>Xóa</button>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <Link to={`/admin/competitions/${getCompetitionId(t.contest_content_id)}/contents/${t.contest_content_id}/scoreboard`} className="btn btn-secondary">Điểm</Link>
+                        <button type="button" className="btn btn-secondary" onClick={() => openEdit(t)}>Sửa</button>
+                        <button type="button" className="btn btn-danger" onClick={() => remove(t.id)}>Xóa</button>
+                      </div>
                     </td>
                   </tr>
                 );
