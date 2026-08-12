@@ -5,21 +5,23 @@ import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
 import SignatureBox from '../../components/SignaturePad';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import {
+  ENERGY_BLOCK_MAX, FIREPOWER_BALL_MAX, ENERGY_BLOCK_SCORE, FIREPOWER_BALL_SCORE, METEOR_TOWER_SCORE,
+  computeTaskScore, determineGroupMatchResult,
+} from '../../lib/battleScoring';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
-const DEFAULT_BONUS_CONFIG = { label: 'Extra reward', base: 40, per_retry: 10 };
-
-// Chấm điểm nội dung content_format = 'combat_stars' (Battle of Stars) — 2 đội
-// cùng chấm chung 1 bộ nhiệm vụ (tái dùng tasks của nội dung), điểm thưởng
-// theo bonus_config, Points lost nhập tay, Total duration. Đội thắng/hòa được
-// TÍNH TỰ ĐỘNG từ điểm ghi được của 2 đội — trọng tài không tự chọn.
+// Chấm điểm nội dung content_format = 'combat_stars' (Battle of Stars) — đúng
+// luật ENJOY AI 2026: 4 nhiệm vụ cố định (Meteor Tower / Energy Defense /
+// Full Firepower / Final Fortress), Extra Reward theo số lần retry, Direct
+// Win qua Final Fortress. Kết quả Win/Draw/Loss được TÍNH TỰ ĐỘNG (server là
+// nơi có thẩm quyền cuối cùng, tính lại từ `details` khi lưu) — trọng tài
+// không tự chọn đội thắng.
 export default function RefereeCombatStars() {
   const { competitionId, contentId } = useParams();
   const { user } = useAuth();
   const { showAlert } = useNotify();
-  const [content, setContent] = useState(null);
-  const [tasks, setTasks] = useState([]);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openId, setOpenId] = useState(null);
@@ -28,24 +30,20 @@ export default function RefereeCombatStars() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([
-      api.getAllContents().then((all) => all.find((c) => c.id === contentId) || null).catch(() => null),
-      api.getTasks(contentId).catch(() => []),
-      api.getCombatMatches(contentId).catch(() => []),
-    ])
-      .then(([c, t, m]) => { setContent(c); setTasks(t); setMatches(m); })
+    api.getCombatMatches(contentId).catch(() => [])
+      .then((m) => setMatches(m))
       .finally(() => setLoading(false));
   };
   useEffect(load, [contentId]);
-
-  const bonusCfg = content?.bonus_config || DEFAULT_BONUS_CONFIG;
 
   const openMatch = (m) => {
     if (openId === m.id) { setOpenId(null); return; }
     const d = m.details || {};
     setForm({
-      taskScoresA: { ...(d.taskScoresA || {}) }, taskQtyA: { ...(d.taskQtyA || {}) },
-      taskScoresB: { ...(d.taskScoresB || {}) }, taskQtyB: { ...(d.taskQtyB || {}) },
+      meteorCompletedA: !!d.meteorCompletedA, meteorCompletedB: !!d.meteorCompletedB,
+      energyBlocksA: d.energyBlocksA ?? 0, energyBlocksB: d.energyBlocksB ?? 0,
+      firepowerBallsA: d.firepowerBallsA ?? 0, firepowerBallsB: d.firepowerBallsB ?? 0,
+      directWinA: !!d.directWinA, directWinB: !!d.directWinB,
       retryCountA: d.retryCountA ?? 0, retryCountB: d.retryCountB ?? 0,
       pointsLostA: d.pointsLostA ?? 0, pointsLostB: d.pointsLostB ?? 0,
       durationA: d.durationA ?? '', durationB: d.durationB ?? '',
@@ -61,46 +59,47 @@ export default function RefereeCombatStars() {
     setOpenId(m.id);
   };
 
-  const setQty = (side, task, qty) => {
-    setForm((f) => {
-      const scoreKey = side === 'A' ? 'taskScoresA' : 'taskScoresB';
-      const qtyKey = side === 'A' ? 'taskQtyA' : 'taskQtyB';
-      return { ...f, [qtyKey]: { ...f[qtyKey], [task.id]: qty }, [scoreKey]: { ...f[scoreKey], [task.id]: qty * (Number(task.max_score) || 0) } };
-    });
-  };
-  const setScore = (side, task, points) => {
-    setForm((f) => {
-      const scoreKey = side === 'A' ? 'taskScoresA' : 'taskScoresB';
-      return { ...f, [scoreKey]: { ...f[scoreKey], [task.id]: points } };
-    });
+  const sideData = (side) => ({
+    meteorCompleted: side === 'A' ? form.meteorCompletedA : form.meteorCompletedB,
+    energyBlocks: side === 'A' ? form.energyBlocksA : form.energyBlocksB,
+    firepowerBalls: side === 'A' ? form.firepowerBallsA : form.firepowerBallsB,
+    retryCount: side === 'A' ? form.retryCountA : form.retryCountB,
+    pointsLost: side === 'A' ? form.pointsLostA : form.pointsLostB,
+    directWin: side === 'A' ? form.directWinA : form.directWinB,
+  });
+
+  const setDirectWin = (side, checked) => {
+    setForm((f) => ({
+      ...f,
+      directWinA: side === 'A' ? checked : (checked ? false : f.directWinA),
+      directWinB: side === 'B' ? checked : (checked ? false : f.directWinB),
+    }));
   };
 
-  const computeScore = (side) => {
-    const scores = side === 'A' ? form.taskScoresA : form.taskScoresB;
-    const retry = Number(side === 'A' ? form.retryCountA : form.retryCountB) || 0;
-    const lost = Number(side === 'A' ? form.pointsLostA : form.pointsLostB) || 0;
-    const taskSum = tasks.reduce((s, t) => s + (Number(scores?.[t.id]) || 0), 0);
-    const extra = Math.max(0, (Number(bonusCfg.base) || 0) - (Number(bonusCfg.per_retry) || 0) * retry);
-    return taskSum + extra - lost;
-  };
+  const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
+  const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
 
   const submit = async (m) => {
     if (!form.studentSigImageA || !form.studentSigImageB || !form.refereeSigImage) {
       showAlert('Please collect signatures from both teams and the referee before submitting.', 'error');
       return;
     }
+    if (form.directWinA && form.directWinB) {
+      showAlert('Only one team can have a Direct Win.', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
-      const scoreA = computeScore('A');
-      const scoreB = computeScore('B');
-      const winner_id = scoreA > scoreB ? m.team_a_id : scoreB > scoreA ? m.team_b_id : null;
+      const { result } = determineGroupMatchResult(sideData('A'), sideData('B'));
       await api.putCombatMatch(m.id, {
         details: {
           division: form.division || null,
-          taskScoresA: form.taskScoresA, taskQtyA: form.taskQtyA,
-          taskScoresB: form.taskScoresB, taskQtyB: form.taskQtyB,
-          retryCountA: Number(form.retryCountA) || 0, retryCountB: Number(form.retryCountB) || 0,
-          pointsLostA: Number(form.pointsLostA) || 0, pointsLostB: Number(form.pointsLostB) || 0,
+          meteorCompletedA: !!form.meteorCompletedA, meteorCompletedB: !!form.meteorCompletedB,
+          energyBlocksA: clampEnergy(form.energyBlocksA), energyBlocksB: clampEnergy(form.energyBlocksB),
+          firepowerBallsA: clampFirepower(form.firepowerBallsA), firepowerBallsB: clampFirepower(form.firepowerBallsB),
+          directWinA: !!form.directWinA, directWinB: !!form.directWinB,
+          retryCountA: Math.max(0, Number(form.retryCountA) || 0), retryCountB: Math.max(0, Number(form.retryCountB) || 0),
+          pointsLostA: Math.max(0, Number(form.pointsLostA) || 0), pointsLostB: Math.max(0, Number(form.pointsLostB) || 0),
           durationA: form.durationA || null, durationB: form.durationB || null,
           teamMembersA: form.teamMembersA || null, teamMembersB: form.teamMembersB || null,
           studentSignatureImageA: form.studentSigImageA || null, studentSignatureImageB: form.studentSigImageB || null,
@@ -110,8 +109,10 @@ export default function RefereeCombatStars() {
           scorekeeperName: form.scorekeeperName || null,
           remarks: form.remarks || null, objection: form.objection || null,
         },
-        winner_id,
-        is_draw: scoreA === scoreB,
+        // Server sẽ tự tính lại winner_id/is_draw từ details — gửi kèm chỉ để
+        // UI phản hồi tức thời, không phải nguồn sự thật cuối cùng.
+        winner_id: result === 'A' ? m.team_a_id : result === 'B' ? m.team_b_id : null,
+        is_draw: result === 'DRAW',
       });
       showAlert('Match score saved.', 'success');
       setOpenId(null);
@@ -125,50 +126,30 @@ export default function RefereeCombatStars() {
 
   if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Loading...</p>;
 
-  const taskInput = (side, t) => {
-    const scores = side === 'A' ? form.taskScoresA : form.taskScoresB;
-    const qty = side === 'A' ? form.taskQtyA : form.taskQtyB;
-    if (t.scoring_type === 'count') {
-      return (
-        <input
-          type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-          value={qty?.[t.id] ?? 0}
-          onChange={(e) => setQty(side, t, Math.max(0, parseInt(e.target.value, 10) || 0))}
-        />
-      );
-    }
-    return (
-      <input
-        type="number" min="0" max={t.max_score} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-        value={scores?.[t.id] ?? 0}
-        onChange={(e) => setScore(side, t, Math.min(Number(t.max_score) || 999, Math.max(0, Number(e.target.value) || 0)))}
-      />
-    );
-  };
-
   return (
     <div>
       <div className="breadcrumb" style={{ marginBottom: 14 }}>
         <Link to="/referee">Chấm điểm</Link>
       </div>
       <h1 className="referee-page-title">Battle of Stars — Combat</h1>
-      <p style={{ color: '#64748b', marginBottom: 20 }}>Select a match to score tasks for both teams. The win/draw result is calculated automatically from the scores.</p>
+      <p style={{ color: '#64748b', marginBottom: 20 }}>Select a match to score both teams. The win/draw result is calculated automatically from the scores.</p>
 
       {matches.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>No matches yet — please contact the admin.</div>
-      ) : tasks.length === 0 ? (
-        <div className="card" style={{ padding: 32, textAlign: 'center' }}>This content has no tasks yet — please contact the admin.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {matches.map((m) => {
             const isOpen = openId === m.id;
             const done = !!m.winner_id || m.is_draw;
-            const scoreA = isOpen ? computeScore('A') : null;
-            const scoreB = isOpen ? computeScore('B') : null;
+            const scoreA = isOpen ? computeTaskScore(sideData('A')) : null;
+            const scoreB = isOpen ? computeTaskScore(sideData('B')) : null;
+            const outcome = isOpen ? determineGroupMatchResult(sideData('A'), sideData('B')) : null;
             const resultText = isOpen
-              ? (scoreA === scoreB ? `Draw (${scoreA} - ${scoreB})`
-                : scoreA > scoreB ? `${m.team_a?.name} wins (${scoreA} - ${scoreB})`
-                : `${m.team_b?.name} wins (${scoreA} - ${scoreB})`)
+              ? (form.directWinA ? `${m.team_a?.name} wins — Direct Win (Final Fortress)`
+                : form.directWinB ? `${m.team_b?.name} wins — Direct Win (Final Fortress)`
+                : outcome.result === 'DRAW' ? `Draw (${scoreA.taskScore} - ${scoreB.taskScore})`
+                : outcome.result === 'A' ? `${m.team_a?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`
+                : `${m.team_b?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`)
               : '';
 
             return (
@@ -180,6 +161,7 @@ export default function RefereeCombatStars() {
                   </strong>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     {m.stage && <span className="ts-board-chip">{m.stage}</span>}
+                    {m.group_label && <span className="ts-board-chip">{m.group_label}</span>}
                     {done && (
                       <span className="rt-badge rt-badge-done">
                         {m.is_draw ? 'Draw' : `Winner: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}`}
@@ -205,33 +187,79 @@ export default function RefereeCombatStars() {
                           </tr>
                         </thead>
                         <tbody>
-                          {tasks.map((t) => (
-                            <tr key={t.id}>
-                              <td style={{ fontSize: 13 }}>{t.name} <span style={{ color: '#94a3b8' }}>{t.scoring_type === 'count' ? `(Qty × ${t.max_score})` : `(0-${t.max_score})`}</span></td>
-                              <td style={{ textAlign: 'center' }}>{taskInput('A', t)}</td>
-                              <td style={{ textAlign: 'center' }}>{taskInput('B', t)}</td>
-                            </tr>
-                          ))}
                           <tr>
-                            <td style={{ fontSize: 13 }}>Reruns</td>
+                            <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} if completed)</span></td>
                             <td style={{ textAlign: 'center' }}>
-                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                                value={form.retryCountA} onChange={(e) => setForm({ ...form, retryCountA: e.target.value })} />
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input type="checkbox" checked={!!form.meteorCompletedA} onChange={(e) => setForm({ ...form, meteorCompletedA: e.target.checked })} /> Completed
+                              </label>
                             </td>
                             <td style={{ textAlign: 'center' }}>
-                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                                value={form.retryCountB} onChange={(e) => setForm({ ...form, retryCountB: e.target.value })} />
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input type="checkbox" checked={!!form.meteorCompletedB} onChange={(e) => setForm({ ...form, meteorCompletedB: e.target.checked })} /> Completed
+                              </label>
                             </td>
                           </tr>
                           <tr>
-                            <td style={{ fontSize: 13 }}>Points lost</td>
+                            <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE} pts × block, max {ENERGY_BLOCK_MAX})</span></td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.energyBlocksA} onChange={(e) => setForm({ ...form, energyBlocksA: clampEnergy(e.target.value) })} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.energyBlocksB} onChange={(e) => setForm({ ...form, energyBlocksB: clampEnergy(e.target.value) })} />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE} pts × ball, max {FIREPOWER_BALL_MAX})</span></td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.firepowerBallsA} onChange={(e) => setForm({ ...form, firepowerBallsA: clampFirepower(e.target.value) })} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.firepowerBallsB} onChange={(e) => setForm({ ...form, firepowerBallsB: clampFirepower(e.target.value) })} />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>(no points — Direct Win only)</span></td>
+                            <td style={{ textAlign: 'center' }}>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input type="checkbox" checked={!!form.directWinA} onChange={(e) => setDirectWin('A', e.target.checked)} /> Direct Win
+                              </label>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <input type="checkbox" checked={!!form.directWinB} onChange={(e) => setDirectWin('B', e.target.checked)} /> Direct Win
+                              </label>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Retries</td>
                             <td style={{ textAlign: 'center' }}>
                               <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                                value={form.pointsLostA} onChange={(e) => setForm({ ...form, pointsLostA: e.target.value })} />
+                                value={form.retryCountA} onChange={(e) => setForm({ ...form, retryCountA: Math.max(0, parseInt(e.target.value, 10) || 0) })} />
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                                value={form.pointsLostB} onChange={(e) => setForm({ ...form, pointsLostB: e.target.value })} />
+                                value={form.retryCountB} onChange={(e) => setForm({ ...form, retryCountB: Math.max(0, parseInt(e.target.value, 10) || 0) })} />
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Extra Reward <span style={{ color: '#94a3b8' }}>(auto — 40/30/20/10/0 by retries)</span></td>
+                            <td style={{ textAlign: 'center' }}>{scoreA.extraReward}</td>
+                            <td style={{ textAlign: 'center' }}>{scoreB.extraReward}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ fontSize: 13 }}>Points lost (penalty)</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.pointsLostA} onChange={(e) => setForm({ ...form, pointsLostA: Math.max(0, Number(e.target.value) || 0) })} />
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
+                                value={form.pointsLostB} onChange={(e) => setForm({ ...form, pointsLostB: Math.max(0, Number(e.target.value) || 0) })} />
                             </td>
                           </tr>
                           <tr>
@@ -248,9 +276,9 @@ export default function RefereeCombatStars() {
                             </td>
                           </tr>
                           <tr style={{ fontWeight: 700 }}>
-                            <td style={{ fontSize: 13 }}>Score</td>
-                            <td style={{ textAlign: 'center' }}>{scoreA}</td>
-                            <td style={{ textAlign: 'center' }}>{scoreB}</td>
+                            <td style={{ fontSize: 13 }}>Task Score</td>
+                            <td style={{ textAlign: 'center' }}>{scoreA.taskScore}</td>
+                            <td style={{ textAlign: 'center' }}>{scoreB.taskScore}</td>
                           </tr>
                         </tbody>
                       </table>

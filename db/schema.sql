@@ -443,6 +443,19 @@ create index if not exists idx_score_edits_complaint on score_edits(complaint_id
 -- (khác arena_entry_time là ô nhập tay tự do theo mẫu phiếu giấy cũ).
 alter table scores add column if not exists started_at timestamptz;
 
+-- Group/Bảng đấu vòng tròn của Battle of Stars (content_format='combat_stars') —
+-- KHÁC board_id (Division theo độ tuổi, 5 bảng cố định A-E). Một content Battle
+-- có thể chia đội thành nhiều group (vd "Bảng A"/"Bảng B") để tạo lịch vòng
+-- tròn riêng từng group, không liên quan gì đến board_id.
+alter table teams add column if not exists combat_group text;
+create index if not exists idx_teams_combat_group on teams(contest_content_id, combat_group);
+
+-- Sân thi đấu (Field) cho từng trận đối kháng — dùng để rải trận đều theo sân
+-- khi sinh lịch vòng tròn tự động. Tái dùng bảng fields đã có (hiện chỉ gán
+-- theo teams.field_id), KHÔNG tạo danh mục sân riêng.
+alter table combat_matches add column if not exists field_id uuid references fields(id) on delete set null;
+create index if not exists idx_combat_matches_field on combat_matches(field_id);
+
 
 -- ============================================================
 -- 2. INDEXES

@@ -292,6 +292,7 @@ export const api = {
     if (body.fieldId !== undefined || body.field_id !== undefined) update.field_id = body.fieldId ?? body.field_id;
     if (body.region !== undefined) update.region = body.region;
     if (body.order !== undefined || body.order_index !== undefined) update.order_index = body.order ?? body.order_index;
+    if (body.combat_group !== undefined) update.combat_group = body.combat_group;
     return withRetry(() => request(`/teams/${id}`, { method: 'PUT', body: update }), 'putTeam');
   },
 

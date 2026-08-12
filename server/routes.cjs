@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const { query, withTransaction } = require('./db.cjs');
 const { requireAuth, requireAdmin } = require('./auth.cjs');
+const battleScoring = require('./battleScoring.cjs');
 
 const router = express.Router();
 
@@ -548,7 +549,7 @@ router.get('/teams', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'field_id', 'region', 'order_index'];
+const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'field_id', 'region', 'order_index', 'combat_group'];
 
 router.post('/contents/:contentId/teams', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TEAM_FIELDS);
@@ -1098,11 +1099,13 @@ const COMBAT_MATCH_NESTED = `
   select cm.*,
     case when ta.id is null then null else json_build_object('id', ta.id, 'name', ta.name) end as team_a,
     case when tb.id is null then null else json_build_object('id', tb.id, 'name', tb.name) end as team_b,
-    case when bd.id is null then null else json_build_object('id', bd.id, 'name', bd.name) end as boards
+    case when bd.id is null then null else json_build_object('id', bd.id, 'name', bd.name) end as boards,
+    case when fd.id is null then null else json_build_object('id', fd.id, 'name', fd.name) end as field
   from combat_matches cm
   left join teams ta on ta.id = cm.team_a_id
   left join teams tb on tb.id = cm.team_b_id
   left join boards bd on bd.id = cm.board_id
+  left join fields fd on fd.id = cm.field_id
 `;
 
 router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
@@ -1122,7 +1125,7 @@ router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
 }));
 
 const COMBAT_MATCH_FIELDS = [
-  'board_id', 'stage', 'group_label', 'match_no',
+  'board_id', 'field_id', 'stage', 'group_label', 'match_no',
   'team_a_id', 'team_b_id', 'team_a_no', 'team_b_no',
   'winner_id', 'is_draw', 'details', 'notes',
 ];
@@ -1130,9 +1133,9 @@ const COMBAT_MATCH_FIELDS = [
 router.post('/contents/:contentId/combat-matches', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, COMBAT_MATCH_FIELDS);
   const { rows } = await query(
-    `insert into combat_matches (contest_content_id, board_id, stage, group_label, match_no, team_a_id, team_b_id, team_a_no, team_b_no, details)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, coalesce($10::jsonb, '{}'::jsonb)) returning *`,
-    [req.params.contentId, b.board_id ?? null, b.stage ?? null, b.group_label ?? null, b.match_no ?? null,
+    `insert into combat_matches (contest_content_id, board_id, field_id, stage, group_label, match_no, team_a_id, team_b_id, team_a_no, team_b_no, details)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, coalesce($11::jsonb, '{}'::jsonb)) returning *`,
+    [req.params.contentId, b.board_id ?? null, b.field_id ?? null, b.stage ?? null, b.group_label ?? null, b.match_no ?? null,
      b.team_a_id ?? null, b.team_b_id ?? null, b.team_a_no ?? null, b.team_b_no ?? null,
      b.details ? JSON.stringify(b.details) : null]
   );
@@ -1143,7 +1146,12 @@ router.post('/contents/:contentId/combat-matches', requireAdmin, h(async (req, r
 // referee_boards) — nhập điểm/hiệp/luân lưu (drone) hoặc điểm task 2 đội
 // (stars), ghi thắng/thua/hòa.
 router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
-  const { rows: mRows } = await query('select * from combat_matches where id = $1', [req.params.id]);
+  const { rows: mRows } = await query(
+    `select cm.*, cc.content_format from combat_matches cm
+     join contest_contents cc on cc.id = cm.contest_content_id
+     where cm.id = $1`,
+    [req.params.id]
+  );
   const match = mRows[0];
   if (!match) return res.status(404).json({ error: 'Không tìm thấy trận đấu.' });
 
@@ -1155,6 +1163,22 @@ router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
   }
 
   const data = pick(req.body, COMBAT_MATCH_FIELDS);
+
+  // Battle of Stars: winner_id/is_draw PHẢI do server tính lại từ `details`
+  // theo đúng luật (mục 10: không cho sửa logic scoring ở phía client để làm
+  // sai kết quả) — bỏ qua hoàn toàn winner_id/is_draw client gửi lên.
+  // Fly Smart Cup (combat_drone) giữ nguyên hành vi cũ (tin client).
+  if (match.content_format === 'combat_stars' && data.details !== undefined) {
+    const validationError = battleScoring.validateDetails(data.details);
+    if (validationError) return res.status(400).json({ error: validationError });
+    const groupLabel = data.group_label !== undefined ? data.group_label : match.group_label;
+    const teamAId = data.team_a_id !== undefined ? data.team_a_id : match.team_a_id;
+    const teamBId = data.team_b_id !== undefined ? data.team_b_id : match.team_b_id;
+    const resolved = battleScoring.resolveMatchResult({ details: data.details, groupLabel, teamAId, teamBId });
+    data.winner_id = resolved.winner_id;
+    data.is_draw = resolved.is_draw;
+  }
+
   if (data.details !== undefined) data.details = JSON.stringify(data.details ?? {});
   if (data.winner_id !== undefined || data.is_draw !== undefined) data.played_at = new Date();
   const q = buildUpdate('combat_matches', req.params.id, data);
