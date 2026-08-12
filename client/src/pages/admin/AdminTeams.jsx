@@ -52,11 +52,11 @@ export default function AdminTeams() {
   const fields = data?.fields || [];
   const [schools, setSchools] = useState([]);
   useEffect(() => { if (data?.schools) setSchools(data.schools); }, [data]);
-  const [schoolFilter, setSchoolFilter] = useState('');
   const [filterComp, setFilterComp] = useState('');
   const [filterBoard, setFilterBoard] = useState('');
+  const [filterSchool, setFilterSchool] = useState('');
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '', fieldId: '' });
+  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '', fieldId: '', schoolId: '' });
   const [contents, setContents] = useState([]);
   const [boards, setBoards] = useState([]);
   const [errors, setErrors] = useState({});
@@ -117,18 +117,36 @@ export default function AdminTeams() {
     return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [compFiltered]);
 
-  const teamsFiltered = useMemo(() => {
+  const boardFiltered = useMemo(() => {
     if (!filterBoard) return compFiltered;
     if (filterBoard === UNASSIGNED) return compFiltered.filter(t => !t.board_id);
     return compFiltered.filter(t => t.board_id === filterBoard);
   }, [compFiltered, filterBoard]);
 
+  // Trường/trung tâm có mặt trong tập đội đang lọc theo giải đấu + bảng đấu
+  // (teams.schools chỉ có {name, level}, không có id — dùng school_id làm key)
+  const schoolOptions = useMemo(() => {
+    const map = new Map();
+    for (const t of boardFiltered) {
+      if (t.school_id && !map.has(t.school_id)) map.set(t.school_id, t.schools?.name || t.school_id);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [boardFiltered]);
+
+  const teamsFiltered = useMemo(() => {
+    if (!filterSchool) return boardFiltered;
+    if (filterSchool === UNASSIGNED) return boardFiltered.filter(t => !t.school_id);
+    return boardFiltered.filter(t => t.school_id === filterSchool);
+  }, [boardFiltered, filterSchool]);
+
   const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
 
   const studentsFiltered = useMemo(() => {
-    if (!schoolFilter) return students;
-    return students.filter(s => (s.school?.name || s.schools?.name || '') === schoolFilter);
-  }, [students, schoolFilter]);
+    if (!form.schoolId) return students;
+    return students.filter(s => s.school_id === form.schoolId);
+  }, [students, form.schoolId]);
 
   const getContentName = (contentId) => {
     const c = allContents.find(x => x.id === contentId);
@@ -145,7 +163,7 @@ export default function AdminTeams() {
   const getCompetitionId = (contentId) => allContents.find(x => x.id === contentId)?.competition_id || '';
 
   const openAdd = () => {
-    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '', fieldId: '' });
+    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '', fieldId: '', schoolId: '' });
     setContents([]);
     setErrors({});
     setModal('add');
@@ -162,14 +180,16 @@ export default function AdminTeams() {
       boardId: team.board_id || '',
       coachId: team.coach_id || '',
       fieldId: team.field_id || '',
+      schoolId: team.school_id || '',
     });
     setContents(content ? allContents.filter(c => c.competition_id === content.competition_id) : []);
     setErrors({});
   };
 
   const openAddStudent = () => {
+    const schoolName = schools.find(s => s.id === form.schoolId)?.name || '';
     setStudentModal(true);
-    setStudentForm({ fullName: '', class: '', grade: '', dateOfBirth: '', school: schoolFilter || '' });
+    setStudentForm({ fullName: '', class: '', grade: '', dateOfBirth: '', school: schoolName });
     setStudentErrors({});
   };
 
@@ -243,6 +263,7 @@ export default function AdminTeams() {
         district: schoolForm.district.trim(),
       });
       setSchools((prev) => [created, ...prev]);
+      setForm((prev) => ({ ...prev, schoolId: created.id }));
       setStudentForm((prev) => ({ ...prev, school: created.name }));
       setSchoolModal(false);
       showAlert('Đã thêm trường.', 'success');
@@ -262,6 +283,7 @@ export default function AdminTeams() {
     const errs = {};
     if (!form.name.trim()) errs.name = 'Tên đội không được để trống.';
     if (!form.contestContentId) errs.contestContentId = 'Chọn nội dung thi.';
+    if (!form.schoolId) errs.schoolId = 'Chọn trường/trung tâm — mọi đội đều phải thuộc 1 trường/trung tâm.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -279,6 +301,7 @@ export default function AdminTeams() {
           boardId: form.boardId || null,
           coachId: form.coachId || null,
           fieldId: form.fieldId || null,
+          schoolId: form.schoolId || null,
           order: teams.length + 1,
         });
       } else {
@@ -288,6 +311,7 @@ export default function AdminTeams() {
           boardId: form.boardId || null,
           coachId: form.coachId || null,
           fieldId: form.fieldId || null,
+          schoolId: form.schoolId || null,
         });
       }
       clearApiCache();
@@ -344,17 +368,25 @@ export default function AdminTeams() {
         <div className="filters-bar" style={{ marginBottom: 0 }}>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 250 }}>
             <label className="form-label">Lọc theo giải đấu</label>
-            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterBoard(''); }}>
+            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterBoard(''); setFilterSchool(''); }}>
               <option value="">Tất cả giải đấu</option>
               {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
             <label className="form-label">Lọc theo bảng đấu</label>
-            <select className="form-input form-select" value={filterBoard} onChange={(e) => setFilterBoard(e.target.value)}>
+            <select className="form-input form-select" value={filterBoard} onChange={(e) => { setFilterBoard(e.target.value); setFilterSchool(''); }}>
               <option value="">Tất cả bảng đấu</option>
               {boardOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.age_group ? ` — ${b.age_group}` : ''}</option>)}
               <option value={UNASSIGNED}>Chưa phân bảng</option>
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
+            <label className="form-label">Lọc theo trường/trung tâm</label>
+            <select className="form-input form-select" value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)}>
+              <option value="">Tất cả trường/trung tâm</option>
+              {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value={UNASSIGNED}>Chưa gán trường/trung tâm</option>
             </select>
           </div>
         </div>
@@ -366,6 +398,7 @@ export default function AdminTeams() {
             <thead>
               <tr>
                 <th>Đội</th>
+                <th>Trường/Trung tâm</th>
                 <th>Giải đấu</th>
                 <th>Nội dung</th>
                 <th>Bảng đấu</th>
@@ -377,13 +410,14 @@ export default function AdminTeams() {
             </thead>
             <tbody>
               {teamsFiltered.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
+                <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có đội nào.</td></tr>
               ) : teamsPage.map((t) => {
                 const compName = getCompetitionName(t.contest_content_id);
                 const mems = (t.student_ids || []).map(sid => students.find(s => s.id === sid)).filter(Boolean);
                 return (
                   <tr key={t.id}>
                     <td>{t.name}</td>
+                    <td>{t.schools?.name || <span style={{ color: '#dc2626' }}>Chưa gán</span>}</td>
                     <td>{compName}</td>
                     <td>{getContentName(t.contest_content_id)}</td>
                     <td>{t.boards?.name || '-'}</td>
@@ -487,19 +521,28 @@ export default function AdminTeams() {
                 {errors.name && <div className="form-error-text">{errors.name}</div>}
               </div>
               <div className="form-group">
-                <label className="form-label">Trường (lọc học sinh)</label>
+                <label className="form-label">Trường/Trung tâm <span style={{ color: '#dc2626' }}>*</span></label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <select className="form-input form-select" value={schoolFilter} onChange={(e) => setSchoolFilter(e.target.value)}>
-                    <option value="">Tất cả trường</option>
-                    {[...new Set(students.map(s => s.school?.name || s.schools?.name).filter(Boolean))].sort().map((name) => (
-                      <option key={name} value={name}>{name}</option>
-                    ))}
+                  <select
+                    className={`form-input form-select ${errors.schoolId ? 'form-input-error' : ''}`}
+                    value={form.schoolId}
+                    onChange={(e) => { setForm({ ...form, schoolId: e.target.value }); setErrors({ ...errors, schoolId: '' }); }}
+                  >
+                    <option value="">-- Chọn trường/trung tâm --</option>
+                    {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
-                  <button type="button" className="btn btn-secondary" onClick={openAddStudent} title="Thêm học sinh">+</button>
+                  <button type="button" className="btn btn-secondary" onClick={openAddSchool} title="Thêm trường/trung tâm">+</button>
+                </div>
+                {errors.schoolId && <div className="form-error-text">{errors.schoolId}</div>}
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                  Mọi đội đều thuộc 1 trường/trung tâm — chọn xong danh sách học sinh bên dưới sẽ tự lọc theo đúng trường này.
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label">Học sinh (chọn nhiều)</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label" style={{ marginBottom: 0 }}>Học sinh (chọn nhiều)</label>
+                  <button type="button" className="btn btn-secondary" onClick={openAddStudent} disabled={!form.schoolId} title={!form.schoolId ? 'Chọn trường/trung tâm trước' : 'Thêm học sinh'}>+ Thêm học sinh</button>
+                </div>
                 {studentsFiltered.length === 0 ? (
                   <p style={{ color: '#888', fontSize: 13 }}>Chưa có học sinh nào. Nhấn + để thêm.</p>
                 ) : (
