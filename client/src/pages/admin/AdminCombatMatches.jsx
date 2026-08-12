@@ -619,7 +619,7 @@ export default function AdminCombatMatches() {
               {scheduleByGroup.map((g) => (
                 <div key={g.label} style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
-                    <h4 style={{ margin: 0 }}>{g.label} <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: 13 }}>({g.teamIds.length} đội)</span></h4>
+                    <h4 style={{ margin: 0, color: '#0f172a' }}>{g.label} <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: 13 }}>({g.teamIds.length} đội)</span></h4>
                     <button
                       type="button" className="btn btn-secondary"
                       disabled={!g.missingPairs.length || generatingGroup === g.label}
@@ -630,10 +630,10 @@ export default function AdminCombatMatches() {
                   </div>
                   {g.rounds.map((r) => (
                     <div key={r.roundNo} style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Round {r.roundNo}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#475569', marginBottom: 4 }}>Round {r.roundNo}</div>
                       <ul style={{ margin: 0, paddingLeft: 20 }}>
                         {r.pairs.map((p, i) => (
-                          <li key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                          <li key={i} style={{ fontSize: 13, marginBottom: 4, color: '#1e293b' }}>
                             {p.teamAName} vs {p.teamBName}
                             {p.match ? (
                               <>
@@ -816,7 +816,7 @@ export default function AdminCombatMatches() {
                 <p style={{ color: '#888', padding: '8px 0' }}>Chưa có trận Finals nào.</p>
               ) : finalsRounds.map((r) => (
                 <div key={r.stage} style={{ marginBottom: 16 }}>
-                  <h4 style={{ marginBottom: 8 }}>{r.stage}</h4>
+                  <h4 style={{ marginBottom: 8, color: '#0f172a' }}>{r.stage}</h4>
                   <div className="table-container">
                     <table>
                       <thead>
