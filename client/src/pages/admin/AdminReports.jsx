@@ -1,12 +1,18 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
+import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { exportMultipleToPdf } from '../referee/exportPdf';
 import ScoreSheetTable from '../shared/ScoreSheetTable';
+import { computeGroupStandings } from '../../lib/battleScoring';
+import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import './AdminLayout.css';
 
+const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
+
 export default function AdminReports() {
+  const { showAlert } = useNotify();
   const { data, loading, error, reload } = useApiLoader(async () => {
     const [comps, allContents] = await Promise.all([api.getCompetitions(), api.getAllContents()]);
     return { competitions: comps, contents: allContents };
@@ -30,13 +36,34 @@ export default function AdminReports() {
     [contents, selectedComp]
   );
 
+  // content_format='scoring' (đo lường) đi qua /reports/scores như cũ. Nội
+  // dung đối kháng (combat_stars/combat_drone) KHÔNG có row nào trong bảng
+  // `scores` — phải tự lấy teams+combat_matches rồi tính bằng đúng luật riêng
+  // của từng format (giống AdminScoreboard.jsx), không có route report riêng.
   const loadReport = async () => {
     if (!selectedComp) return;
     setRowsLoading(true);
     setRowsError(null);
     try {
-      const data = await api.getReportScores({ competitionId: selectedComp, contentId: selectedContent || undefined });
-      setRows(data);
+      const scopedCombatContents = (selectedContent ? contents.filter((c) => c.id === selectedContent) : contentsForComp)
+        .filter((c) => COMBAT_FORMATS.includes(c.content_format));
+      const [measurement, combatNested] = await Promise.all([
+        api.getReportScores({ competitionId: selectedComp, contentId: selectedContent || undefined }),
+        Promise.all(scopedCombatContents.map(async (c) => {
+          const [teams, matches] = await Promise.all([api.getTeams(c.id), api.getCombatMatches(c.id)]);
+          const standings = c.content_format === 'combat_stars'
+            ? computeGroupStandings(teams, matches)
+            : computeDroneStandings(teams, matches);
+          return standings.map((s) => ({
+            team_id: s.teamId, team_name: s.teamName,
+            school: teams.find((t) => t.id === s.teamId)?.schools?.name || 'Chưa có trường',
+            content_name: c.name, contest_content_id: c.id,
+            played: s.played, wins: s.wins, draws: s.draws, losses: s.losses,
+            match_points: s.matchPoints, total_score: s.totalScore,
+          }));
+        })),
+      ]);
+      setRows({ measurement, combat: combatNested.flat() });
     } catch (e) {
       setRowsError(e.message || 'Lỗi tải báo cáo.');
     } finally {
@@ -44,28 +71,35 @@ export default function AdminReports() {
     }
   };
 
-  // Gộp theo đội (tổng cả 2 lượt), rồi nhóm theo trường/trung tâm — mỗi đội
-  // luôn thuộc 1 trường/trung tâm nên đây là cách nhóm duy nhất, không cần chọn.
+  // Gộp theo (đội × nội dung) rồi nhóm theo trường/trung tâm — 1 đội có thể
+  // thi nhiều nội dung khác nhau trong cùng cuộc thi nên không gộp theo đội
+  // đơn thuần (tránh trộn lẫn điểm 2 nội dung khác nhau vào 1 dòng).
   const groups = useMemo(() => {
     if (!rows) return [];
     const byTeam = new Map();
-    for (const r of rows) {
-      if (!byTeam.has(r.team_id)) {
-        byTeam.set(r.team_id, {
-          team_id: r.team_id,
-          team_name: r.team_name,
+    for (const r of rows.measurement || []) {
+      const key = `${r.team_id}|${r.contest_content_id}`;
+      if (!byTeam.has(key)) {
+        byTeam.set(key, {
+          key, team_id: r.team_id, team_name: r.team_name,
           school: r.schools?.name || 'Chưa có trường',
-          content_name: r.content_name,
-          contest_content_id: r.contest_content_id,
-          total_score: 0,
-          total_time: 0,
-          rounds: 0,
+          content_name: r.content_name, contest_content_id: r.contest_content_id,
+          format: 'measurement', total_score: 0, total_time: 0, rounds: 0,
         });
       }
-      const t = byTeam.get(r.team_id);
+      const t = byTeam.get(key);
       t.total_score += Number(r.score) || 0;
       t.total_time += Number(r.time) || 0;
       t.rounds += 1;
+    }
+    for (const r of rows.combat || []) {
+      const key = `${r.team_id}|${r.contest_content_id}`;
+      byTeam.set(key, {
+        key, team_id: r.team_id, team_name: r.team_name, school: r.school,
+        content_name: r.content_name, contest_content_id: r.contest_content_id,
+        format: 'combat', total_score: r.total_score, total_time: null, rounds: r.played,
+        wins: r.wins, draws: r.draws, losses: r.losses, match_points: r.match_points,
+      });
     }
     const teams = Array.from(byTeam.values());
     const byGroup = new Map();
@@ -87,13 +121,20 @@ export default function AdminReports() {
 
   // Xuất PDF CHI TIẾT (đầy đủ phiếu điểm từng đội, theo đúng mẫu Score Sheet)
   // cho toàn bộ đội thuộc 1 group (1 trường/trung tâm hoặc 1 HLV) — không phải
-  // bảng tổng hợp điểm.
+  // bảng tổng hợp điểm. CHỈ áp dụng đội thi nội dung đo lường (mẫu ScoreSheetTable
+  // không dùng được cho đối kháng) — phiếu đối kháng đã có sẵn ở trang "Trận đối
+  // kháng" (xuất theo từng trận, đúng mẫu Battle of Stars/Fly Smart Cup riêng).
   const handleExportGroupPdf = async (group) => {
+    const measurementTeams = group.teams.filter((t) => t.format !== 'combat');
+    if (measurementTeams.length === 0) {
+      showAlert('Nhóm này chỉ có đội thi đối kháng — xuất phiếu đối kháng ở trang "Trận đối kháng".', 'error');
+      return;
+    }
     setExportingGroup(group.name);
     try {
       const tasksCache = new Map();
       const sheets = [];
-      for (const t of group.teams) {
+      for (const t of measurementTeams) {
         const contentId = t.contest_content_id;
         if (contentId && !tasksCache.has(contentId)) {
           tasksCache.set(contentId, await api.getTasks(contentId).catch(() => []));
@@ -191,19 +232,21 @@ export default function AdminReports() {
                     <tr>
                       <th>Đội</th>
                       <th>Nội dung</th>
-                      <th style={{ width: 90 }}>Số lượt</th>
+                      <th style={{ width: 90 }}>Số lượt/trận</th>
                       <th style={{ width: 100 }}>Tổng điểm</th>
+                      <th style={{ width: 140 }}>Kết quả (đối kháng)</th>
                       <th style={{ width: 120 }}>Tổng thời gian</th>
                     </tr>
                   </thead>
                   <tbody>
                     {g.teams.map((t) => (
-                      <tr key={t.team_id}>
+                      <tr key={t.key}>
                         <td>{t.team_name}</td>
                         <td>{t.content_name}</td>
                         <td>{t.rounds}</td>
                         <td><strong>{t.total_score}</strong></td>
-                        <td>{formatSecondsAsMinutes(String(t.total_time)) || '-'}</td>
+                        <td>{t.format === 'combat' ? `W${t.wins} D${t.draws} L${t.losses} · ${t.match_points} MP` : '-'}</td>
+                        <td>{t.format === 'combat' ? '-' : (formatSecondsAsMinutes(String(t.total_time)) || '-')}</td>
                       </tr>
                     ))}
                   </tbody>

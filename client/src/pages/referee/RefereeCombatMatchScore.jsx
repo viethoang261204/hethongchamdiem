@@ -372,21 +372,23 @@ export default function RefereeCombatMatchScore({ format }) {
     </div>
   );
 
-  // ── Success screen: per-team score sheet, ready to view/print right away ──
+  // ── Success screen: just a confirmation + PDF download, no on-screen sheet
+  // preview — the actual sheet still renders off-screen so handleExportPdf's
+  // html2canvas capture keeps working. ──
   if (success) {
     return (
-      <div className="ts-wrapper ts-tablet-layout">
-        <div className="ts-success" style={{ margin: '24px auto' }}>
+      <div className="ts-wrapper ts-center-screen">
+        <div className="ts-success">
           <div className="ts-success-icon">✓</div>
           <strong>Match score sheet saved!</strong>
-        </div>
-        <div className="ts-card" style={{ marginBottom: 20, overflowX: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20 }}>
             <button type="button" className="ts-btn ts-btn-primary" onClick={handleExportPdf} disabled={exporting}>
               {exporting ? 'Exporting...' : 'Download PDF'}
             </button>
             <Link to={listUrl} className="ts-btn ts-btn-secondary">← Back to match list</Link>
           </div>
+        </div>
+        <div style={{ position: 'fixed', top: 0, left: -99999, zIndex: -1 }}>
           {isStars
             ? <CombatStarsSheetTable match={savedMatch} sheetRef={sheetRef} />
             : <CombatDroneSheetTable match={savedMatch} sheetRef={sheetRef} />}

@@ -4,7 +4,7 @@ import { api } from '../../api';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { computeGroupStandings } from '../../lib/battleScoring';
-import { computeDroneStandings } from '../../lib/droneScoring';
+import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import './AdminLayout.css';
 
 function MeasurementTable({ teams }) {
@@ -124,8 +124,9 @@ function CombatBoardTable({ standings, isStars }) {
               </>
             ) : (
               <>
-                <th style={{ width: 90 }}>Points</th>
-                <th style={{ width: 110 }}>Highest Points</th>
+                <th style={{ width: 100 }}>Match Points</th>
+                <th style={{ width: 100 }}>Total Score</th>
+                <th style={{ width: 130 }}>Status</th>
               </>
             )}
           </tr>
@@ -149,8 +150,13 @@ function CombatBoardTable({ standings, isStars }) {
                 </>
               ) : (
                 <>
-                  <td><strong>{s.points}</strong></td>
-                  <td>{s.highestPoints}</td>
+                  <td><strong>{s.matchPoints}</strong></td>
+                  <td>{s.totalScore}</td>
+                  <td>
+                    {s.tieBreakRequired
+                      ? <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 12 }}>TIE-BREAK REQUIRED</span>
+                      : s.headToHeadWinner ? <span style={{ color: '#16a34a', fontSize: 12 }}>H2H</span> : ''}
+                  </td>
                 </>
               )}
             </tr>
