@@ -35,6 +35,7 @@ import RefereeScoreDetail from './pages/referee/RefereeScoreDetail';
 import RefereeMatches from './pages/referee/RefereeMatches';
 import RefereeCombatDrone from './pages/referee/RefereeCombatDrone';
 import RefereeCombatStars from './pages/referee/RefereeCombatStars';
+import RefereeCombatMatchScore from './pages/referee/RefereeCombatMatchScore';
 
 const AuthContext = createContext(null);
 
@@ -117,6 +118,8 @@ export default function App() {
               <Route path="competition/:competitionId/content/:contentId/region/:region/matches" element={<RefereeMatches />} />
               <Route path="competition/:competitionId/content/:contentId/combat-drone" element={<RefereeCombatDrone />} />
               <Route path="competition/:competitionId/content/:contentId/combat-stars" element={<RefereeCombatStars />} />
+              <Route path="competition/:competitionId/content/:contentId/combat-drone/match/:matchId" element={<RefereeCombatMatchScore format="combat_drone" />} />
+              <Route path="competition/:competitionId/content/:contentId/combat-stars/match/:matchId" element={<RefereeCombatMatchScore format="combat_stars" />} />
               <Route path="competition/:competitionId/content/:contentId/region/:region/team/:teamId/round/:roundNo/score" element={<RefereeScoreForm />} />
               <Route path="history" element={<RefereeScoreHistory />} />
               <Route path="complaints" element={<RefereeComplaints />} />
