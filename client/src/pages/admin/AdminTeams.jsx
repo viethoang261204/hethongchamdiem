@@ -55,6 +55,7 @@ export default function AdminTeams() {
   const [filterComp, setFilterComp] = useState('');
   const [filterBoard, setFilterBoard] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
+  const [filterField, setFilterField] = useState('');
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '', fieldId: '', schoolId: '' });
   const [contents, setContents] = useState([]);
@@ -135,11 +136,28 @@ export default function AdminTeams() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [boardFiltered]);
 
-  const teamsFiltered = useMemo(() => {
+  const schoolFiltered = useMemo(() => {
     if (!filterSchool) return boardFiltered;
     if (filterSchool === UNASSIGNED) return boardFiltered.filter(t => !t.school_id);
     return boardFiltered.filter(t => t.school_id === filterSchool);
   }, [boardFiltered, filterSchool]);
+
+  // Field có mặt trong tập đội đang lọc theo giải đấu + bảng đấu + trường
+  const fieldOptions = useMemo(() => {
+    const map = new Map();
+    for (const t of schoolFiltered) {
+      if (t.field_id && !map.has(t.field_id)) map.set(t.field_id, t.fields?.name || t.field_id);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [schoolFiltered]);
+
+  const teamsFiltered = useMemo(() => {
+    if (!filterField) return schoolFiltered;
+    if (filterField === UNASSIGNED) return schoolFiltered.filter(t => !t.field_id);
+    return schoolFiltered.filter(t => t.field_id === filterField);
+  }, [schoolFiltered, filterField]);
 
   const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
 
@@ -368,14 +386,14 @@ export default function AdminTeams() {
         <div className="filters-bar" style={{ marginBottom: 0 }}>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 250 }}>
             <label className="form-label">Lọc theo giải đấu</label>
-            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterBoard(''); setFilterSchool(''); }}>
+            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterBoard(''); setFilterSchool(''); setFilterField(''); }}>
               <option value="">Tất cả giải đấu</option>
               {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
             <label className="form-label">Lọc theo bảng đấu</label>
-            <select className="form-input form-select" value={filterBoard} onChange={(e) => { setFilterBoard(e.target.value); setFilterSchool(''); }}>
+            <select className="form-input form-select" value={filterBoard} onChange={(e) => { setFilterBoard(e.target.value); setFilterSchool(''); setFilterField(''); }}>
               <option value="">Tất cả bảng đấu</option>
               {boardOptions.map(b => <option key={b.id} value={b.id}>{b.name}{b.age_group ? ` — ${b.age_group}` : ''}</option>)}
               <option value={UNASSIGNED}>Chưa phân bảng</option>
@@ -383,10 +401,18 @@ export default function AdminTeams() {
           </div>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
             <label className="form-label">Lọc theo trường/trung tâm</label>
-            <select className="form-input form-select" value={filterSchool} onChange={(e) => setFilterSchool(e.target.value)}>
+            <select className="form-input form-select" value={filterSchool} onChange={(e) => { setFilterSchool(e.target.value); setFilterField(''); }}>
               <option value="">Tất cả trường/trung tâm</option>
               {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               <option value={UNASSIGNED}>Chưa gán trường/trung tâm</option>
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
+            <label className="form-label">Lọc theo Field</label>
+            <select className="form-input form-select" value={filterField} onChange={(e) => setFilterField(e.target.value)}>
+              <option value="">Tất cả Field</option>
+              {fieldOptions.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              <option value={UNASSIGNED}>Chưa gán Field</option>
             </select>
           </div>
         </div>
