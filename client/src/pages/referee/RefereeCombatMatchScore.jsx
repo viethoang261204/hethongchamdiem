@@ -616,12 +616,12 @@ export default function RefereeCombatMatchScore({ format }) {
 
           <div className="ts-sheet-form-grid">
             <div className="ts-form-row">
-              <label className="ts-label">Student / Team Captain — Red ({match.team_a?.name})</label>
-              <input type="text" className="ts-input" value={form.teamMembersA} onChange={(e) => setForm({ ...form, teamMembersA: e.target.value })} />
+              <label className="ts-label">Student / Team Captain — Red ({match.team_a?.name}) <span className="ts-hint-inline">(locked)</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.teamMembersA} readOnly placeholder="No members recorded" />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Student / Team Captain — Blue ({match.team_b?.name})</label>
-              <input type="text" className="ts-input" value={form.teamMembersB} onChange={(e) => setForm({ ...form, teamMembersB: e.target.value })} />
+              <label className="ts-label">Student / Team Captain — Blue ({match.team_b?.name}) <span className="ts-hint-inline">(locked)</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.teamMembersB} readOnly placeholder="No members recorded" />
             </div>
             <div className="ts-form-row">
               <SignatureBox label="Red Team Signature" value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
@@ -630,19 +630,19 @@ export default function RefereeCombatMatchScore({ format }) {
               <SignatureBox label="Blue Team Signature" value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Referee Name</label>
-              <input type="text" className="ts-input" value={form.refereeSignature} onChange={(e) => setForm({ ...form, refereeSignature: e.target.value })} />
+              <label className="ts-label">Referee Name <span className="ts-hint-inline">(locked)</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.refereeSignature} readOnly />
             </div>
             <div className="ts-form-row">
               <SignatureBox label="Referee Signature" value={form.refereeSigImage} onChange={(v) => setForm({ ...form, refereeSigImage: v })} required />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Chief Referee</label>
-              <input type="text" className="ts-input" value={form.headRefereeName} onChange={(e) => setForm({ ...form, headRefereeName: e.target.value })} />
+              <label className="ts-label">Chief Referee <span className="ts-hint-inline">(locked)</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.headRefereeName} readOnly />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Scorekeeper</label>
-              <input type="text" className="ts-input" value={form.scorekeeperName} onChange={(e) => setForm({ ...form, scorekeeperName: e.target.value })} />
+              <label className="ts-label">Scorekeeper <span className="ts-hint-inline">(locked)</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.scorekeeperName} readOnly />
             </div>
             <div className="ts-form-row ts-full">
               <label className="ts-label">Remarks</label>
