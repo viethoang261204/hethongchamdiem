@@ -81,6 +81,8 @@ export default function AdminCombatMatches() {
   const [detailModal, setDetailModal] = useState(null); // match object đang sửa chi tiết
   const [detailForm, setDetailForm] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [viewMatchId, setViewMatchId] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [pendingExport, setPendingExport] = useState(null);
@@ -171,6 +173,34 @@ export default function AdminCombatMatches() {
       showAlert('Đã xóa.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
+    }
+  };
+
+  const removeAllMatches = async () => {
+    if (!matches.length) return;
+    const ok = await showConfirm({
+      message: `Xóa TẤT CẢ ${matches.length} trận đấu của nội dung này? Toàn bộ điểm số và phiếu đã nhập sẽ mất — không thể hoàn tác.`,
+      confirmText: 'Xóa tất cả', cancelText: 'Hủy', danger: true,
+    });
+    if (!ok) return;
+    setDeleteAllConfirm({ securityCode: '' });
+  };
+
+  const confirmDeleteAll = async () => {
+    if (!deleteAllConfirm) return;
+    if (deleteAllConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    setDeletingAll(true);
+    try {
+      for (const m of matches) {
+        await api.deleteCombatMatch(selectedContentId, m.id);
+      }
+      setDeleteAllConfirm(null);
+      await reloadMatches();
+      showAlert('Đã xóa tất cả trận đấu.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setDeletingAll(false);
     }
   };
 
@@ -667,7 +697,10 @@ export default function AdminCombatMatches() {
 
           <div className="page-header" style={{ marginBottom: 12 }}>
             <div><h3 className="card-title">Danh sách trận ({matches.length})</h3></div>
-            <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn btn-danger" onClick={removeAllMatches} disabled={matches.length === 0}>Xóa tất cả trận</button>
+              <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận</button>
+            </div>
           </div>
 
           <div className="card" style={{ marginBottom: 24 }}>
@@ -1251,6 +1284,31 @@ export default function AdminCombatMatches() {
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Hủy</button>
               <button type="button" className="btn btn-danger" onClick={confirmDelete}>Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteAllConfirm && (
+        <div className="modal-overlay" onClick={() => !deletingAll && setDeleteAllConfirm(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">Xác nhận xóa tất cả trận</h3>
+              <button type="button" className="form-modal-close" onClick={() => setDeleteAllConfirm(null)} aria-label="Đóng" disabled={deletingAll}>×</button>
+            </div>
+            <div className="form-modal-body">
+              <p style={{ marginBottom: 16, color: '#374151' }}>Nhập mã bảo mật để xóa TẤT CẢ {matches.length} trận đấu của nội dung này:</p>
+              <div className="form-group">
+                <label className="form-label">Mã bảo mật</label>
+                <input type="password" className="form-input" value={deleteAllConfirm.securityCode}
+                  onChange={(e) => setDeleteAllConfirm({ ...deleteAllConfirm, securityCode: e.target.value })} autoFocus disabled={deletingAll} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteAllConfirm(null)} disabled={deletingAll}>Hủy</button>
+              <button type="button" className="btn btn-danger" onClick={confirmDeleteAll} disabled={deletingAll}>
+                {deletingAll ? 'Đang xóa...' : 'Xóa tất cả'}
+              </button>
             </div>
           </div>
         </div>
