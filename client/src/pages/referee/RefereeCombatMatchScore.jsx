@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api } from '../../api';
+import { api, combatMissionImageUrl } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
 import SignatureBox from '../../components/SignaturePad';
@@ -13,7 +13,7 @@ import {
   computeTaskScore, determineGroupMatchResult,
 } from '../../lib/battleScoring';
 import {
-  PENALTY_MAX_SECONDS, computeSideScore, computeMatchPoints,
+  PENALTY_MAX_SECONDS, computeSideScore,
   determineGroupMatchResult as determineDroneGroupResult,
   determineKnockoutResult, resolveShootoutWinner,
 } from '../../lib/flySmartCupScoring';
@@ -54,6 +54,7 @@ export default function RefereeCombatMatchScore({ format }) {
   const [success, setSuccess] = useState(false);
   const [savedMatch, setSavedMatch] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [missionImages, setMissionImages] = useState([]);
 
   // ── Match Status (Fly Smart Cup only) — Cancel Match / Disqualify a Team ──
   const [statusAction, setStatusAction] = useState(null); // 'cancel' | 'disqualify' | null
@@ -71,7 +72,9 @@ export default function RefereeCombatMatchScore({ format }) {
       api.getCombatMatches(contentId),
       api.getTeams(contentId).catch(() => []),
       api.getStudents().catch(() => []),
-    ]).then(([list, teams, students]) => {
+      isStars ? api.getCombatMissionImages(contentId).catch(() => []) : Promise.resolve([]),
+    ]).then(([list, teams, students, images]) => {
+      if (!cancelled) setMissionImages(images);
       if (cancelled) return;
       const m = list.find((x) => x.id === matchId);
       if (!m) { setNotFound(true); return; }
@@ -193,6 +196,18 @@ export default function RefereeCombatMatchScore({ format }) {
     ? (isKnockout ? determineKnockoutResult(droneSideA(), droneSideB(), form.shootoutRounds) : determineDroneGroupResult(droneSideA(), droneSideB()))
     : null;
   const shootoutWinnerInfo = !isStars && isKnockout ? resolveShootoutWinner(form.shootoutRounds) : { winner: null };
+
+  // Ảnh minh hoạ 4 nhiệm vụ cố định Battle of Stars (admin upload ở AdminCombatMatches).
+  const missionImageThumb = (missionKey) => {
+    const entry = missionImages.find((m) => m.mission_key === missionKey);
+    const url = combatMissionImageUrl(contentId, entry);
+    if (!url) return null;
+    return (
+      <a href={url} target="_blank" rel="noreferrer" title="Xem ảnh lớn" style={{ display: 'inline-block', marginLeft: 8, verticalAlign: 'middle' }}>
+        <img src={url} alt={missionKey} style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid #334155' }} />
+      </a>
+    );
+  };
 
   const droneResultText = () => {
     if (!match) return '';
@@ -531,7 +546,7 @@ export default function RefereeCombatMatchScore({ format }) {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} if completed)</span></td>
+                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} if completed)</span>{missionImageThumb('meteorTower')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.meteorCompletedA} onChange={(e) => setForm({ ...form, meteorCompletedA: e.target.checked })} /> Completed
@@ -544,7 +559,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}pts/block, max {ENERGY_BLOCK_MAX})</span></td>
+                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}pts/block, max {ENERGY_BLOCK_MAX})</span>{missionImageThumb('energyDefense')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.energyBlocksA} onChange={(e) => setForm({ ...form, energyBlocksA: clampEnergy(e.target.value) })} />
@@ -555,7 +570,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}pts/ball, max {FIREPOWER_BALL_MAX})</span></td>
+                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}pts/ball, max {FIREPOWER_BALL_MAX})</span>{missionImageThumb('fullFirepower')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.firepowerBallsA} onChange={(e) => setForm({ ...form, firepowerBallsA: clampFirepower(e.target.value) })} />
@@ -566,7 +581,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>(no points — Direct Win only)</span></td>
+                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>(no points — Direct Win only)</span>{missionImageThumb('finalFortress')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.directWinA} onChange={(e) => setDirectWin('A', e.target.checked)} /> Direct Win

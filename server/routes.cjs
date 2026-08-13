@@ -1247,6 +1247,56 @@ router.delete('/contents/:contentId/combat-matches/:id', requireAdmin, h(async (
 }));
 
 // ============================================================
+// Ảnh minh hoạ nhiệm vụ Battle of Stars (Meteor Tower/Energy Defense/Full
+// Firepower/Final Fortress) — 4 nhiệm vụ CỐ ĐỊNH theo luật, không phải row
+// trong bảng `tasks` (bảng đó dành cho content_format='scoring'), nên có
+// endpoint riêng, cùng kiểu lưu bytea như /tasks/:id/image.
+// ============================================================
+const MISSION_KEYS = ['meteorTower', 'energyDefense', 'fullFirepower', 'finalFortress'];
+
+router.get('/contents/:contentId/combat-mission-images', h(async (req, res) => {
+  const { rows } = await query(
+    `select mission_key, (image_data is not null) as has_image, updated_at
+     from combat_mission_images where contest_content_id = $1`,
+    [req.params.contentId]
+  );
+  res.json(rows);
+}));
+
+// Dùng arrow wrapper để trì hoãn việc đọc `uploadImage` tới lúc request thật
+// sự tới (biến này khai báo bên dưới, sau phần Tasks) — tránh lỗi tham chiếu
+// trước khi khởi tạo, giống cách route /tasks/:id/image đã làm.
+router.post('/contents/:contentId/combat-mission-images/:missionKey', requireAdmin,
+  (req, res, next) => uploadImage(req, res, next), h(async (req, res) => {
+    if (!MISSION_KEYS.includes(req.params.missionKey)) return res.status(400).json({ error: 'Nhiệm vụ không hợp lệ.' });
+    if (!req.file) return res.status(400).json({ error: 'Chưa chọn file ảnh.' });
+    await query(
+      `insert into combat_mission_images (contest_content_id, mission_key, image_data, image_mime, updated_at)
+       values ($1, $2, $3, $4, now())
+       on conflict (contest_content_id, mission_key)
+       do update set image_data = excluded.image_data, image_mime = excluded.image_mime, updated_at = now()`,
+      [req.params.contentId, req.params.missionKey, req.file.buffer, req.file.mimetype]
+    );
+    res.json({ ok: true });
+  }));
+
+router.get('/contents/:contentId/combat-mission-images/:missionKey/raw', h(async (req, res) => {
+  const { rows } = await query(
+    'select image_mime, image_data from combat_mission_images where contest_content_id = $1 and mission_key = $2',
+    [req.params.contentId, req.params.missionKey]
+  );
+  if (!rows[0] || !rows[0].image_data) return res.status(404).send('Not found');
+  res.set('Content-Type', rows[0].image_mime || 'application/octet-stream');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(rows[0].image_data);
+}));
+
+router.delete('/contents/:contentId/combat-mission-images/:missionKey', requireAdmin, h(async (req, res) => {
+  await query('delete from combat_mission_images where contest_content_id = $1 and mission_key = $2', [req.params.contentId, req.params.missionKey]);
+  res.json({ ok: true });
+}));
+
+// ============================================================
 // Khiếu nại bảng điểm — luồng RIÊNG có trạng thái (khác field text tự do
 // `objection`/"Kiến nghị" đã có sẵn trên scores/combat_matches). Trọng tài
 // gửi khiếu nại về 1 phiếu điểm (đo lường HOẶC đối kháng), admin xử lý.

@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { api } from '../../api';
+import { api, combatMissionImageUrl } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
@@ -24,6 +24,14 @@ import './AdminLayout.css';
 const CONTENT_FORMAT_LABEL = {
   combat_drone: 'Đối kháng — Fly Smart Cup',
   combat_stars: 'Đối kháng — Battle of Stars',
+};
+
+// 4 nhiệm vụ cố định Battle of Stars — ảnh minh hoạ lưu riêng (không phải
+// task trong bảng `tasks`), xem combat_mission_images trong db/schema.sql.
+const MISSION_KEYS = ['meteorTower', 'energyDefense', 'fullFirepower', 'finalFortress'];
+const MISSION_LABELS = {
+  meteorTower: 'Meteor Tower', energyDefense: 'Energy Defense',
+  fullFirepower: 'Full Firepower', finalFortress: 'Final Fortress',
 };
 
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
@@ -55,14 +63,18 @@ export default function AdminCombatMatches() {
 
   const { data: cdata, loading: cLoading, error: cError, reload: cReload, setData: setCData } = useApiLoader(async () => {
     if (!selectedContentId) return null;
-    const [teams, matches] = await Promise.all([
+    const isStarsContent = selectedContent?.content_format === 'combat_stars';
+    const [teams, matches, missionImages] = await Promise.all([
       api.getTeams(selectedContentId),
       api.getCombatMatches(selectedContentId),
+      isStarsContent ? api.getCombatMissionImages(selectedContentId) : Promise.resolve([]),
     ]);
-    return { teams, matches };
+    return { teams, matches, missionImages };
   }, [selectedContentId]);
   const teams = cdata?.teams || [];
   const matches = cdata?.matches || [];
+  const missionImages = cdata?.missionImages || [];
+  const [uploadingMission, setUploadingMission] = useState(null);
   const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matches, 10);
 
   const [modal, setModal] = useState(null); // 'add' | { id }
@@ -98,6 +110,36 @@ export default function AdminCombatMatches() {
     const t = await api.getTeams(selectedContentId);
     setCData((prev) => prev ? { ...prev, teams: t } : prev);
     clearApiCache('getTeams');
+  };
+
+  const reloadMissionImages = async () => {
+    const m = await api.getCombatMissionImages(selectedContentId);
+    setCData((prev) => prev ? { ...prev, missionImages: m } : prev);
+  };
+
+  const uploadMissionImage = async (missionKey, file) => {
+    setUploadingMission(missionKey);
+    try {
+      await api.uploadCombatMissionImage({ contestContentId: selectedContentId, missionKey, file });
+      await reloadMissionImages();
+      showAlert('Đã lưu ảnh.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setUploadingMission(null);
+    }
+  };
+
+  const removeMissionImage = async (missionKey) => {
+    setUploadingMission(missionKey);
+    try {
+      await api.deleteCombatMissionImage(selectedContentId, missionKey);
+      await reloadMissionImages();
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setUploadingMission(null);
+    }
   };
 
   const openAdd = () => {
@@ -625,6 +667,52 @@ export default function AdminCombatMatches() {
       ) : (
         <>
           {cError && <ErrorBox error={cError} onRetry={cReload} />}
+
+          {/* ── A0. Ảnh minh hoạ nhiệm vụ (chỉ Battle of Stars) ── */}
+          {isStars && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <h3 className="card-title">Ảnh minh họa nhiệm vụ</h3>
+              </div>
+              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
+                Ảnh giúp trọng tài dễ hình dung luật khi chấm điểm — hiện ở màn chấm điểm của trọng tài.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
+                {MISSION_KEYS.map((key) => {
+                  const entry = missionImages.find((m) => m.mission_key === key);
+                  const url = combatMissionImageUrl(selectedContentId, entry);
+                  const isUploading = uploadingMission === key;
+                  return (
+                    <div key={key} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, textAlign: 'center' }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{MISSION_LABELS[key]}</div>
+                      {url ? (
+                        <img src={url} alt={MISSION_LABELS[key]} style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }} />
+                      ) : (
+                        <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12, background: '#f8fafc', borderRadius: 6, marginBottom: 6 }}>
+                          Chưa có ảnh
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                        <label className="btn btn-secondary" style={{ fontSize: 12, cursor: isUploading ? 'not-allowed' : 'pointer', margin: 0 }}>
+                          {isUploading ? 'Đang tải...' : (url ? 'Đổi ảnh' : 'Tải ảnh lên')}
+                          <input
+                            type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }}
+                            disabled={isUploading}
+                            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMissionImage(key, f); e.target.value = ''; }}
+                          />
+                        </label>
+                        {url && (
+                          <button type="button" className="btn btn-danger" style={{ fontSize: 12 }} disabled={isUploading} onClick={() => removeMissionImage(key)}>
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* ── A+B. Teams & Groups (Battle of Stars + Fly Smart Cup) ── */}
           {isCombat && (

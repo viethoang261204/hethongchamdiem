@@ -484,6 +484,22 @@ alter table combat_matches add column if not exists status text not null default
 update combat_matches set status = 'completed' where status = 'scheduled' and (winner_id is not null or is_draw = true);
 create index if not exists idx_combat_matches_status on combat_matches(status);
 
+-- Ảnh minh hoạ nhiệm vụ Battle of Stars (Meteor Tower/Energy Defense/Full
+-- Firepower/Final Fortress) — 4 nhiệm vụ CỐ ĐỊNH theo luật (không phải task
+-- admin tự tạo trong bảng `tasks`), nên cần chỗ lưu ảnh riêng, gắn theo từng
+-- content Battle of Stars (mỗi content có thể tự upload ảnh riêng nếu muốn,
+-- dù thường chỉ cần upload 1 lần). Cùng kiểu lưu bytea như tasks.image_data.
+create table if not exists combat_mission_images (
+  id                 uuid primary key default gen_random_uuid(),
+  contest_content_id uuid not null references contest_contents(id) on delete cascade,
+  mission_key        text not null check (mission_key in ('meteorTower', 'energyDefense', 'fullFirepower', 'finalFortress')),
+  image_data         bytea,
+  image_mime         text,
+  updated_at         timestamptz default now(),
+  unique (contest_content_id, mission_key)
+);
+create index if not exists idx_combat_mission_images_content on combat_mission_images(contest_content_id);
+
 
 -- ============================================================
 -- 2. INDEXES
