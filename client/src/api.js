@@ -46,13 +46,6 @@ export function taskImageUrl(task) {
   return task.image_url || null;
 }
 
-// URL ảnh minh hoạ 4 nhiệm vụ cố định Battle of Stars — xem
-// combat_mission_images trong db/schema.sql. `entry` = 1 phần tử trả về từ
-// api.getCombatMissionImages(contentId): { mission_key, has_image, updated_at }.
-export function combatMissionImageUrl(contentId, entry) {
-  if (!contentId || !entry?.has_image) return null;
-  return `/api/contents/${contentId}/combat-mission-images/${entry.mission_key}/raw?v=${Date.parse(entry.updated_at) || ''}`;
-}
 
 // Gắn alias `team` (số ít) từ nested key `teams` — các trang cũ đọc `score.team`
 // theo alias Supabase `team:teams(...)`. Không ghi đè nếu server đã trả `team`.
@@ -236,25 +229,6 @@ export const api = {
   deleteCombatMatch: (contestContentId, id) => withRetry(() => request(
     `/contents/${contestContentId}/combat-matches/${id}`, { method: 'DELETE' }
   ), 'deleteCombatMatch'),
-
-  // Ảnh minh hoạ 4 nhiệm vụ cố định Battle of Stars — xem combatMissionImageUrl() ở trên.
-  getCombatMissionImages: (contestContentId) => withRetry(() => request(
-    `/contents/${contestContentId}/combat-mission-images`
-  ), 'getCombatMissionImages'),
-
-  uploadCombatMissionImage: async ({ contestContentId, missionKey, file }) => {
-    if (!file) throw new Error('Chưa chọn file ảnh.');
-    if (file.size > 5 * 1024 * 1024) throw new Error('Ảnh tối đa 5MB.');
-    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowed.includes(file.type)) throw new Error('Chỉ chấp nhận JPG/PNG/WEBP/GIF.');
-    const formData = new FormData();
-    formData.append('file', file);
-    return request(`/contents/${contestContentId}/combat-mission-images/${missionKey}`, { method: 'POST', formData });
-  },
-
-  deleteCombatMissionImage: (contestContentId, missionKey) => withRetry(() => request(
-    `/contents/${contestContentId}/combat-mission-images/${missionKey}`, { method: 'DELETE' }
-  ), 'deleteCombatMissionImage'),
 
   // ============================================================
   // Students

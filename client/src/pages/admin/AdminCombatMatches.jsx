@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
-import { api, combatMissionImageUrl } from '../../api';
+import { api, taskImageUrl } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
@@ -26,13 +26,10 @@ const CONTENT_FORMAT_LABEL = {
   combat_stars: 'Đối kháng — Battle of Stars',
 };
 
-// 4 nhiệm vụ cố định Battle of Stars — ảnh minh hoạ lưu riêng (không phải
-// task trong bảng `tasks`), xem combat_mission_images trong db/schema.sql.
-const MISSION_KEYS = ['meteorTower', 'energyDefense', 'fullFirepower', 'finalFortress'];
-const MISSION_LABELS = {
-  meteorTower: 'Meteor Tower', energyDefense: 'Energy Defense',
-  fullFirepower: 'Full Firepower', finalFortress: 'Final Fortress',
-};
+// 4 nhiệm vụ cố định Battle of Stars — ảnh minh hoạ lấy từ "Nhiệm vụ" (bảng
+// tasks) đã tạo sẵn cùng tên cho content này, khớp theo tên (không phân biệt
+// hoa/thường) — không có kho ảnh riêng, admin quản lý ảnh như task bình thường.
+const MISSION_NAMES = ['Meteor Tower', 'Energy Defense', 'Full Firepower', 'Final Fortress'];
 
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
@@ -64,17 +61,18 @@ export default function AdminCombatMatches() {
   const { data: cdata, loading: cLoading, error: cError, reload: cReload, setData: setCData } = useApiLoader(async () => {
     if (!selectedContentId) return null;
     const isStarsContent = selectedContent?.content_format === 'combat_stars';
-    const [teams, matches, missionImages] = await Promise.all([
+    const [teams, matches, tasks] = await Promise.all([
       api.getTeams(selectedContentId),
       api.getCombatMatches(selectedContentId),
-      isStarsContent ? api.getCombatMissionImages(selectedContentId) : Promise.resolve([]),
+      // Ảnh minh hoạ 4 nhiệm vụ Battle of Stars — lấy từ "Nhiệm vụ" đã tạo sẵn
+      // cho đúng content này (khớp theo tên), không phải kho ảnh riêng.
+      isStarsContent ? api.getTasks(selectedContentId).catch(() => []) : Promise.resolve([]),
     ]);
-    return { teams, matches, missionImages };
+    return { teams, matches, tasks };
   }, [selectedContentId]);
   const teams = cdata?.teams || [];
   const matches = cdata?.matches || [];
-  const missionImages = cdata?.missionImages || [];
-  const [uploadingMission, setUploadingMission] = useState(null);
+  const missionTasks = cdata?.tasks || [];
   const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matches, 10);
 
   const [modal, setModal] = useState(null); // 'add' | { id }
@@ -110,36 +108,6 @@ export default function AdminCombatMatches() {
     const t = await api.getTeams(selectedContentId);
     setCData((prev) => prev ? { ...prev, teams: t } : prev);
     clearApiCache('getTeams');
-  };
-
-  const reloadMissionImages = async () => {
-    const m = await api.getCombatMissionImages(selectedContentId);
-    setCData((prev) => prev ? { ...prev, missionImages: m } : prev);
-  };
-
-  const uploadMissionImage = async (missionKey, file) => {
-    setUploadingMission(missionKey);
-    try {
-      await api.uploadCombatMissionImage({ contestContentId: selectedContentId, missionKey, file });
-      await reloadMissionImages();
-      showAlert('Đã lưu ảnh.', 'success');
-    } catch (e) {
-      showAlert(e.message || 'Lỗi', 'error');
-    } finally {
-      setUploadingMission(null);
-    }
-  };
-
-  const removeMissionImage = async (missionKey) => {
-    setUploadingMission(missionKey);
-    try {
-      await api.deleteCombatMissionImage(selectedContentId, missionKey);
-      await reloadMissionImages();
-    } catch (e) {
-      showAlert(e.message || 'Lỗi', 'error');
-    } finally {
-      setUploadingMission(null);
-    }
   };
 
   const openAdd = () => {
@@ -668,45 +636,26 @@ export default function AdminCombatMatches() {
         <>
           {cError && <ErrorBox error={cError} onRetry={cReload} />}
 
-          {/* ── A0. Ảnh minh hoạ nhiệm vụ (chỉ Battle of Stars) ── */}
-          {isStars && (
+          {/* ── A0. Ảnh minh hoạ nhiệm vụ (chỉ Battle of Stars) — lấy từ "Nhiệm
+               vụ" đã tạo sẵn cho content này, khớp theo tên. Muốn thêm/đổi ảnh
+               thì vào trang "Nhiệm vụ", không quản lý riêng ở đây. ── */}
+          {isStars && missionTasks.some((t) => MISSION_NAMES.some((n) => n.toLowerCase() === (t.name || '').trim().toLowerCase()) && t.has_image) && (
             <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <h3 className="card-title">Ảnh minh họa nhiệm vụ</h3>
               </div>
               <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
-                Ảnh giúp trọng tài dễ hình dung luật khi chấm điểm — hiện ở màn chấm điểm của trọng tài.
+                Lấy từ "Nhiệm vụ" cùng tên trong content này — muốn đổi ảnh thì vào trang "Nhiệm vụ" để sửa.
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 16 }}>
-                {MISSION_KEYS.map((key) => {
-                  const entry = missionImages.find((m) => m.mission_key === key);
-                  const url = combatMissionImageUrl(selectedContentId, entry);
-                  const isUploading = uploadingMission === key;
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                {MISSION_NAMES.map((name) => {
+                  const task = missionTasks.find((t) => (t.name || '').trim().toLowerCase() === name.toLowerCase());
+                  const url = taskImageUrl(task);
+                  if (!url) return null;
                   return (
-                    <div key={key} style={{ border: '1px solid #e2e8f0', borderRadius: 10, padding: 10, textAlign: 'center' }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{MISSION_LABELS[key]}</div>
-                      {url ? (
-                        <img src={url} alt={MISSION_LABELS[key]} style={{ width: '100%', height: 100, objectFit: 'cover', borderRadius: 6, marginBottom: 6 }} />
-                      ) : (
-                        <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 12, background: '#f8fafc', borderRadius: 6, marginBottom: 6 }}>
-                          Chưa có ảnh
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-                        <label className="btn btn-secondary" style={{ fontSize: 12, cursor: isUploading ? 'not-allowed' : 'pointer', margin: 0 }}>
-                          {isUploading ? 'Đang tải...' : (url ? 'Đổi ảnh' : 'Tải ảnh lên')}
-                          <input
-                            type="file" accept="image/jpeg,image/png,image/webp,image/gif" style={{ display: 'none' }}
-                            disabled={isUploading}
-                            onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMissionImage(key, f); e.target.value = ''; }}
-                          />
-                        </label>
-                        {url && (
-                          <button type="button" className="btn btn-danger" style={{ fontSize: 12 }} disabled={isUploading} onClick={() => removeMissionImage(key)}>
-                            Xóa
-                          </button>
-                        )}
-                      </div>
+                    <div key={name} style={{ textAlign: 'center' }}>
+                      <img src={url} alt={name} style={{ width: 120, height: 90, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{name}</div>
                     </div>
                   );
                 })}
