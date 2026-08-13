@@ -12,18 +12,27 @@ import {
   ENERGY_BLOCK_MAX, FIREPOWER_BALL_MAX, ENERGY_BLOCK_SCORE, FIREPOWER_BALL_SCORE, METEOR_TOWER_SCORE,
   computeTaskScore, determineGroupMatchResult,
 } from '../../lib/battleScoring';
+import {
+  PENALTY_MAX_SECONDS, computeSideScore, computeMatchPoints,
+  determineGroupMatchResult as determineDroneGroupResult,
+  determineKnockoutResult, resolveShootoutWinner,
+} from '../../lib/flySmartCupScoring';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
-const emptyPenalty = () => [{ score: '', time: '' }, { score: '', time: '' }, { score: '', time: '' }];
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
+const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: '', bSuccess: false, bTimeSeconds: '' });
 
 // Score sheet for 1 combat match — replaces the old inline accordion: clicking
 // a match in the list opens this dedicated page (same shape as the "pure"
 // TaskScoringWizard flow): a Start Match gate, a live stopwatch while
 // scoring, and after saving it shows the actual per-team score sheet inline
 // (view/print PDF) instead of just a toast.
+//
+// Battle of Stars (isStars) keeps its existing rules untouched. Fly Smart Cup
+// (drone) uses its OWN, independent rule set (client/src/lib/flySmartCupScoring.js)
+// — goals/score only, no Meteor Tower/Direct Win/Task Score/Retry.
 export default function RefereeCombatMatchScore({ format }) {
   const isStars = format === 'combat_stars';
   const { competitionId, contentId, matchId } = useParams();
@@ -45,6 +54,12 @@ export default function RefereeCombatMatchScore({ format }) {
   const [success, setSuccess] = useState(false);
   const [savedMatch, setSavedMatch] = useState(null);
   const [exporting, setExporting] = useState(false);
+
+  // ── Match Status (Fly Smart Cup only) — Cancel Match / Disqualify a Team ──
+  const [statusAction, setStatusAction] = useState(null); // 'cancel' | 'disqualify' | null
+  const [statusReason, setStatusReason] = useState('');
+  const [disqualifiedSide, setDisqualifiedSide] = useState('A');
+  const [statusSaving, setStatusSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +92,15 @@ export default function RefereeCombatMatchScore({ format }) {
       };
       const teamMembersA = d.teamMembersA || rosterNames(m.team_a_id);
       const teamMembersB = d.teamMembersB || rosterNames(m.team_b_id);
+      const commonFields = {
+        teamMembersA, teamMembersB,
+        studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
+        refereeSignature: d.refereeSignature || user?.fullName || user?.username || '',
+        refereeSigImage: d.refereeSignatureImage || '',
+        headRefereeName: d.headRefereeName || 'Mr Ly Quang Van',
+        scorekeeperName: d.scorekeeperName || user?.fullName || user?.username || '',
+        remarks: d.remarks || '', objection: d.objection || '',
+      };
 
       if (isStars) {
         setForm({
@@ -88,35 +112,22 @@ export default function RefereeCombatMatchScore({ format }) {
           pointsLostA: d.pointsLostA ?? 0, pointsLostB: d.pointsLostB ?? 0,
           durationA: d.durationA ?? '', durationB: d.durationB ?? '',
           division: d.division || '',
-          teamMembersA, teamMembersB,
-          studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
-          refereeSignature: d.refereeSignature || user?.fullName || user?.username || '',
-          refereeSigImage: d.refereeSignatureImage || '',
-          headRefereeName: d.headRefereeName || 'Mr Ly Quang Van',
-          scorekeeperName: d.scorekeeperName || user?.fullName || user?.username || '',
-          remarks: d.remarks || '', objection: d.objection || '',
+          ...commonFields,
         });
       } else {
         setForm({
           division: d.division || '',
           firstHalfA: d.firstHalfA ?? 0, firstHalfB: d.firstHalfB ?? 0,
           secondHalfA: d.secondHalfA ?? 0, secondHalfB: d.secondHalfB ?? 0,
-          penaltyShootout: !!d.penaltyShootout,
-          penaltyA: d.penaltyA?.length ? d.penaltyA : emptyPenalty(),
-          penaltyB: d.penaltyB?.length ? d.penaltyB : emptyPenalty(),
-          winner_id: m.winner_id || '', is_draw: !!m.is_draw,
-          teamMembersA, teamMembersB,
-          studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
-          refereeSignature: d.refereeSignature || user?.fullName || user?.username || '',
-          refereeSigImage: d.refereeSignatureImage || '',
-          headRefereeName: d.headRefereeName || 'Mr Ly Quang Van',
-          scorekeeperName: d.scorekeeperName || user?.fullName || user?.username || '',
-          remarks: d.remarks || '', objection: d.objection || '',
+          refereeAwardedA: d.refereeAwardedA ?? 0, refereeAwardedB: d.refereeAwardedB ?? 0,
+          refereeAwardedReasonA: d.refereeAwardedReasonA || '', refereeAwardedReasonB: d.refereeAwardedReasonB || '',
+          shootoutRounds: Array.isArray(d.shootoutRounds) ? d.shootoutRounds : [],
+          ...commonFields,
         });
       }
-      // Match already has a result (re-editing) — skip straight to scoring,
-      // don't force another "Start" click.
-      if (m.winner_id || m.is_draw) setEntered(true);
+      // Match already has a result / is past "scheduled" (re-editing) — skip
+      // straight to scoring, don't force another "Start" click.
+      if (m.winner_id || m.is_draw || (m.status && m.status !== 'scheduled')) setEntered(true);
     }).catch(() => { if (!cancelled) setNotFound(true); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [contentId, matchId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -141,9 +152,14 @@ export default function RefereeCombatMatchScore({ format }) {
     setStartedAt(new Date().toISOString());
     setIsTimerRunning(true);
     setEntered(true);
+    // Fly Smart Cup: match lifecycle status (mục 2/13 luật) — Battle of Stars
+    // không dùng status nên không đụng tới để không ảnh hưởng module đó.
+    if (!isStars && match?.status === 'scheduled') {
+      api.putCombatMatch(match.id, { status: 'live' }).catch(() => {});
+    }
   };
 
-  // ── Battle of Stars: live score & result ──
+  // ── Battle of Stars: live score & result (KHÔNG đổi) ──
   const sideData = (side) => ({
     meteorCompleted: side === 'A' ? form.meteorCompletedA : form.meteorCompletedB,
     energyBlocks: side === 'A' ? form.energyBlocksA : form.energyBlocksB,
@@ -170,11 +186,56 @@ export default function RefereeCombatMatchScore({ format }) {
       : `${match?.team_b?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`
   ) : '';
 
-  // ── Fly Smart Cup: round 1+2 total (live) ──
-  const droneTotalA = !isStars ? (Number(form.firstHalfA) || 0) + (Number(form.secondHalfA) || 0) : 0;
-  const droneTotalB = !isStars ? (Number(form.firstHalfB) || 0) + (Number(form.secondHalfB) || 0) : 0;
+  // ── Fly Smart Cup: live score & result — independent rules, no relation to Battle of Stars ──
+  const droneSideA = () => ({ half1: form.firstHalfA, half2: form.secondHalfA, refereeAwarded: form.refereeAwardedA });
+  const droneSideB = () => ({ half1: form.firstHalfB, half2: form.secondHalfB, refereeAwarded: form.refereeAwardedB });
+  const droneScoreA = !isStars ? computeSideScore(droneSideA()) : null;
+  const droneScoreB = !isStars ? computeSideScore(droneSideB()) : null;
+  const isKnockout = !isStars && !match?.group_label;
+  const droneTied = !isStars && droneScoreA.total === droneScoreB.total;
+  const droneOutcome = !isStars
+    ? (isKnockout ? determineKnockoutResult(droneSideA(), droneSideB(), form.shootoutRounds) : determineDroneGroupResult(droneSideA(), droneSideB()))
+    : null;
+  const shootoutWinnerInfo = !isStars && isKnockout ? resolveShootoutWinner(form.shootoutRounds) : { winner: null };
 
-  const gotoStep2 = () => { setIsTimerRunning(false); setStep(2); };
+  const droneResultText = () => {
+    if (!match) return '';
+    if (isKnockout) {
+      if (droneOutcome.result === 'A') return `${match.team_a?.name} advances (${droneScoreA.total} - ${droneScoreB.total})${droneOutcome.shootoutNeeded ? ' — decided by Penalty Shootout' : ''}`;
+      if (droneOutcome.result === 'B') return `${match.team_b?.name} advances (${droneScoreA.total} - ${droneScoreB.total})${droneOutcome.shootoutNeeded ? ' — decided by Penalty Shootout' : ''}`;
+      return `Tied ${droneScoreA.total} - ${droneScoreB.total} — Penalty Shootout required`;
+    }
+    if (droneOutcome.result === 'DRAW') return `Draw (${droneScoreA.total} - ${droneScoreB.total}) — 1 Match Point each`;
+    if (droneOutcome.result === 'A') return `${match.team_a?.name} wins (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`;
+    return `${match.team_b?.name} wins (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`;
+  };
+
+  const startShootout = () => setForm((f) => ({ ...f, shootoutRounds: [1, 2, 3].map(newShootoutRound) }));
+  const addShootoutRound = () => setForm((f) => ({ ...f, shootoutRounds: [...f.shootoutRounds, newShootoutRound(f.shootoutRounds.length + 1)] }));
+  const updateShootoutRound = (idx, patch) => setForm((f) => {
+    const rounds = [...f.shootoutRounds];
+    rounds[idx] = { ...rounds[idx], ...patch };
+    return { ...f, shootoutRounds: rounds };
+  });
+
+  const gotoStep2 = () => {
+    if (!isStars) {
+      if (isKnockout && droneTied && !shootoutWinnerInfo.winner) {
+        showAlert('Penalty Shootout is not resolved yet — add rounds until there is a winner.', 'error');
+        return;
+      }
+      if ((Number(form.refereeAwardedA) || 0) > 0 && !String(form.refereeAwardedReasonA || '').trim()) {
+        showAlert('A reason is required for Red Referee Awarded Points.', 'error');
+        return;
+      }
+      if ((Number(form.refereeAwardedB) || 0) > 0 && !String(form.refereeAwardedReasonB || '').trim()) {
+        showAlert('A reason is required for Blue Referee Awarded Points.', 'error');
+        return;
+      }
+    }
+    setIsTimerRunning(false);
+    setStep(2);
+  };
 
   const handleSubmit = async () => {
     if (!form.studentSigImageA || !form.studentSigImageB || !form.refereeSigImage) {
@@ -215,11 +276,15 @@ export default function RefereeCombatMatchScore({ format }) {
       } else {
         const details = {
           division: form.division || null,
-          firstHalfA: Number(form.firstHalfA) || 0, firstHalfB: Number(form.firstHalfB) || 0,
-          secondHalfA: Number(form.secondHalfA) || 0, secondHalfB: Number(form.secondHalfB) || 0,
-          penaltyShootout: !!form.penaltyShootout,
-          penaltyA: form.penaltyShootout ? form.penaltyA : [],
-          penaltyB: form.penaltyShootout ? form.penaltyB : [],
+          firstHalfA: Math.max(0, Number(form.firstHalfA) || 0), firstHalfB: Math.max(0, Number(form.firstHalfB) || 0),
+          secondHalfA: Math.max(0, Number(form.secondHalfA) || 0), secondHalfB: Math.max(0, Number(form.secondHalfB) || 0),
+          refereeAwardedA: Math.max(0, Number(form.refereeAwardedA) || 0), refereeAwardedB: Math.max(0, Number(form.refereeAwardedB) || 0),
+          refereeAwardedReasonA: form.refereeAwardedReasonA || null, refereeAwardedReasonB: form.refereeAwardedReasonB || null,
+          shootoutRounds: (form.shootoutRounds || []).map((r) => ({
+            roundNo: r.roundNo,
+            aSuccess: !!r.aSuccess, aTimeSeconds: r.aSuccess ? (Number(r.aTimeSeconds) || null) : null,
+            bSuccess: !!r.bSuccess, bTimeSeconds: r.bSuccess ? (Number(r.bTimeSeconds) || null) : null,
+          })),
           teamMembersA: form.teamMembersA || null, teamMembersB: form.teamMembersB || null,
           studentSignatureImageA: form.studentSigImageA || null, studentSignatureImageB: form.studentSigImageB || null,
           refereeSignature: form.refereeSignature || null,
@@ -228,21 +293,46 @@ export default function RefereeCombatMatchScore({ format }) {
           scorekeeperName: form.scorekeeperName || null,
           remarks: form.remarks || null, objection: form.objection || null,
         };
+        const outcome = isKnockout
+          ? determineKnockoutResult(droneSideA(), droneSideB(), details.shootoutRounds)
+          : determineDroneGroupResult(droneSideA(), droneSideB());
         body = {
           details,
-          winner_id: form.is_draw ? null : (form.winner_id || null),
-          is_draw: !!form.is_draw,
+          winner_id: outcome.result === 'A' ? match.team_a_id : outcome.result === 'B' ? match.team_b_id : null,
+          is_draw: !isKnockout && outcome.result === 'DRAW',
         };
       }
       await api.putCombatMatch(match.id, body);
       // The PUT response doesn't include nested team_a/team_b/boards (only the
       // GET list joins those) — merge into the match we already have loaded.
-      setSavedMatch({ ...match, details: body.details, winner_id: body.winner_id, is_draw: body.is_draw });
+      setSavedMatch({ ...match, details: body.details, winner_id: body.winner_id, is_draw: body.is_draw, status: 'completed' });
       setSuccess(true);
     } catch (e) {
       showAlert(e.message || 'Failed to save.', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const submitStatusAction = async () => {
+    if (!statusReason.trim()) { showAlert('A reason is required.', 'error'); return; }
+    setStatusSaving(true);
+    try {
+      const status = statusAction === 'cancel' ? 'cancelled' : 'disqualified';
+      const details = {
+        ...(match.details || {}),
+        division: form.division || null,
+        disqualifiedTeam: statusAction === 'disqualify' ? disqualifiedSide : null,
+        disqualificationReason: statusReason,
+      };
+      await api.putCombatMatch(match.id, { status, details });
+      showAlert(`Match marked as ${status}.`, 'success');
+      setStatusAction(null);
+      navigate(listUrl);
+    } catch (e) {
+      showAlert(e.message || 'Failed to update match status.', 'error');
+    } finally {
+      setStatusSaving(false);
     }
   };
 
@@ -335,13 +425,14 @@ export default function RefereeCombatMatchScore({ format }) {
             {match.team_a?.name || '—'} <span style={{ color: '#64748b', fontWeight: 400 }}>vs</span> {match.team_b?.name || '—'}
             {match.stage && <span className="ts-board-chip">{match.stage}</span>}
             {match.group_label && <span className="ts-board-chip">{match.group_label}</span>}
+            {!isStars && match.status && match.status !== 'scheduled' && <span className="ts-board-chip">{match.status.toUpperCase()}</span>}
           </div>
           <div className="ts-content-name">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'} — Combat</div>
         </div>
         <div className="ts-header-score">
           <div className="ts-score-label">LIVE SCORE</div>
           <div className="ts-score-value" style={{ fontSize: 20 }}>
-            {isStars ? `${scoreA.taskScore} - ${scoreB.taskScore}` : `${droneTotalA} - ${droneTotalB}`}
+            {isStars ? `${scoreA.taskScore} - ${scoreB.taskScore}` : `${droneScoreA.total} - ${droneScoreB.total}`}
           </div>
         </div>
       </header>
@@ -387,12 +478,47 @@ export default function RefereeCombatMatchScore({ format }) {
                 </div>
               ) : (
                 <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#4ade80' }}>
-                  {form.is_draw ? `Draw (${droneTotalA} - ${droneTotalB})`
-                    : form.winner_id ? `${form.winner_id === match.team_a_id ? match.team_a?.name : match.team_b?.name} wins (${droneTotalA} - ${droneTotalB})`
-                    : `No winner selected yet (${droneTotalA} - ${droneTotalB})`}
+                  {droneResultText()}
                 </div>
               )}
             </div>
+
+            {!isStars && (
+              <div className="ts-card ts-sidebar-card" style={{ marginTop: 12 }}>
+                <div className="ts-sidebar-title">MATCH STATUS</div>
+                <div style={{ marginBottom: 10 }}>
+                  <span className="rt-badge">{(match.status || 'scheduled').toUpperCase()}</span>
+                </div>
+                {match.status !== 'cancelled' && match.status !== 'disqualified' && !statusAction && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('cancel'); setStatusReason(''); }}>Cancel Match</button>
+                    <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('disqualify'); setStatusReason(''); setDisqualifiedSide('A'); }}>Disqualify a Team</button>
+                  </div>
+                )}
+                {(match.status === 'cancelled' || match.status === 'disqualified') && (
+                  <p style={{ fontSize: 12, color: '#f87171' }}>
+                    {match.details?.disqualificationReason || 'This match was closed without a normal result.'}
+                  </p>
+                )}
+                {statusAction && (
+                  <div style={{ marginTop: 6, padding: 10, background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>
+                    {statusAction === 'disqualify' && (
+                      <select className="form-input form-select" value={disqualifiedSide} onChange={(e) => setDisqualifiedSide(e.target.value)} style={{ marginBottom: 6 }}>
+                        <option value="A">{match.team_a?.name} (Red)</option>
+                        <option value="B">{match.team_b?.name} (Blue)</option>
+                      </select>
+                    )}
+                    <textarea className="form-input" rows={2} placeholder="Reason (required)" value={statusReason} onChange={(e) => setStatusReason(e.target.value)} />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStatusAction(null)} disabled={statusSaving}>Back</button>
+                      <button type="button" className="ts-btn ts-btn-primary" onClick={submitStatusAction} disabled={statusSaving}>
+                        {statusSaving ? 'Saving...' : statusAction === 'cancel' ? 'Confirm Cancel' : 'Confirm Disqualify'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </aside>
 
           <main>
@@ -522,68 +648,82 @@ export default function RefereeCombatMatchScore({ format }) {
                       </thead>
                       <tbody>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Round 1</td>
+                          <td style={{ fontSize: 13 }}>Half 1</td>
                           <td style={{ textAlign: 'center' }}>
-                            <input type="number" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfA} onChange={(e) => setForm({ ...form, firstHalfA: e.target.value })} />
+                            <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfA} onChange={(e) => setForm({ ...form, firstHalfA: e.target.value })} />
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <input type="number" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfB} onChange={(e) => setForm({ ...form, firstHalfB: e.target.value })} />
+                            <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfB} onChange={(e) => setForm({ ...form, firstHalfB: e.target.value })} />
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Round 2</td>
+                          <td style={{ fontSize: 13 }}>Half 2</td>
                           <td style={{ textAlign: 'center' }}>
-                            <input type="number" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfA} onChange={(e) => setForm({ ...form, secondHalfA: e.target.value })} />
+                            <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfA} onChange={(e) => setForm({ ...form, secondHalfA: e.target.value })} />
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <input type="number" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfB} onChange={(e) => setForm({ ...form, secondHalfB: e.target.value })} />
+                            <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfB} onChange={(e) => setForm({ ...form, secondHalfB: e.target.value })} />
+                          </td>
+                        </tr>
+                        <tr>
+                          <td style={{ fontSize: 13 }}>Referee Awarded Points <span style={{ color: '#94a3b8' }}>(mục 12 — cần lý do)</span></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.refereeAwardedA} onChange={(e) => setForm({ ...form, refereeAwardedA: e.target.value })} />
+                            {(Number(form.refereeAwardedA) || 0) > 0 && (
+                              <input type="text" className="form-input" style={{ marginTop: 4, fontSize: 12 }} placeholder="Reason"
+                                value={form.refereeAwardedReasonA} onChange={(e) => setForm({ ...form, refereeAwardedReasonA: e.target.value })} />
+                            )}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.refereeAwardedB} onChange={(e) => setForm({ ...form, refereeAwardedB: e.target.value })} />
+                            {(Number(form.refereeAwardedB) || 0) > 0 && (
+                              <input type="text" className="form-input" style={{ marginTop: 4, fontSize: 12 }} placeholder="Reason"
+                                value={form.refereeAwardedReasonB} onChange={(e) => setForm({ ...form, refereeAwardedReasonB: e.target.value })} />
+                            )}
                           </td>
                         </tr>
                         <tr style={{ fontWeight: 700 }}>
-                          <td style={{ fontSize: 13 }}>Total score</td>
-                          <td style={{ textAlign: 'center' }}>{droneTotalA}</td>
-                          <td style={{ textAlign: 'center' }}>{droneTotalB}</td>
+                          <td style={{ fontSize: 13 }}>Total Score</td>
+                          <td style={{ textAlign: 'center' }}>{droneScoreA.total}</td>
+                          <td style={{ textAlign: 'center' }}>{droneScoreB.total}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
 
-                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
-                    <input type="checkbox" checked={form.penaltyShootout} onChange={(e) => setForm({ ...form, penaltyShootout: e.target.checked })} style={{ width: 'auto' }} />
-                    Penalty Shootout
-                  </label>
-
-                  {form.penaltyShootout && (
-                    <div style={{ padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 10, marginTop: 8 }}>
-                      {[0, 1, 2].map((i) => (
-                        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                          <input type="number" className="form-input" placeholder={`Red — round ${i + 1} score`} value={form.penaltyA[i]?.score ?? ''}
-                            onChange={(e) => setForm((f) => { const a = [...f.penaltyA]; a[i] = { ...a[i], score: e.target.value }; return { ...f, penaltyA: a }; })} />
-                          <input type="text" className="form-input" placeholder="Time" value={form.penaltyA[i]?.time ?? ''}
-                            onChange={(e) => setForm((f) => { const a = [...f.penaltyA]; a[i] = { ...a[i], time: e.target.value }; return { ...f, penaltyA: a }; })} />
-                          <input type="number" className="form-input" placeholder={`Blue — round ${i + 1} score`} value={form.penaltyB[i]?.score ?? ''}
-                            onChange={(e) => setForm((f) => { const b = [...f.penaltyB]; b[i] = { ...b[i], score: e.target.value }; return { ...f, penaltyB: b }; })} />
-                          <input type="text" className="form-input" placeholder="Time" value={form.penaltyB[i]?.time ?? ''}
-                            onChange={(e) => setForm((f) => { const b = [...f.penaltyB]; b[i] = { ...b[i], time: e.target.value }; return { ...f, penaltyB: b }; })} />
-                        </div>
-                      ))}
+                  {isKnockout && droneTied && (
+                    <div style={{ marginTop: 20, padding: 16, border: '1px solid rgba(239,68,68,0.35)', borderRadius: 12, background: 'rgba(239,68,68,0.06)' }}>
+                      <h4 style={{ margin: '0 0 8px', color: '#f87171' }}>PENALTY SHOOTOUT — scores tied {droneScoreA.total} - {droneScoreB.total}</h4>
+                      {form.shootoutRounds.length === 0 ? (
+                        <button type="button" className="ts-btn ts-btn-primary" onClick={startShootout}>Start Penalty Shootout</button>
+                      ) : (
+                        <>
+                          {form.shootoutRounds.map((r, idx) => (
+                            <div key={r.roundNo} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+                              <strong style={{ width: 70 }}>Round {r.roundNo}</strong>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateShootoutRound(idx, { aSuccess: e.target.checked })} /> Red scored
+                              </label>
+                              <input type="number" className="form-input" style={{ width: 90 }} placeholder="sec" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
+                                disabled={!r.aSuccess} value={r.aTimeSeconds} onChange={(e) => updateShootoutRound(idx, { aTimeSeconds: e.target.value })} />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateShootoutRound(idx, { bSuccess: e.target.checked })} /> Blue scored
+                              </label>
+                              <input type="number" className="form-input" style={{ width: 90 }} placeholder="sec" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
+                                disabled={!r.bSuccess} value={r.bTimeSeconds} onChange={(e) => updateShootoutRound(idx, { bTimeSeconds: e.target.value })} />
+                            </div>
+                          ))}
+                          {shootoutWinnerInfo.winner ? (
+                            <p style={{ color: '#4ade80', fontWeight: 700 }}>
+                              Shootout winner: {shootoutWinnerInfo.winner === 'A' ? match.team_a?.name : match.team_b?.name} (Round {shootoutWinnerInfo.decidingRound})
+                            </p>
+                          ) : (
+                            <button type="button" className="ts-btn ts-btn-secondary" onClick={addShootoutRound}>+ Add Round</button>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
-
-                  <div className="ts-bigbtns-container" style={{ gridTemplateColumns: '1fr 1fr auto', marginTop: 16 }}>
-                    <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${form.winner_id === match.team_a_id && !form.is_draw ? 'selected' : ''}`}
-                      onClick={() => setForm({ ...form, winner_id: match.team_a_id, is_draw: false })}>
-                      {match.team_a?.name} wins
-                    </button>
-                    <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${form.winner_id === match.team_b_id && !form.is_draw ? 'selected' : ''}`}
-                      onClick={() => setForm({ ...form, winner_id: match.team_b_id, is_draw: false })}>
-                      {match.team_b?.name} wins
-                    </button>
-                    <button type="button" className={`ts-bigbtn ts-bigbtn-fail ${form.is_draw ? 'selected' : ''}`}
-                      onClick={() => setForm({ ...form, is_draw: true, winner_id: '' })}>
-                      Draw
-                    </button>
-                  </div>
                 </>
               )}
 
@@ -609,7 +749,11 @@ export default function RefereeCombatMatchScore({ format }) {
             <div className="ts-sheet-total-badge">
               <span className="ts-st-label">RESULT</span>
               <span className="ts-st-val" style={{ fontSize: 16 }}>
-                {isStars ? starsResultText : (form.is_draw ? 'Draw' : form.winner_id ? (form.winner_id === match.team_a_id ? match.team_a?.name : match.team_b?.name) : '—')}
+                {isStars
+                  ? starsResultText
+                  : (isKnockout
+                    ? (droneOutcome.result === 'A' ? match.team_a?.name : droneOutcome.result === 'B' ? match.team_b?.name : 'Pending shootout')
+                    : (droneOutcome.result === 'DRAW' ? 'Draw' : droneOutcome.result === 'A' ? match.team_a?.name : match.team_b?.name))}
               </span>
             </div>
           </div>

@@ -8,6 +8,7 @@ const multer = require('multer');
 const { query, withTransaction } = require('./db.cjs');
 const { requireAuth, requireAdmin } = require('./auth.cjs');
 const battleScoring = require('./battleScoring.cjs');
+const flySmartCup = require('./flySmartCup.cjs');
 
 const router = express.Router();
 
@@ -1146,8 +1147,9 @@ router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
 const COMBAT_MATCH_FIELDS = [
   'board_id', 'field_id', 'stage', 'group_label', 'match_no',
   'team_a_id', 'team_b_id', 'team_a_no', 'team_b_no',
-  'winner_id', 'is_draw', 'details', 'notes',
+  'winner_id', 'is_draw', 'details', 'notes', 'status',
 ];
+const COMBAT_MATCH_RESTRICTED_STATUSES = ['cancelled', 'disqualified'];
 
 router.post('/contents/:contentId/combat-matches', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, COMBAT_MATCH_FIELDS);
@@ -1189,7 +1191,6 @@ router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
   // Battle of Stars: winner_id/is_draw PHẢI do server tính lại từ `details`
   // theo đúng luật (mục 10: không cho sửa logic scoring ở phía client để làm
   // sai kết quả) — bỏ qua hoàn toàn winner_id/is_draw client gửi lên.
-  // Fly Smart Cup (combat_drone) giữ nguyên hành vi cũ (tin client).
   if (match.content_format === 'combat_stars' && data.details !== undefined) {
     const validationError = battleScoring.validateDetails(data.details);
     if (validationError) return res.status(400).json({ error: validationError });
@@ -1199,6 +1200,37 @@ router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
     const resolved = battleScoring.resolveMatchResult({ details: data.details, groupLabel, teamAId, teamBId });
     data.winner_id = resolved.winner_id;
     data.is_draw = resolved.is_draw;
+  }
+
+  // Fly Smart Cup: cùng nguyên tắc — winner_id/is_draw/status PHẢI do server
+  // tính lại từ `details` theo luật riêng của Fly Smart Cup (mục 3-11), KHÔNG
+  // dùng bất kỳ logic nào của Battle of Stars (mục 19). Vòng sơ loại luôn
+  // phân định được thắng/thua/hòa từ Total Score; Knockout bằng điểm phải chờ
+  // Penalty Shootout mới có kết quả (mục 9-10).
+  if (match.content_format === 'combat_drone' && data.details !== undefined) {
+    const validationError = flySmartCup.validateDetails(data.details);
+    if (validationError) return res.status(400).json({ error: validationError });
+    const groupLabel = data.group_label !== undefined ? data.group_label : match.group_label;
+    const teamAId = data.team_a_id !== undefined ? data.team_a_id : match.team_a_id;
+    const teamBId = data.team_b_id !== undefined ? data.team_b_id : match.team_b_id;
+    const requestedStatus = data.status !== undefined ? data.status : match.status;
+    const resolved = flySmartCup.resolveMatchResult({
+      details: data.details, groupLabel, teamAId, teamBId,
+      currentStatus: requestedStatus,
+    });
+    data.winner_id = resolved.winner_id;
+    data.is_draw = resolved.is_draw;
+    // Cancelled/Disqualified do client chủ động chọn được GIỮ NGUYÊN — không
+    // để việc tính lại kết quả từ details ghi đè lại thành completed (mục 13:
+    // trận bị hủy không phải trận bình thường có tỷ số).
+    if (!(data.status && COMBAT_MATCH_RESTRICTED_STATUSES.includes(data.status))) {
+      data.status = resolved.status;
+    }
+  }
+  // Trận bị hủy/truất quyền không được coi là có kết quả thật (mục 13).
+  if (data.status && COMBAT_MATCH_RESTRICTED_STATUSES.includes(data.status)) {
+    data.winner_id = null;
+    data.is_draw = false;
   }
 
   if (data.details !== undefined) data.details = JSON.stringify(data.details ?? {});

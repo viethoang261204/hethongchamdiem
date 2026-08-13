@@ -13,6 +13,12 @@ import {
   ENERGY_BLOCK_MAX, FIREPOWER_BALL_MAX, ENERGY_BLOCK_SCORE, FIREPOWER_BALL_SCORE, METEOR_TOWER_SCORE,
   computeTaskScore, determineGroupMatchResult, determineFinalsMatchResult, computeGroupStandings, generateRoundRobin,
 } from '../../lib/battleScoring';
+import {
+  PENALTY_MAX_SECONDS, computeSideScore,
+  determineGroupMatchResult as determineDroneGroupResult,
+  determineKnockoutResult, resolveShootoutWinner,
+  computeGroupStandings as computeDroneGroupStandings,
+} from '../../lib/flySmartCupScoring';
 import './AdminLayout.css';
 
 const CONTENT_FORMAT_LABEL = {
@@ -20,25 +26,9 @@ const CONTENT_FORMAT_LABEL = {
   combat_stars: 'Đối kháng — Battle of Stars',
 };
 
-// Quy ước dùng cho bảng xếp hạng vòng bảng (Appendix II) của Fly Smart Cup
-// (combat_drone) — không có trong ảnh mẫu, có thể chỉnh nếu cần: thắng = 3,
-// hòa = 1, thua = 0; "Highest Points" = tổng điểm số thực ghi được (tie-break
-// phụ khi bằng điểm). KHÔNG áp dụng cho Battle of Stars (combat_stars) —
-// Battle of Stars dùng logic riêng trong client/src/lib/battleScoring.js theo
-// đúng luật ENJOY AI 2026.
-const WIN_POINTS = 3, DRAW_POINTS = 1, LOSS_POINTS = 0;
-
-// Chỉ dùng cho combat_drone (Fly Smart Cup) — điểm 1 trận = tổng hiệp 1 + hiệp 2.
-function matchPoints(match) {
-  const d = match.details || {};
-  return {
-    a: (Number(d.firstHalfA) || 0) + (Number(d.secondHalfA) || 0),
-    b: (Number(d.firstHalfB) || 0) + (Number(d.secondHalfB) || 0),
-  };
-}
-
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
+const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: '', bSuccess: false, bTimeSeconds: '' });
 
 export default function AdminCombatMatches() {
   const { showConfirm, showAlert } = useNotify();
@@ -89,6 +79,10 @@ export default function AdminCombatMatches() {
   const [generatingGroup, setGeneratingGroup] = useState(null);
   const [groupDivModal, setGroupDivModal] = useState(null); // { count } khi mở modal Phân chia bảng
   const [dividingGroups, setDividingGroups] = useState(false);
+  const [statusAction, setStatusAction] = useState(null); // 'cancel' | 'disqualify' | null
+  const [statusReason, setStatusReason] = useState('');
+  const [disqualifiedSide, setDisqualifiedSide] = useState('A');
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const isStars = selectedContent?.content_format === 'combat_stars';
   const isDrone = selectedContent?.content_format === 'combat_drone';
@@ -218,6 +212,8 @@ export default function AdminCombatMatches() {
   const openDetail = (m) => {
     const d = m.details || {};
     setDetailModal(m);
+    setStatusAction(null);
+    setStatusReason('');
     if (isStars) {
       setDetailForm({
         meteorCompletedA: !!d.meteorCompletedA, meteorCompletedB: !!d.meteorCompletedB,
@@ -235,10 +231,9 @@ export default function AdminCombatMatches() {
         division: d.division || '',
         firstHalfA: d.firstHalfA ?? 0, firstHalfB: d.firstHalfB ?? 0,
         secondHalfA: d.secondHalfA ?? 0, secondHalfB: d.secondHalfB ?? 0,
-        penaltyShootout: !!d.penaltyShootout,
-        penaltyA: d.penaltyA?.length ? d.penaltyA : [{ score: '', time: '' }, { score: '', time: '' }, { score: '', time: '' }],
-        penaltyB: d.penaltyB?.length ? d.penaltyB : [{ score: '', time: '' }, { score: '', time: '' }, { score: '', time: '' }],
-        winner_id: m.winner_id || '', is_draw: !!m.is_draw,
+        refereeAwardedA: d.refereeAwardedA ?? 0, refereeAwardedB: d.refereeAwardedB ?? 0,
+        refereeAwardedReasonA: d.refereeAwardedReasonA || '', refereeAwardedReasonB: d.refereeAwardedReasonB || '',
+        shootoutRounds: Array.isArray(d.shootoutRounds) ? d.shootoutRounds : [],
         ...confirmFieldsFrom(d),
       });
     }
@@ -288,17 +283,31 @@ export default function AdminCombatMatches() {
         winner_id = result === 'A' ? detailModal.team_a_id : result === 'B' ? detailModal.team_b_id : null;
         is_draw = result === 'DRAW';
       } else {
+        // Fly Smart Cup — điểm & kết quả tính tự động từ Total Score (mục 3-9
+        // luật), KHÔNG dùng logic Battle of Stars. Vòng sơ loại (group_label
+        // có giá trị) luôn phân định W/D/L; Knockout (group_label rỗng) bằng
+        // điểm phải chờ Penalty Shootout mới có kết quả.
         details = {
           division: detailForm.division || null,
-          firstHalfA: Number(detailForm.firstHalfA) || 0, firstHalfB: Number(detailForm.firstHalfB) || 0,
-          secondHalfA: Number(detailForm.secondHalfA) || 0, secondHalfB: Number(detailForm.secondHalfB) || 0,
-          penaltyShootout: !!detailForm.penaltyShootout,
-          penaltyA: detailForm.penaltyShootout ? detailForm.penaltyA : [],
-          penaltyB: detailForm.penaltyShootout ? detailForm.penaltyB : [],
+          firstHalfA: Math.max(0, Number(detailForm.firstHalfA) || 0), firstHalfB: Math.max(0, Number(detailForm.firstHalfB) || 0),
+          secondHalfA: Math.max(0, Number(detailForm.secondHalfA) || 0), secondHalfB: Math.max(0, Number(detailForm.secondHalfB) || 0),
+          refereeAwardedA: Math.max(0, Number(detailForm.refereeAwardedA) || 0), refereeAwardedB: Math.max(0, Number(detailForm.refereeAwardedB) || 0),
+          refereeAwardedReasonA: detailForm.refereeAwardedReasonA || null, refereeAwardedReasonB: detailForm.refereeAwardedReasonB || null,
+          shootoutRounds: (detailForm.shootoutRounds || []).map((r) => ({
+            roundNo: r.roundNo,
+            aSuccess: !!r.aSuccess, aTimeSeconds: r.aSuccess ? (Number(r.aTimeSeconds) || null) : null,
+            bSuccess: !!r.bSuccess, bTimeSeconds: r.bSuccess ? (Number(r.bTimeSeconds) || null) : null,
+          })),
           ...confirmFields,
         };
-        winner_id = detailForm.is_draw ? null : (detailForm.winner_id || null);
-        is_draw = !!detailForm.is_draw;
+        const droneSideA = { half1: details.firstHalfA, half2: details.secondHalfA, refereeAwarded: details.refereeAwardedA };
+        const droneSideB = { half1: details.firstHalfB, half2: details.secondHalfB, refereeAwarded: details.refereeAwardedB };
+        const isKnockout = !detailModal.group_label;
+        const outcome = isKnockout
+          ? determineKnockoutResult(droneSideA, droneSideB, details.shootoutRounds)
+          : determineDroneGroupResult(droneSideA, droneSideB);
+        winner_id = outcome.result === 'A' ? detailModal.team_a_id : outcome.result === 'B' ? detailModal.team_b_id : null;
+        is_draw = !isKnockout && outcome.result === 'DRAW';
       }
       await api.putCombatMatch(detailModal.id, { details, winner_id, is_draw });
       setDetailModal(null);
@@ -308,6 +317,39 @@ export default function AdminCombatMatches() {
       showAlert(e.message || 'Lỗi', 'error');
     }
   };
+
+  // ── Match Status (Fly Smart Cup) — Hủy trận / Truất quyền một đội (mục 13) ──
+  const submitStatusAction = async () => {
+    if (!detailModal) return;
+    if (!statusReason.trim()) { showAlert('Cần nhập lý do.', 'error'); return; }
+    setStatusSaving(true);
+    try {
+      const status = statusAction === 'cancel' ? 'cancelled' : 'disqualified';
+      const details = {
+        ...(detailModal.details || {}),
+        division: detailForm.division || null,
+        disqualifiedTeam: statusAction === 'disqualify' ? disqualifiedSide : null,
+        disqualificationReason: statusReason,
+      };
+      await api.putCombatMatch(detailModal.id, { status, details });
+      showAlert(`Đã đặt trạng thái trận: ${status}.`, 'success');
+      setStatusAction(null);
+      setDetailModal(null);
+      await reloadMatches();
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
+  const startDroneShootout = () => setDetailForm((f) => ({ ...f, shootoutRounds: [1, 2, 3].map(newShootoutRound) }));
+  const addDroneShootoutRound = () => setDetailForm((f) => ({ ...f, shootoutRounds: [...f.shootoutRounds, newShootoutRound(f.shootoutRounds.length + 1)] }));
+  const updateDroneShootoutRound = (idx, patch) => setDetailForm((f) => {
+    const rounds = [...f.shootoutRounds];
+    rounds[idx] = { ...rounds[idx], ...patch };
+    return { ...f, shootoutRounds: rounds };
+  });
 
   // ── Teams & Groups (Battle of Stars + Fly Smart Cup) — gán Group/Bảng đấu cho từng đội ──
   // Nhãn Group luôn theo mẫu "Group N" (số) — cho phép chọn tay từng đội vào
@@ -391,7 +433,7 @@ export default function AdminCombatMatches() {
   }, [isCombat, teams]);
 
   // ── Bảng xếp hạng vòng bảng — Battle of Stars: logic riêng theo đúng luật
-  // (xem client/src/lib/battleScoring.js). Fly Smart Cup: xem "groups" bên dưới.
+  // (xem client/src/lib/battleScoring.js). Fly Smart Cup: xem "droneGroups" bên dưới.
   const starsGroups = useMemo(() => {
     if (!isStars) return [];
     return teamGroups.map((g) => {
@@ -478,45 +520,30 @@ export default function AdminCombatMatches() {
     return Array.from(byStage.entries()).map(([stage, ms]) => ({ stage, matches: ms }));
   }, [isStars, matches]);
 
-  // ── Bảng xếp hạng vòng bảng Fly Smart Cup (combat_drone) — giữ nguyên như cũ ──
-  const groups = useMemo(() => {
+  // ── Bảng xếp hạng vòng bảng Fly Smart Cup (combat_drone) — luật riêng, xem
+  // client/src/lib/flySmartCupScoring.js (mục 6-8 luật: Match Points 3/1/0 →
+  // Total Score → Head-to-Head → Tie-break Required, KHÔNG dùng logic Battle
+  // of Stars/Highest Points cũ).
+  const droneGroups = useMemo(() => {
     if (isStars) return [];
-    const byGroup = new Map();
+    return teamGroups.map((g) => {
+      const groupMatches = matches.filter((m) => m.group_label === g.label);
+      return { label: g.label, teams: g.teams, standings: computeDroneGroupStandings(g.teams, groupMatches) };
+    });
+  }, [isStars, teamGroups, matches]);
+
+  // ── Finals (Knockout) — Fly Smart Cup, trận có group_label rỗng (mục 9) ──
+  const droneFinalsRounds = useMemo(() => {
+    if (isStars) return [];
+    const byStage = new Map();
     for (const m of matches) {
-      if (!m.group_label) continue;
-      if (!byGroup.has(m.group_label)) byGroup.set(m.group_label, []);
-      byGroup.get(m.group_label).push(m);
+      if (m.group_label) continue;
+      const key = m.stage || 'Chưa đặt tên vòng';
+      if (!byStage.has(key)) byStage.set(key, []);
+      byStage.get(key).push(m);
     }
-    const result = [];
-    for (const [label, groupMatches] of byGroup.entries()) {
-      if (groupMatches.length < 2) continue;
-      const teamIds = new Set();
-      for (const m of groupMatches) { if (m.team_a_id) teamIds.add(m.team_a_id); if (m.team_b_id) teamIds.add(m.team_b_id); }
-      const standings = Array.from(teamIds).map((tid) => {
-        const teamName = teams.find((t) => t.id === tid)?.name || groupMatches.find((m) => m.team_a_id === tid)?.team_a?.name
-          || groupMatches.find((m) => m.team_b_id === tid)?.team_b?.name || tid;
-        let points = 0, highestPoints = 0;
-        const vs = {};
-        for (const m of groupMatches) {
-          if (m.team_a_id !== tid && m.team_b_id !== tid) continue;
-          const isA = m.team_a_id === tid;
-          const oppId = isA ? m.team_b_id : m.team_a_id;
-          if (m.winner_id) points += m.winner_id === tid ? WIN_POINTS : LOSS_POINTS;
-          else if (m.is_draw) points += DRAW_POINTS;
-          const pts = matchPoints(m);
-          const myScore = pts ? (isA ? pts.a : pts.b) : null;
-          const oppScore = pts ? (isA ? pts.b : pts.a) : null;
-          if (myScore !== null) highestPoints += myScore;
-          if (oppId) vs[oppId] = pts ? `${myScore}:${oppScore}` : (m.winner_id === tid ? 'W' : m.winner_id === oppId ? 'L' : m.is_draw ? 'D' : '');
-        }
-        return { teamId: tid, teamName, points, highestPoints, vs };
-      });
-      standings.sort((a, b) => b.points - a.points || b.highestPoints - a.highestPoints);
-      standings.forEach((s, i) => { s.rank = i + 1; });
-      result.push({ label, teamIds: Array.from(teamIds), standings });
-    }
-    return result;
-  }, [matches, teams, isStars]);
+    return Array.from(byStage.entries()).map(([stage, ms]) => ({ stage, matches: ms }));
+  }, [isStars, matches]);
 
   // ── Xuất PDF ──
   const handleExportOne = async () => {
@@ -729,7 +756,9 @@ export default function AdminCombatMatches() {
                       <td>{m.team_a?.name || '-'}{m.team_a_no ? ` (No.${m.team_a_no})` : ''}</td>
                       <td>{m.team_b?.name || '-'}{m.team_b_no ? ` (No.${m.team_b_no})` : ''}</td>
                       <td style={{ fontSize: 13 }}>
-                        {m.is_draw ? 'Hòa' : m.winner_id ? `Thắng: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}` : 'Chưa có kết quả'}
+                        {m.status === 'cancelled' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Đã hủy</span>
+                          : m.status === 'disqualified' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Truất quyền</span>
+                          : m.is_draw ? 'Hòa' : m.winner_id ? `Thắng: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}` : 'Chưa có kết quả'}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -764,8 +793,8 @@ export default function AdminCombatMatches() {
             </div>
           )}
 
-          {/* ── E. Group Ranking ── */}
-          {!isStars && groups.map((g) => (
+          {/* ── E. Group Ranking (Fly Smart Cup) — mục 7-8 luật ── */}
+          {isDrone && droneGroups.map((g) => (
             <div className="card" key={g.label} style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <h3 className="card-title">Bảng xếp hạng — {g.label}</h3>
@@ -774,30 +803,46 @@ export default function AdminCombatMatches() {
                 <table>
                   <thead>
                     <tr>
-                      <th>Đội</th>
-                      {g.standings.map((s) => <th key={s.teamId} style={{ textAlign: 'center' }}>{s.teamName}</th>)}
-                      <th style={{ textAlign: 'center' }}>Points</th>
-                      <th style={{ textAlign: 'center' }}>Highest Points</th>
                       <th style={{ textAlign: 'center' }}>Rank</th>
+                      <th>Đội</th>
+                      <th style={{ textAlign: 'center' }}>Played</th>
+                      <th style={{ textAlign: 'center' }}>W</th>
+                      <th style={{ textAlign: 'center' }}>D</th>
+                      <th style={{ textAlign: 'center' }}>L</th>
+                      <th style={{ textAlign: 'center' }}>Match Points</th>
+                      <th style={{ textAlign: 'center' }}>Total Score</th>
+                      <th style={{ textAlign: 'center' }}>Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {g.standings.map((row) => (
                       <tr key={row.teamId}>
-                        <td style={{ fontWeight: 600 }}>{row.teamName}</td>
-                        {g.standings.map((opp) => (
-                          <td key={opp.teamId} style={{ textAlign: 'center' }}>
-                            {opp.teamId === row.teamId ? '—' : (row.vs[opp.teamId] || '')}
-                          </td>
-                        ))}
-                        <td style={{ textAlign: 'center' }}><strong>{row.points}</strong></td>
-                        <td style={{ textAlign: 'center' }}>{row.highestPoints}</td>
                         <td style={{ textAlign: 'center' }}><strong>{row.rank}</strong></td>
+                        <td style={{ fontWeight: 600 }}>
+                          {row.teamName}
+                          {row.headToHeadWinner && <span style={{ marginLeft: 6, fontSize: 11, color: '#16a34a', fontWeight: 700 }}>H2H</span>}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>{row.played}</td>
+                        <td style={{ textAlign: 'center' }}>{row.wins}</td>
+                        <td style={{ textAlign: 'center' }}>{row.draws}</td>
+                        <td style={{ textAlign: 'center' }}>{row.losses}</td>
+                        <td style={{ textAlign: 'center' }}><strong>{row.matchPoints}</strong></td>
+                        <td style={{ textAlign: 'center' }}>{row.totalScore}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          {row.tieBreakRequired
+                            ? <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 12 }}>TIE-BREAK REQUIRED</span>
+                            : <span style={{ color: '#16a34a', fontSize: 12 }}>OK</span>}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {g.standings.some((s) => s.tieBreakRequired) && (
+                <p style={{ fontSize: 12, color: '#dc2626', margin: '10px 0 0' }}>
+                  Các đội đánh dấu "TIE-BREAK REQUIRED" đang bằng nhau cả Match Points, Total Score (và Head-to-Head nếu chỉ 2 đội) — tạo thêm 1 trận giữa các đội này bằng nút "Thêm trận" (cùng chọn Group "{g.label}"), xếp hạng sẽ tự cập nhật sau khi nhập kết quả.
+                </p>
+              )}
             </div>
           ))}
 
@@ -879,6 +924,63 @@ export default function AdminCombatMatches() {
                                 {m.winner_id
                                   ? <strong style={{ color: '#16a34a' }}>Đi tiếp: {m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}</strong>
                                   : scored ? <span style={{ color: '#dc2626', fontWeight: 600 }}>TIE-BREAK — cần phân định thêm</span> : 'Chưa có kết quả'}
+                              </td>
+                              <td>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                  <button type="button" className="btn btn-secondary" onClick={() => openEditMatch(m)}>Sửa trận</button>
+                                  <button type="button" className="btn btn-secondary" onClick={() => openDetail(m)}>Nhập điểm</button>
+                                  <button type="button" className="btn btn-danger" onClick={() => removeMatch(m)}>Xóa</button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── F. Finals (Knockout) — Fly Smart Cup, mục 9-10 luật ── */}
+          {isDrone && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="page-header" style={{ marginBottom: 12 }}>
+                <div><h3 className="card-title">Finals (Knockout)</h3></div>
+                <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận Finals</button>
+              </div>
+              <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 12px' }}>
+                Tạo trận Finals bằng nút trên (để trống "Bảng vòng tròn", đặt tên vòng đấu ở "Vòng đấu" — vd Quarterfinal/Semifinal/Final). Không dùng Match Points 3/1/0 ở Knockout — bằng Total Score sẽ chuyển Penalty Shootout (mục 9-10 luật), không có kết quả Hòa.
+              </p>
+              {droneFinalsRounds.length === 0 ? (
+                <p style={{ color: '#888', padding: '8px 0' }}>Chưa có trận Finals nào.</p>
+              ) : droneFinalsRounds.map((r) => (
+                <div key={r.stage} style={{ marginBottom: 16 }}>
+                  <h4 style={{ marginBottom: 8, color: '#0f172a' }}>{r.stage}</h4>
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr><th>Đội Đỏ</th><th>Đội Xanh</th><th>Kết quả</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        {r.matches.map((m) => {
+                          const d = m.details || {};
+                          const scored = Object.prototype.hasOwnProperty.call(d, 'firstHalfA');
+                          const totalA = computeSideScore({ half1: d.firstHalfA, half2: d.secondHalfA, refereeAwarded: d.refereeAwardedA }).total;
+                          const totalB = computeSideScore({ half1: d.firstHalfB, half2: d.secondHalfB, refereeAwarded: d.refereeAwardedB }).total;
+                          const tied = scored && totalA === totalB;
+                          return (
+                            <tr key={m.id}>
+                              <td>{m.team_a?.name || '-'}</td>
+                              <td>{m.team_b?.name || '-'}</td>
+                              <td style={{ fontSize: 13 }}>
+                                {m.status === 'cancelled' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>CANCELLED</span>
+                                  : m.status === 'disqualified' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>DISQUALIFIED</span>
+                                  : m.winner_id
+                                  ? <strong style={{ color: '#16a34a' }}>Đi tiếp: {m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name} ({totalA} - {totalB})</strong>
+                                  : tied ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Bằng {totalA}-{totalB} — cần Penalty Shootout</span>
+                                  : scored ? `${totalA} - ${totalB}` : 'Chưa có kết quả'}
                               </td>
                               <td>
                                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1099,72 +1201,109 @@ export default function AdminCombatMatches() {
                   <div className="form-row">
                     <div className="form-group">
                       <label className="form-label">Hiệp 1 — Đỏ</label>
-                      <input type="number" className="form-input" value={detailForm.firstHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfA: e.target.value })} />
+                      <input type="number" min="0" className="form-input" value={detailForm.firstHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfA: e.target.value })} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Hiệp 1 — Xanh</label>
-                      <input type="number" className="form-input" value={detailForm.firstHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfB: e.target.value })} />
+                      <input type="number" min="0" className="form-input" value={detailForm.firstHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfB: e.target.value })} />
                     </div>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
                       <label className="form-label">Hiệp 2 — Đỏ</label>
-                      <input type="number" className="form-input" value={detailForm.secondHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, secondHalfA: e.target.value })} />
+                      <input type="number" min="0" className="form-input" value={detailForm.secondHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, secondHalfA: e.target.value })} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Hiệp 2 — Xanh</label>
-                      <input type="number" className="form-input" value={detailForm.secondHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, secondHalfB: e.target.value })} />
+                      <input type="number" min="0" className="form-input" value={detailForm.secondHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, secondHalfB: e.target.value })} />
                     </div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="checkbox" checked={!!detailForm.penaltyShootout} onChange={(e) => setDetailForm({ ...detailForm, penaltyShootout: e.target.checked })} style={{ width: 'auto' }} />
-                      Đá luân lưu (Penalty Shootout)
-                    </label>
-                  </div>
-                  {detailForm.penaltyShootout && (
-                    <div style={{ padding: 12, background: '#f8fafc', borderRadius: 8, marginBottom: 12 }}>
-                      {[0, 1, 2].map((i) => (
-                        <div className="form-row" key={i}>
-                          <div className="form-group">
-                            <label className="form-label">Đỏ — lượt {i + 1} (điểm / thời gian)</label>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <input type="number" className="form-input" placeholder="Điểm" value={detailForm.penaltyA?.[i]?.score ?? ''}
-                                onChange={(e) => setDetailForm((f) => { const a = [...f.penaltyA]; a[i] = { ...a[i], score: e.target.value }; return { ...f, penaltyA: a }; })} />
-                              <input type="text" className="form-input" placeholder="Thời gian" value={detailForm.penaltyA?.[i]?.time ?? ''}
-                                onChange={(e) => setDetailForm((f) => { const a = [...f.penaltyA]; a[i] = { ...a[i], time: e.target.value }; return { ...f, penaltyA: a }; })} />
-                            </div>
-                          </div>
-                          <div className="form-group">
-                            <label className="form-label">Xanh — lượt {i + 1} (điểm / thời gian)</label>
-                            <div style={{ display: 'flex', gap: 6 }}>
-                              <input type="number" className="form-input" placeholder="Điểm" value={detailForm.penaltyB?.[i]?.score ?? ''}
-                                onChange={(e) => setDetailForm((f) => { const b = [...f.penaltyB]; b[i] = { ...b[i], score: e.target.value }; return { ...f, penaltyB: b }; })} />
-                              <input type="text" className="form-input" placeholder="Thời gian" value={detailForm.penaltyB?.[i]?.time ?? ''}
-                                onChange={(e) => setDetailForm((f) => { const b = [...f.penaltyB]; b[i] = { ...b[i], time: e.target.value }; return { ...f, penaltyB: b }; })} />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Referee Awarded Points — Đỏ <span style={{ color: '#94a3b8' }}>(mục 12, cần lý do)</span></label>
+                      <input type="number" min="0" className="form-input" value={detailForm.refereeAwardedA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedA: e.target.value })} />
+                      {(Number(detailForm.refereeAwardedA) || 0) > 0 && (
+                        <input type="text" className="form-input" style={{ marginTop: 6 }} placeholder="Lý do" value={detailForm.refereeAwardedReasonA} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedReasonA: e.target.value })} />
+                      )}
                     </div>
-                  )}
-                </>
-              )}
+                    <div className="form-group">
+                      <label className="form-label">Referee Awarded Points — Xanh</label>
+                      <input type="number" min="0" className="form-input" value={detailForm.refereeAwardedB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedB: e.target.value })} />
+                      {(Number(detailForm.refereeAwardedB) || 0) > 0 && (
+                        <input type="text" className="form-input" style={{ marginTop: 6 }} placeholder="Lý do" value={detailForm.refereeAwardedReasonB} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedReasonB: e.target.value })} />
+                      )}
+                    </div>
+                  </div>
 
-              {!isStars && (
-                <div className="form-group">
-                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="checkbox" checked={!!detailForm.is_draw} onChange={(e) => setDetailForm({ ...detailForm, is_draw: e.target.checked, winner_id: e.target.checked ? '' : detailForm.winner_id })} style={{ width: 'auto' }} />
-                    Hòa
-                  </label>
-                  {!detailForm.is_draw && (
-                    <select className="form-input form-select" value={detailForm.winner_id || ''} onChange={(e) => setDetailForm({ ...detailForm, winner_id: e.target.value })}>
-                      <option value="">-- Chưa có kết quả --</option>
-                      <option value={detailModal.team_a_id}>{detailModal.team_a?.name} thắng (Đỏ)</option>
-                      <option value={detailModal.team_b_id}>{detailModal.team_b?.name} thắng (Xanh)</option>
-                    </select>
-                  )}
-                </div>
+                  {(() => {
+                    const sideA = { half1: detailForm.firstHalfA, half2: detailForm.secondHalfA, refereeAwarded: detailForm.refereeAwardedA };
+                    const sideB = { half1: detailForm.firstHalfB, half2: detailForm.secondHalfB, refereeAwarded: detailForm.refereeAwardedB };
+                    const tA = computeSideScore(sideA), tB = computeSideScore(sideB);
+                    const isKnockout = !detailModal.group_label;
+                    const outcome = isKnockout ? determineKnockoutResult(sideA, sideB, detailForm.shootoutRounds) : determineDroneGroupResult(sideA, sideB);
+                    const resultText = isKnockout
+                      ? (outcome.result === 'A' ? `Đi tiếp: ${detailModal.team_a?.name} (${tA.total} - ${tB.total})`
+                        : outcome.result === 'B' ? `Đi tiếp: ${detailModal.team_b?.name} (${tA.total} - ${tB.total})`
+                        : `Bằng ${tA.total} - ${tB.total} — cần Penalty Shootout`)
+                      : (outcome.result === 'DRAW' ? `Hòa (${tA.total} - ${tB.total}) — 1 Match Point mỗi đội`
+                        : outcome.result === 'A' ? `${detailModal.team_a?.name} thắng (${tA.total} - ${tB.total}) — 3 Match Points`
+                        : `${detailModal.team_b?.name} thắng (${tA.total} - ${tB.total}) — 3 Match Points`);
+                    const tied = tA.total === tB.total;
+                    return (
+                      <>
+                        <div style={{ margin: '12px 0', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13 }}>
+                          <div>Total Score — Đỏ: <strong>{tA.total}</strong> · Xanh: <strong>{tB.total}</strong></div>
+                          <div style={{ marginTop: 4, fontWeight: 700, color: '#16a34a' }}>Kết quả (tự động): {resultText}</div>
+                        </div>
+                        {isKnockout && tied && (
+                          <div style={{ padding: 12, background: '#fef2f2', borderRadius: 8, marginBottom: 12, border: '1px solid #fecaca' }}>
+                            <h4 style={{ margin: '0 0 8px', fontSize: 14, color: '#b91c1c' }}>PENALTY SHOOTOUT</h4>
+                            {(!detailForm.shootoutRounds || detailForm.shootoutRounds.length === 0) ? (
+                              <button type="button" className="btn btn-secondary" onClick={startDroneShootout}>Bắt đầu Penalty Shootout</button>
+                            ) : (
+                              <>
+                                {detailForm.shootoutRounds.map((r, idx) => (
+                                  <div className="form-row" key={r.roundNo} style={{ alignItems: 'center' }}>
+                                    <div className="form-group">
+                                      <label className="form-label">Round {r.roundNo} — Đỏ</label>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                                          <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateDroneShootoutRound(idx, { aSuccess: e.target.checked })} /> Ghi điểm
+                                        </label>
+                                        <input type="number" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01" className="form-input" placeholder="giây"
+                                          disabled={!r.aSuccess} value={r.aTimeSeconds} onChange={(e) => updateDroneShootoutRound(idx, { aTimeSeconds: e.target.value })} />
+                                      </div>
+                                    </div>
+                                    <div className="form-group">
+                                      <label className="form-label">Round {r.roundNo} — Xanh</label>
+                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                                          <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateDroneShootoutRound(idx, { bSuccess: e.target.checked })} /> Ghi điểm
+                                        </label>
+                                        <input type="number" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01" className="form-input" placeholder="giây"
+                                          disabled={!r.bSuccess} value={r.bTimeSeconds} onChange={(e) => updateDroneShootoutRound(idx, { bTimeSeconds: e.target.value })} />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                                {(() => {
+                                  const sw = resolveShootoutWinner(detailForm.shootoutRounds);
+                                  return sw.winner ? (
+                                    <p style={{ color: '#16a34a', fontWeight: 700, margin: '8px 0 0' }}>
+                                      Thắng shootout: {sw.winner === 'A' ? detailModal.team_a?.name : detailModal.team_b?.name} (Round {sw.decidingRound})
+                                    </p>
+                                  ) : (
+                                    <button type="button" className="btn btn-secondary" onClick={addDroneShootoutRound}>+ Thêm Round</button>
+                                  );
+                                })()}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
               )}
 
               <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '16px 0' }} />
@@ -1214,6 +1353,39 @@ export default function AdminCombatMatches() {
                 <label className="form-label">Kiến nghị</label>
                 <textarea className="form-input" rows={2} value={detailForm.objection || ''} onChange={(e) => setDetailForm({ ...detailForm, objection: e.target.value })} />
               </div>
+
+              {!isStars && detailModal.status !== 'cancelled' && detailModal.status !== 'disqualified' && (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #e5e7eb' }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: 14, color: '#b91c1c' }}>Hủy trận / Truất quyền (mục 13)</h4>
+                  {!statusAction ? (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button" className="btn btn-secondary" onClick={() => { setStatusAction('cancel'); setStatusReason(''); }}>Hủy trận</button>
+                      <button type="button" className="btn btn-secondary" onClick={() => { setStatusAction('disqualify'); setStatusReason(''); setDisqualifiedSide('A'); }}>Truất quyền 1 đội</button>
+                    </div>
+                  ) : (
+                    <div style={{ padding: 12, background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
+                      {statusAction === 'disqualify' && (
+                        <select className="form-input form-select" style={{ marginBottom: 8 }} value={disqualifiedSide} onChange={(e) => setDisqualifiedSide(e.target.value)}>
+                          <option value="A">{detailModal.team_a?.name} (Đỏ)</option>
+                          <option value="B">{detailModal.team_b?.name} (Xanh)</option>
+                        </select>
+                      )}
+                      <textarea className="form-input" rows={2} placeholder="Lý do (bắt buộc)" value={statusReason} onChange={(e) => setStatusReason(e.target.value)} />
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button type="button" className="btn btn-secondary" onClick={() => setStatusAction(null)} disabled={statusSaving}>Bỏ qua</button>
+                        <button type="button" className="btn btn-danger" onClick={submitStatusAction} disabled={statusSaving}>
+                          {statusSaving ? 'Đang lưu...' : statusAction === 'cancel' ? 'Xác nhận hủy trận' : 'Xác nhận truất quyền'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!isStars && (detailModal.status === 'cancelled' || detailModal.status === 'disqualified') && (
+                <p style={{ marginTop: 12, fontSize: 12, color: '#dc2626' }}>
+                  Trận này đã ở trạng thái "{detailModal.status}" — {detailModal.details?.disqualificationReason || 'không có lý do ghi nhận'}.
+                </p>
+              )}
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setDetailModal(null)}>Hủy</button>

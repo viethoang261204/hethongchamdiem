@@ -15,17 +15,22 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
   const firstHalfB = Number(d.firstHalfB) || 0;
   const secondHalfA = Number(d.secondHalfA) || 0;
   const secondHalfB = Number(d.secondHalfB) || 0;
-  const pointsA = firstHalfA + secondHalfA;
-  const pointsB = firstHalfB + secondHalfB;
-  const penaltyA = Array.isArray(d.penaltyA) ? d.penaltyA : [];
-  const penaltyB = Array.isArray(d.penaltyB) ? d.penaltyB : [];
+  const refereeAwardedA = Number(d.refereeAwardedA) || 0;
+  const refereeAwardedB = Number(d.refereeAwardedB) || 0;
+  const pointsA = firstHalfA + secondHalfA + refereeAwardedA;
+  const pointsB = firstHalfB + secondHalfB + refereeAwardedB;
+  const shootoutRounds = Array.isArray(d.shootoutRounds) ? d.shootoutRounds : [];
+  // Dữ liệu cũ (trước khi có shootoutRounds) — vẫn hiển thị được nếu có.
+  const legacyPenaltyA = Array.isArray(d.penaltyA) ? d.penaltyA : [];
+  const legacyPenaltyB = Array.isArray(d.penaltyB) ? d.penaltyB : [];
 
+  const isVoid = match?.status === 'cancelled' || match?.status === 'disqualified';
   const winnerSide = match?.winner_id
     ? (match.winner_id === match?.team_a_id ? 'Red' : match.winner_id === match?.team_b_id ? 'Blue' : '')
     : '';
   const winnerNo = winnerSide === 'Red' ? match?.team_a_no : winnerSide === 'Blue' ? match?.team_b_no : '';
 
-  const penaltyRow = (label, attempts) => (
+  const legacyPenaltyRow = (label, attempts) => (
     <tr key={label}>
       <td className="ss-label" colSpan={2}>{label}</td>
       {[0, 1, 2].map((i) => (
@@ -41,6 +46,16 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
     <table className="ss-sheet" ref={sheetRef}>
       <tbody>
         <tr><td colSpan={7} className="ss-title">Scoring Sheet of Drone Cup</td></tr>
+
+        {isVoid && (
+          <tr>
+            <td colSpan={7} className="ss-section" style={{ color: '#b91c1c', fontWeight: 700 }}>
+              {match.status === 'cancelled' ? 'MATCH CANCELLED' : 'MATCH — TEAM DISQUALIFIED'}
+              {d.disqualifiedTeam && ` (${d.disqualifiedTeam === 'A' ? match?.team_a?.name : match?.team_b?.name})`}
+              {d.disqualificationReason ? ` — ${d.disqualificationReason}` : ''}
+            </td>
+          </tr>
+        )}
 
         <tr>
           <td colSpan={3}><span className="ss-label">Division:</span> {d.division || ''}</td>
@@ -80,17 +95,43 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
           <td className="ss-center"><strong>{secondHalfB}</strong></td>
           <td></td>
         </tr>
+        {(refereeAwardedA > 0 || refereeAwardedB > 0) && (
+          <tr>
+            <td className="ss-label" colSpan={2}>Referee Awarded Points</td>
+            <td className="ss-center"><strong>{refereeAwardedA}</strong>{d.refereeAwardedReasonA ? <div className="ss-small">{d.refereeAwardedReasonA}</div> : null}</td>
+            <td colSpan={2}></td>
+            <td className="ss-center"><strong>{refereeAwardedB}</strong>{d.refereeAwardedReasonB ? <div className="ss-small">{d.refereeAwardedReasonB}</div> : null}</td>
+            <td></td>
+          </tr>
+        )}
         <tr className="ss-row-total">
-          <td className="ss-label" colSpan={2}>Points</td>
+          <td className="ss-label" colSpan={2}>Total Score</td>
           <td className="ss-center" colSpan={5}><strong>{pointsA} : {pointsB}</strong></td>
         </tr>
 
         <tr>
           <td colSpan={7} className="ss-section">
-            Penalty Shootout ( {d.penaltyShootout ? 'Yes ✓ / No ___' : 'Yes ___ / No ✓'} )
+            Penalty Shootout ( {(shootoutRounds.length > 0 || d.penaltyShootout) ? 'Yes ✓ / No ___' : 'Yes ___ / No ✓'} )
           </td>
         </tr>
-        {d.penaltyShootout && (
+        {shootoutRounds.length > 0 ? (
+          <>
+            <tr className="ss-header-row">
+              <th>Round</th>
+              <th className="ss-center" colSpan={2}>Red (success / time)</th>
+              <th className="ss-center" colSpan={2}>Blue (success / time)</th>
+              <th colSpan={2}></th>
+            </tr>
+            {shootoutRounds.map((r) => (
+              <tr key={r.roundNo}>
+                <td>{r.roundNo}</td>
+                <td className="ss-center" colSpan={2}>{r.aSuccess ? `✓ / ${r.aTimeSeconds ?? ''}s` : 'MISS'}</td>
+                <td className="ss-center" colSpan={2}>{r.bSuccess ? `✓ / ${r.bTimeSeconds ?? ''}s` : 'MISS'}</td>
+                <td colSpan={2}></td>
+              </tr>
+            ))}
+          </>
+        ) : d.penaltyShootout && (
           <>
             <tr className="ss-header-row">
               <th colSpan={2}>Attempt</th>
@@ -99,16 +140,20 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
               <th className="ss-center">3</th>
               <th colSpan={2}>Score / Time</th>
             </tr>
-            {penaltyRow('Red', penaltyA)}
-            {penaltyRow('Blue', penaltyB)}
+            {legacyPenaltyRow('Red', legacyPenaltyA)}
+            {legacyPenaltyRow('Blue', legacyPenaltyB)}
           </>
         )}
 
         <tr>
           <td className="ss-label" colSpan={2}>Winner</td>
           <td colSpan={5}>
-            <strong>{winnerSide ? `${winnerSide} Side` : (match?.is_draw ? 'Draw' : '')}</strong>
-            {winnerNo ? ` — No. ${winnerNo}` : ''}
+            {isVoid ? <strong style={{ color: '#b91c1c' }}>N/A — {match.status}</strong> : (
+              <>
+                <strong>{winnerSide ? `${winnerSide} Side` : (match?.is_draw ? 'Draw' : '')}</strong>
+                {winnerNo ? ` — No. ${winnerNo}` : ''}
+              </>
+            )}
           </td>
         </tr>
 
