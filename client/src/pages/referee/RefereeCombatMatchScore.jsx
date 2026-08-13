@@ -143,10 +143,6 @@ export default function RefereeCombatMatchScore({ format }) {
   }, [isTimerRunning]);
   const toggleStopwatch = () => setIsTimerRunning((r) => !r);
   const resetStopwatch = () => { setIsTimerRunning(false); setStopwatchSeconds(0); };
-  const applyStopwatchToTime = () => {
-    setForm((f) => ({ ...f, durationA: String(stopwatchSeconds), durationB: String(stopwatchSeconds) }));
-    showAlert(`Match time recorded: ${stopwatchSeconds}s (${formatSecondsAsMinutes(stopwatchSeconds)}) for both teams`, 'success');
-  };
 
   const startMatch = () => {
     setStartedAt(new Date().toISOString());
@@ -465,11 +461,6 @@ export default function RefereeCombatMatchScore({ format }) {
                   </button>
                   <button type="button" className="ts-timer-btn reset" onClick={resetStopwatch} title="Reset to 0">↺</button>
                 </div>
-                {isStars && (
-                  <button type="button" className="ts-timer-apply-btn" onClick={applyStopwatchToTime}>
-                    ✓ Use this time for both teams
-                  </button>
-                )}
               </div>
 
               {isStars ? (
