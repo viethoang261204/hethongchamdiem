@@ -22,6 +22,12 @@ export default function AdminRefereeAccounts() {
   const allContents = contentsData || [];
   const { data: fieldsData } = useApiLoader(() => api.getFields(), []);
   const allFields = fieldsData || [];
+  const { data: permCountsData, reload: reloadPermCounts } = useApiLoader(() => api.getUserPermissionCounts(), []);
+  const permCountsByReferee = useMemo(() => {
+    const map = new Map();
+    for (const r of permCountsData || []) map.set(r.referee_id, r);
+    return map;
+  }, [permCountsData]);
   const list = data || [];
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
@@ -35,17 +41,33 @@ export default function AdminRefereeAccounts() {
   const SECURITY_CODE = '26122004';
 
   const permKey = (contentId, fieldId) => `${contentId}:${fieldId}`;
+  // Snapshot đã lưu (chuỗi đã sort, so sánh nhanh) — dùng để phát hiện có
+  // thay đổi chưa lưu khi đóng modal, tránh việc bấm ra ngoài/nhấn X làm mất
+  // tick đã chọn mà không hề có cảnh báo (dễ khiến admin tưởng đã lưu).
+  const snapshotOf = (set) => [...set].sort().join(',');
 
   const openPerms = async (u) => {
-    setPermModal({ user: u, selected: new Set(), loading: true, saving: false });
+    setPermModal({ user: u, selected: new Set(), saved: '', loading: true, saving: false });
     try {
       const items = await api.getUserPermissions(u.id);
       const selected = new Set(items.map((it) => permKey(it.contest_content_id, it.field_id)));
-      setPermModal({ user: u, selected, loading: false, saving: false });
+      setPermModal({ user: u, selected, saved: snapshotOf(selected), loading: false, saving: false });
     } catch (e) {
       showAlert(e.message || 'Không tải được danh sách phân quyền.', 'error');
       setPermModal(null);
     }
+  };
+
+  const closePermModal = async () => {
+    if (permModal.saving) return;
+    if (snapshotOf(permModal.selected) !== permModal.saved) {
+      const ok = await showConfirm({
+        message: 'Có thay đổi chưa lưu — đóng và bỏ các ô vừa tick?',
+        confirmText: 'Bỏ thay đổi', cancelText: 'Quay lại', danger: true,
+      });
+      if (!ok) return;
+    }
+    setPermModal(null);
   };
 
   const togglePerm = (contentId, fieldId) => {
@@ -77,6 +99,7 @@ export default function AdminRefereeAccounts() {
       });
       await api.putUserPermissions(permModal.user.id, items);
       setPermModal(null);
+      reloadPermCounts();
       showAlert('Đã lưu phân quyền.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi khi lưu phân quyền.', 'error');
@@ -213,16 +236,19 @@ export default function AdminRefereeAccounts() {
                 <th>Họ tên</th>
                 <th>Vai trò</th>
                 <th>Loại chấm điểm</th>
+                <th>Phân quyền Field</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có tài khoản trọng tài. Bấm "Thêm tài khoản" để tạo mới.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có tài khoản trọng tài. Bấm "Thêm tài khoản" để tạo mới.</td></tr>
               ) : (
-                pageItems.map((u) => (
+                pageItems.map((u) => {
+                  const pc = permCountsByReferee.get(u.id);
+                  return (
                   <tr key={u.id}>
                     <td>{u.username}</td>
                     <td>{u.full_name || '-'}</td>
@@ -233,12 +259,18 @@ export default function AdminRefereeAccounts() {
                         : <span className="badge badge-blue" style={{ background: '#f1f5f9', color: '#64748b', borderColor: '#e2e8f0' }}>Chấm điểm bình thường</span>}
                     </td>
                     <td>
+                      {pc
+                        ? <span className="badge badge-green" title="Số dòng (Nội dung × Field) đã gán">Giới hạn ở {pc.content_count} nội dung ({pc.row_count} field)</span>
+                        : <span className="badge badge-blue" style={{ background: '#f1f5f9', color: '#64748b', borderColor: '#e2e8f0' }}>Chưa giới hạn — thấy tất cả</span>}
+                    </td>
+                    <td>
                       <button type="button" className="btn btn-secondary" onClick={() => openEdit(u)}>Sửa</button>
                       <button type="button" className="btn btn-secondary" style={{ marginLeft: 8 }} onClick={() => openPerms(u)}>Phân quyền Nội dung × Field</button>
                       <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(u.id)}>Xóa</button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -329,11 +361,11 @@ export default function AdminRefereeAccounts() {
       )}
 
       {permModal && (
-        <div className="modal-overlay" onClick={() => !permModal.saving && setPermModal(null)}>
+        <div className="modal-overlay" onClick={closePermModal}>
           <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720 }}>
             <div className="form-modal-header">
               <h3 className="form-modal-title">Phân quyền Nội dung × Field — {permModal.user.full_name || permModal.user.username}</h3>
-              <button type="button" className="form-modal-close" onClick={() => setPermModal(null)} aria-label="Đóng">×</button>
+              <button type="button" className="form-modal-close" onClick={closePermModal} aria-label="Đóng">×</button>
             </div>
             <div className="form-modal-body">
               <p style={{ marginBottom: 16, color: '#374151' }}>
@@ -381,7 +413,7 @@ export default function AdminRefereeAccounts() {
               )}
             </div>
             <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => setPermModal(null)} disabled={permModal.saving}>Hủy</button>
+              <button type="button" className="btn btn-secondary" onClick={closePermModal} disabled={permModal.saving}>Hủy</button>
               <button type="button" className="btn btn-primary" onClick={savePerms} disabled={permModal.loading || permModal.saving}>
                 {permModal.saving ? 'Đang lưu...' : 'Lưu phân quyền'}
               </button>

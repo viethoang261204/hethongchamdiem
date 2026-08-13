@@ -416,6 +416,10 @@ export const api = {
   // {contest_content_id, field_id} (rỗng cho 1 nội dung = chưa giới hạn field nào trong nội dung đó)
   getUserPermissions: (userId) => withRetry(() => request(`/users/${userId}/permissions`), 'getUserPermissions'),
 
+  // Tổng số dòng phân quyền theo từng trọng tài — {referee_id, content_count, row_count}[]
+  // dùng để hiện ngay trong danh sách tài khoản, xác nhận Lưu phân quyền có ghi vào DB thật không.
+  getUserPermissionCounts: () => withRetry(() => request('/users/permission-counts'), 'getUserPermissionCounts'),
+
   // Phân quyền của chính trọng tài đang đăng nhập
   getMyPermissions: () => withRetry(() => request('/me/permissions'), 'getMyPermissions'),
 

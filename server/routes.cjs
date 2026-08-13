@@ -1587,6 +1587,18 @@ router.delete('/users/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Tổng số dòng (Nội dung × Field) đã gán cho MỖI trọng tài — dùng để hiện
+// "đã giới hạn X nội dung" trong danh sách tài khoản, để admin xác nhận
+// ngay thao tác Lưu phân quyền có thực sự ghi vào DB hay không, không phải
+// mở lại từng modal để kiểm tra.
+router.get('/users/permission-counts', requireAdmin, h(async (_req, res) => {
+  const { rows } = await query(
+    `select referee_id, count(distinct contest_content_id)::int as content_count, count(*)::int as row_count
+     from referee_content_fields group by referee_id`
+  );
+  res.json(rows);
+}));
+
 // Phân quyền (Nội dung × Field) của TÔI (trọng tài đang đăng nhập) — rỗng
 // cho 1 nội dung = chưa giới hạn field nào trong nội dung đó.
 router.get('/me/permissions', requireAuth, h(async (req, res) => {
