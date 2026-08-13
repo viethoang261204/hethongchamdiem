@@ -53,6 +53,7 @@ export default function AdminTeams() {
   const [schools, setSchools] = useState([]);
   useEffect(() => { if (data?.schools) setSchools(data.schools); }, [data]);
   const [filterComp, setFilterComp] = useState('');
+  const [filterContent, setFilterContent] = useState('');
   const [filterBoard, setFilterBoard] = useState('');
   const [filterSchool, setFilterSchool] = useState('');
   const [filterField, setFilterField] = useState('');
@@ -109,20 +110,39 @@ export default function AdminTeams() {
     return teams.filter(t => contentIds.includes(t.contest_content_id));
   }, [teams, filterComp, allContents]);
 
-  // Bảng đấu có mặt trong tập đội đang lọc theo giải đấu — không cần gọi API riêng
-  const boardOptions = useMemo(() => {
+  // Nội dung có mặt trong tập đội đang lọc theo giải đấu
+  const contentOptions = useMemo(() => {
     const map = new Map();
     for (const t of compFiltered) {
+      if (t.contest_content_id && !map.has(t.contest_content_id)) {
+        const c = allContents.find(x => x.id === t.contest_content_id);
+        map.set(t.contest_content_id, c ? c.name : t.contest_content_id);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [compFiltered, allContents]);
+
+  const contentFiltered = useMemo(() => {
+    if (!filterContent) return compFiltered;
+    return compFiltered.filter(t => t.contest_content_id === filterContent);
+  }, [compFiltered, filterContent]);
+
+  // Bảng đấu có mặt trong tập đội đang lọc theo giải đấu + nội dung — không cần gọi API riêng
+  const boardOptions = useMemo(() => {
+    const map = new Map();
+    for (const t of contentFiltered) {
       if (t.boards?.id && !map.has(t.boards.id)) map.set(t.boards.id, t.boards);
     }
     return Array.from(map.values()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [compFiltered]);
+  }, [contentFiltered]);
 
   const boardFiltered = useMemo(() => {
-    if (!filterBoard) return compFiltered;
-    if (filterBoard === UNASSIGNED) return compFiltered.filter(t => !t.board_id);
-    return compFiltered.filter(t => t.board_id === filterBoard);
-  }, [compFiltered, filterBoard]);
+    if (!filterBoard) return contentFiltered;
+    if (filterBoard === UNASSIGNED) return contentFiltered.filter(t => !t.board_id);
+    return contentFiltered.filter(t => t.board_id === filterBoard);
+  }, [contentFiltered, filterBoard]);
 
   // Trường/trung tâm có mặt trong tập đội đang lọc theo giải đấu + bảng đấu
   // (teams.schools chỉ có {name, level}, không có id — dùng school_id làm key)
@@ -386,9 +406,16 @@ export default function AdminTeams() {
         <div className="filters-bar" style={{ marginBottom: 0 }}>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 250 }}>
             <label className="form-label">Lọc theo giải đấu</label>
-            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterBoard(''); setFilterSchool(''); setFilterField(''); }}>
+            <select className="form-input form-select" value={filterComp} onChange={(e) => { setFilterComp(e.target.value); setFilterContent(''); setFilterBoard(''); setFilterSchool(''); setFilterField(''); }}>
               <option value="">Tất cả giải đấu</option>
               {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
+            <label className="form-label">Lọc theo nội dung</label>
+            <select className="form-input form-select" value={filterContent} onChange={(e) => { setFilterContent(e.target.value); setFilterBoard(''); setFilterSchool(''); setFilterField(''); }}>
+              <option value="">Tất cả nội dung</option>
+              {contentOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 220 }}>
