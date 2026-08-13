@@ -873,6 +873,37 @@
   text-transform: none;
 }
 
+/* ─── Generic Card (dùng chung ở các trang danh sách trọng tài) ── */
+.ts-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 20px;
+}
+.ts-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f8fafb;
+  margin: 0 0 14px;
+}
+
+/* Hàng trận đấu bấm để mở form chấm — thêm khung + hover để dễ bấm hơn */
+.ts-match-toggle {
+  cursor: pointer;
+  padding: 10px 12px;
+  margin: -10px -12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.ts-match-toggle:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.ts-match-toggle:active {
+  background: rgba(59, 130, 246, 0.18);
+}
+
 /* Action Footer */
 .ts-footer {
   display: flex;

@@ -104,8 +104,9 @@ export default function RefereeCombatDrone() {
             const done = !!m.winner_id || m.is_draw;
             return (
               <div className="ts-card" key={m.id}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
-                  onClick={() => openMatch(m)} role="button">
+                <div className="ts-match-toggle" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
+                  onClick={() => openMatch(m)} role="button" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMatch(m); } }}>
                   <strong style={{ color: '#f1f5f9' }}>
                     {m.team_a?.name || '—'} <span style={{ color: '#64748b' }}>vs</span> {m.team_b?.name || '—'}
                   </strong>
