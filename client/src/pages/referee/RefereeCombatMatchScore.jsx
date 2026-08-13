@@ -19,10 +19,11 @@ const emptyPenalty = () => [{ score: '', time: '' }, { score: '', time: '' }, { 
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
 
-// Trang chấm 1 trận đối kháng — thay cho accordion cũ: bấm vào 1 trận ở danh
-// sách sẽ mở HẲN trang này (giống luồng "thuần" TaskScoringWizard): có màn
-// Bắt đầu trận, đồng hồ bấm giờ sống trong lúc chấm, và sau khi lưu thì hiện
-// luôn phiếu điểm (Score Sheet) từng đội để xem/in PDF — không phải dropdown.
+// Score sheet for 1 combat match — replaces the old inline accordion: clicking
+// a match in the list opens this dedicated page (same shape as the "pure"
+// TaskScoringWizard flow): a Start Match gate, a live stopwatch while
+// scoring, and after saving it shows the actual per-team score sheet inline
+// (view/print PDF) instead of just a toast.
 export default function RefereeCombatMatchScore({ format }) {
   const isStars = format === 'combat_stars';
   const { competitionId, contentId, matchId } = useParams();
@@ -46,15 +47,37 @@ export default function RefereeCombatMatchScore({ format }) {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setEntered(false);
     setStep(1);
     setSuccess(false);
-    api.getCombatMatches(contentId).then((list) => {
+    Promise.all([
+      api.getCombatMatches(contentId),
+      api.getTeams(contentId).catch(() => []),
+      api.getStudents().catch(() => []),
+    ]).then(([list, teams, students]) => {
+      if (cancelled) return;
       const m = list.find((x) => x.id === matchId);
       if (!m) { setNotFound(true); return; }
       setMatch(m);
       const d = m.details || {};
+
+      // Roster names aren't stored on the match itself — pull them from the
+      // team's student_ids so the referee doesn't have to type them by hand
+      // (same idea as `memberNames` in the pure scoring flow).
+      const rosterNames = (teamId) => {
+        const t = teams.find((x) => x.id === teamId);
+        if (!t?.student_ids?.length) return '';
+        return t.student_ids
+          .map((sid) => students.find((s) => s.id === sid))
+          .filter(Boolean)
+          .map((s) => s.full_name)
+          .join(', ');
+      };
+      const teamMembersA = d.teamMembersA || rosterNames(m.team_a_id);
+      const teamMembersB = d.teamMembersB || rosterNames(m.team_b_id);
+
       if (isStars) {
         setForm({
           meteorCompletedA: !!d.meteorCompletedA, meteorCompletedB: !!d.meteorCompletedB,
@@ -65,7 +88,7 @@ export default function RefereeCombatMatchScore({ format }) {
           pointsLostA: d.pointsLostA ?? 0, pointsLostB: d.pointsLostB ?? 0,
           durationA: d.durationA ?? '', durationB: d.durationB ?? '',
           division: d.division || '',
-          teamMembersA: d.teamMembersA || '', teamMembersB: d.teamMembersB || '',
+          teamMembersA, teamMembersB,
           studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
           refereeSignature: d.refereeSignature || user?.fullName || user?.username || '',
           refereeSigImage: d.refereeSignatureImage || '',
@@ -82,7 +105,7 @@ export default function RefereeCombatMatchScore({ format }) {
           penaltyA: d.penaltyA?.length ? d.penaltyA : emptyPenalty(),
           penaltyB: d.penaltyB?.length ? d.penaltyB : emptyPenalty(),
           winner_id: m.winner_id || '', is_draw: !!m.is_draw,
-          teamMembersA: d.teamMembersA || '', teamMembersB: d.teamMembersB || '',
+          teamMembersA, teamMembersB,
           studentSigImageA: d.studentSignatureImageA || '', studentSigImageB: d.studentSignatureImageB || '',
           refereeSignature: d.refereeSignature || user?.fullName || user?.username || '',
           refereeSigImage: d.refereeSignatureImage || '',
@@ -91,12 +114,14 @@ export default function RefereeCombatMatchScore({ format }) {
           remarks: d.remarks || '', objection: d.objection || '',
         });
       }
-      // Trận đã có kết quả rồi (đang sửa lại) — vào thẳng màn chấm, không bắt bấm Bắt đầu lại.
+      // Match already has a result (re-editing) — skip straight to scoring,
+      // don't force another "Start" click.
       if (m.winner_id || m.is_draw) setEntered(true);
-    }).catch(() => setNotFound(true)).finally(() => setLoading(false));
+    }).catch(() => { if (!cancelled) setNotFound(true); }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [contentId, matchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Đồng hồ bấm giờ ──
+  // ── Stopwatch ──
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   useEffect(() => {
@@ -109,7 +134,7 @@ export default function RefereeCombatMatchScore({ format }) {
   const resetStopwatch = () => { setIsTimerRunning(false); setStopwatchSeconds(0); };
   const applyStopwatchToTime = () => {
     setForm((f) => ({ ...f, durationA: String(stopwatchSeconds), durationB: String(stopwatchSeconds) }));
-    showAlert(`Đã ghi thời gian trận: ${stopwatchSeconds}s (${formatSecondsAsMinutes(stopwatchSeconds)}) cho cả 2 đội`, 'success');
+    showAlert(`Match time recorded: ${stopwatchSeconds}s (${formatSecondsAsMinutes(stopwatchSeconds)}) for both teams`, 'success');
   };
 
   const startMatch = () => {
@@ -118,7 +143,7 @@ export default function RefereeCombatMatchScore({ format }) {
     setEntered(true);
   };
 
-  // ── Battle of Stars: điểm & kết quả trực tiếp (live) ──
+  // ── Battle of Stars: live score & result ──
   const sideData = (side) => ({
     meteorCompleted: side === 'A' ? form.meteorCompletedA : form.meteorCompletedB,
     energyBlocks: side === 'A' ? form.energyBlocksA : form.energyBlocksB,
@@ -138,14 +163,14 @@ export default function RefereeCombatMatchScore({ format }) {
   const scoreB = isStars ? computeTaskScore(sideData('B')) : null;
   const starsOutcome = isStars ? determineGroupMatchResult(sideData('A'), sideData('B')) : null;
   const starsResultText = isStars ? (
-    form.directWinA ? `${match?.team_a?.name} thắng — Direct Win (Final Fortress)`
-      : form.directWinB ? `${match?.team_b?.name} thắng — Direct Win (Final Fortress)`
-      : starsOutcome.result === 'DRAW' ? `Hòa (${scoreA.taskScore} - ${scoreB.taskScore})`
-      : starsOutcome.result === 'A' ? `${match?.team_a?.name} thắng (${scoreA.taskScore} - ${scoreB.taskScore})`
-      : `${match?.team_b?.name} thắng (${scoreA.taskScore} - ${scoreB.taskScore})`
+    form.directWinA ? `${match?.team_a?.name} wins — Direct Win (Final Fortress)`
+      : form.directWinB ? `${match?.team_b?.name} wins — Direct Win (Final Fortress)`
+      : starsOutcome.result === 'DRAW' ? `Draw (${scoreA.taskScore} - ${scoreB.taskScore})`
+      : starsOutcome.result === 'A' ? `${match?.team_a?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`
+      : `${match?.team_b?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`
   ) : '';
 
-  // ── Fly Smart Cup: tổng điểm hiệp 1+2 (live) ──
+  // ── Fly Smart Cup: round 1+2 total (live) ──
   const droneTotalA = !isStars ? (Number(form.firstHalfA) || 0) + (Number(form.secondHalfA) || 0) : 0;
   const droneTotalB = !isStars ? (Number(form.firstHalfB) || 0) + (Number(form.secondHalfB) || 0) : 0;
 
@@ -153,11 +178,11 @@ export default function RefereeCombatMatchScore({ format }) {
 
   const handleSubmit = async () => {
     if (!form.studentSigImageA || !form.studentSigImageB || !form.refereeSigImage) {
-      showAlert('Vui lòng lấy đủ chữ ký 2 đội và trọng tài trước khi lưu.', 'error');
+      showAlert('Please collect signatures from both teams and the referee before saving.', 'error');
       return;
     }
     if (isStars && form.directWinA && form.directWinB) {
-      showAlert('Không thể cả hai đội cùng Direct Win.', 'error');
+      showAlert('Both teams cannot have Direct Win at the same time.', 'error');
       return;
     }
     setSubmitting(true);
@@ -210,12 +235,12 @@ export default function RefereeCombatMatchScore({ format }) {
         };
       }
       await api.putCombatMatch(match.id, body);
-      // Response PUT không kèm team_a/team_b/boards lồng nhau (chỉ GET danh
-      // sách mới join) — ghép thẳng vào match đã có sẵn để hiện phiếu điểm.
+      // The PUT response doesn't include nested team_a/team_b/boards (only the
+      // GET list joins those) — merge into the match we already have loaded.
       setSavedMatch({ ...match, details: body.details, winner_id: body.winner_id, is_draw: body.is_draw });
       setSuccess(true);
     } catch (e) {
-      showAlert(e.message || 'Lưu thất bại.', 'error');
+      showAlert(e.message || 'Failed to save.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -224,7 +249,7 @@ export default function RefereeCombatMatchScore({ format }) {
   const handleExportPdf = async () => {
     setExporting(true);
     try {
-      const teamName = (savedMatch?.team_a?.name || 'tran').replace(/\s+/g, '-').toLowerCase();
+      const teamName = (savedMatch?.team_a?.name || 'match').replace(/\s+/g, '-').toLowerCase();
       await exportToPdf(sheetRef, `${format}-${teamName}`);
     } finally {
       setExporting(false);
@@ -233,33 +258,33 @@ export default function RefereeCombatMatchScore({ format }) {
 
   if (loading) return (
     <div className="ts-wrapper ts-center-screen">
-      <p style={{ color: '#94a3b8' }}>Đang tải...</p>
+      <p style={{ color: '#94a3b8' }}>Loading...</p>
     </div>
   );
 
   if (notFound) return (
     <div className="ts-wrapper ts-center-screen">
       <div className="ts-card ts-gate-card">
-        <p style={{ color: '#f87171' }}>Không tìm thấy trận đấu.</p>
-        <Link to={listUrl} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>← Quay lại</Link>
+        <p style={{ color: '#f87171' }}>Match not found.</p>
+        <Link to={listUrl} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>← Back</Link>
       </div>
     </div>
   );
 
-  // ── Màn thành công: phiếu điểm từng đội, có thể xem/in ngay ──
+  // ── Success screen: per-team score sheet, ready to view/print right away ──
   if (success) {
     return (
       <div className="ts-wrapper ts-tablet-layout">
         <div className="ts-success" style={{ margin: '24px auto' }}>
           <div className="ts-success-icon">✓</div>
-          <strong>Đã lưu phiếu điểm trận đấu!</strong>
+          <strong>Match score sheet saved!</strong>
         </div>
         <div className="ts-card" style={{ marginBottom: 20, overflowX: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
             <button type="button" className="ts-btn ts-btn-primary" onClick={handleExportPdf} disabled={exporting}>
-              {exporting ? 'Đang xuất...' : 'Tải PDF'}
+              {exporting ? 'Exporting...' : 'Download PDF'}
             </button>
-            <Link to={listUrl} className="ts-btn ts-btn-secondary">← Quay lại danh sách trận</Link>
+            <Link to={listUrl} className="ts-btn ts-btn-secondary">← Back to match list</Link>
           </div>
           {isStars
             ? <CombatStarsSheetTable match={savedMatch} sheetRef={sheetRef} />
@@ -269,7 +294,7 @@ export default function RefereeCombatMatchScore({ format }) {
     );
   }
 
-  // ── Màn Bắt đầu trận ──
+  // ── Start Match gate ──
   if (!entered) {
     return (
       <div className="ts-wrapper ts-center-screen">
@@ -286,13 +311,13 @@ export default function RefereeCombatMatchScore({ format }) {
           <div className="ts-gate-action">
             <button type="button" className="ts-btn ts-btn-primary ts-btn-xl ts-gate-start-btn" onClick={startMatch}>
               <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M8 5v14l11-7z"/></svg>
-              BẮT ĐẦU TRẬN
+              START MATCH
             </button>
-            <p className="ts-gate-hint">⏱ Đồng hồ bấm giờ sẽ tự chạy khi bấm bắt đầu — dùng để ghi thời gian trận vào phiếu.</p>
+            <p className="ts-gate-hint">⏱ The stopwatch starts automatically — use it to record the match time on the sheet.</p>
           </div>
 
           <div className="ts-gate-footer">
-            <Link to={listUrl} className="ts-btn ts-btn-ghost">← Quay lại danh sách trận</Link>
+            <Link to={listUrl} className="ts-btn ts-btn-ghost">← Back to match list</Link>
           </div>
         </div>
       </div>
@@ -302,7 +327,7 @@ export default function RefereeCombatMatchScore({ format }) {
   return (
     <div className="ts-wrapper ts-tablet-layout">
       <header className="ts-header">
-        <Link to={listUrl} className="ts-back" title="Quay lại danh sách trận">
+        <Link to={listUrl} className="ts-back" title="Back to match list">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </Link>
         <div className="ts-header-info">
@@ -311,10 +336,10 @@ export default function RefereeCombatMatchScore({ format }) {
             {match.stage && <span className="ts-board-chip">{match.stage}</span>}
             {match.group_label && <span className="ts-board-chip">{match.group_label}</span>}
           </div>
-          <div className="ts-content-name">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'} — Đối kháng</div>
+          <div className="ts-content-name">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'} — Combat</div>
         </div>
         <div className="ts-header-score">
-          <div className="ts-score-label">TỶ SỐ TRỰC TIẾP</div>
+          <div className="ts-score-label">LIVE SCORE</div>
           <div className="ts-score-value" style={{ fontSize: 20 }}>
             {isStars ? `${scoreA.taskScore} - ${scoreB.taskScore}` : `${droneTotalA} - ${droneTotalB}`}
           </div>
@@ -324,12 +349,12 @@ export default function RefereeCombatMatchScore({ format }) {
       <div className="ts-stepper">
         <div className={`ts-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}`} onClick={() => setStep(1)}>
           <span className="ts-step-num">1</span>
-          <span className="ts-step-label">Chấm điểm 2 đội</span>
+          <span className="ts-step-label">Score both teams</span>
         </div>
         <div className="ts-step-line" />
         <div className={`ts-step ${step >= 2 ? 'active' : ''}`} onClick={() => setStep(2)}>
           <span className="ts-step-num">2</span>
-          <span className="ts-step-label">Xác nhận & ký để lưu</span>
+          <span className="ts-step-label">Confirm & sign to save</span>
         </div>
       </div>
 
@@ -337,7 +362,7 @@ export default function RefereeCombatMatchScore({ format }) {
         <div className="ts-split-container">
           <aside className="ts-sidebar-pane">
             <div className="ts-card ts-sidebar-card">
-              <div className="ts-sidebar-title">ĐỒNG HỒ BẤM GIỜ</div>
+              <div className="ts-sidebar-title">STOPWATCH</div>
               <div className="ts-stopwatch-widget">
                 <div className="ts-stopwatch-display">
                   <span className="ts-stopwatch-digits">{formatSecondsAsMinutes(stopwatchSeconds)}</span>
@@ -345,13 +370,13 @@ export default function RefereeCombatMatchScore({ format }) {
                 </div>
                 <div className="ts-stopwatch-controls">
                   <button type="button" className={`ts-timer-btn ${isTimerRunning ? 'pause' : 'start'}`} onClick={toggleStopwatch}>
-                    {isTimerRunning ? '⏸ TẠM DỪNG' : '▶ BẮT ĐẦU'}
+                    {isTimerRunning ? '⏸ PAUSE' : '▶ START'}
                   </button>
-                  <button type="button" className="ts-timer-btn reset" onClick={resetStopwatch} title="Reset về 0">↺</button>
+                  <button type="button" className="ts-timer-btn reset" onClick={resetStopwatch} title="Reset to 0">↺</button>
                 </div>
                 {isStars && (
                   <button type="button" className="ts-timer-apply-btn" onClick={applyStopwatchToTime}>
-                    ✓ Dùng thời gian này cho cả 2 đội
+                    ✓ Use this time for both teams
                   </button>
                 )}
               </div>
@@ -362,9 +387,9 @@ export default function RefereeCombatMatchScore({ format }) {
                 </div>
               ) : (
                 <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.04)', borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#4ade80' }}>
-                  {form.is_draw ? `Hòa (${droneTotalA} - ${droneTotalB})`
-                    : form.winner_id ? `${form.winner_id === match.team_a_id ? match.team_a?.name : match.team_b?.name} thắng (${droneTotalA} - ${droneTotalB})`
-                    : `Chưa chọn đội thắng (${droneTotalA} - ${droneTotalB})`}
+                  {form.is_draw ? `Draw (${droneTotalA} - ${droneTotalB})`
+                    : form.winner_id ? `${form.winner_id === match.team_a_id ? match.team_a?.name : match.team_b?.name} wins (${droneTotalA} - ${droneTotalB})`
+                    : `No winner selected yet (${droneTotalA} - ${droneTotalB})`}
                 </div>
               )}
             </div>
@@ -389,7 +414,7 @@ export default function RefereeCombatMatchScore({ format }) {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} nếu hoàn thành)</span></td>
+                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} if completed)</span></td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.meteorCompletedA} onChange={(e) => setForm({ ...form, meteorCompletedA: e.target.checked })} /> Completed
@@ -402,7 +427,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}đ/block, tối đa {ENERGY_BLOCK_MAX})</span></td>
+                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}pts/block, max {ENERGY_BLOCK_MAX})</span></td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.energyBlocksA} onChange={(e) => setForm({ ...form, energyBlocksA: clampEnergy(e.target.value) })} />
@@ -413,7 +438,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}đ/ball, tối đa {FIREPOWER_BALL_MAX})</span></td>
+                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}pts/ball, max {FIREPOWER_BALL_MAX})</span></td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.firepowerBallsA} onChange={(e) => setForm({ ...form, firepowerBallsA: clampFirepower(e.target.value) })} />
@@ -424,7 +449,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>(không tính điểm — chỉ Direct Win)</span></td>
+                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>(no points — Direct Win only)</span></td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.directWinA} onChange={(e) => setDirectWin('A', e.target.checked)} /> Direct Win
@@ -448,7 +473,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Extra Reward <span style={{ color: '#94a3b8' }}>(auto — 40/30/20/10/0 theo retry)</span></td>
+                        <td style={{ fontSize: 13 }}>Extra Reward <span style={{ color: '#94a3b8' }}>(auto — 40/30/20/10/0 by retries)</span></td>
                         <td style={{ textAlign: 'center' }}>{scoreA.extraReward}</td>
                         <td style={{ textAlign: 'center' }}>{scoreB.extraReward}</td>
                       </tr>
@@ -464,7 +489,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Tổng thời gian (giây)</td>
+                        <td style={{ fontSize: 13 }}>Total duration (seconds)</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.durationA} onChange={(e) => setForm({ ...form, durationA: e.target.value })} />
@@ -497,7 +522,7 @@ export default function RefereeCombatMatchScore({ format }) {
                       </thead>
                       <tbody>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Hiệp 1</td>
+                          <td style={{ fontSize: 13 }}>Round 1</td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfA} onChange={(e) => setForm({ ...form, firstHalfA: e.target.value })} />
                           </td>
@@ -506,7 +531,7 @@ export default function RefereeCombatMatchScore({ format }) {
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Hiệp 2</td>
+                          <td style={{ fontSize: 13 }}>Round 2</td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfA} onChange={(e) => setForm({ ...form, secondHalfA: e.target.value })} />
                           </td>
@@ -515,7 +540,7 @@ export default function RefereeCombatMatchScore({ format }) {
                           </td>
                         </tr>
                         <tr style={{ fontWeight: 700 }}>
-                          <td style={{ fontSize: 13 }}>Tổng điểm</td>
+                          <td style={{ fontSize: 13 }}>Total score</td>
                           <td style={{ textAlign: 'center' }}>{droneTotalA}</td>
                           <td style={{ textAlign: 'center' }}>{droneTotalB}</td>
                         </tr>
@@ -525,20 +550,20 @@ export default function RefereeCombatMatchScore({ format }) {
 
                   <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16 }}>
                     <input type="checkbox" checked={form.penaltyShootout} onChange={(e) => setForm({ ...form, penaltyShootout: e.target.checked })} style={{ width: 'auto' }} />
-                    Đá luân lưu (Penalty Shootout)
+                    Penalty Shootout
                   </label>
 
                   {form.penaltyShootout && (
                     <div style={{ padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 10, marginTop: 8 }}>
                       {[0, 1, 2].map((i) => (
                         <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
-                          <input type="number" className="form-input" placeholder={`Red — lượt ${i + 1} điểm`} value={form.penaltyA[i]?.score ?? ''}
+                          <input type="number" className="form-input" placeholder={`Red — round ${i + 1} score`} value={form.penaltyA[i]?.score ?? ''}
                             onChange={(e) => setForm((f) => { const a = [...f.penaltyA]; a[i] = { ...a[i], score: e.target.value }; return { ...f, penaltyA: a }; })} />
-                          <input type="text" className="form-input" placeholder="Thời gian" value={form.penaltyA[i]?.time ?? ''}
+                          <input type="text" className="form-input" placeholder="Time" value={form.penaltyA[i]?.time ?? ''}
                             onChange={(e) => setForm((f) => { const a = [...f.penaltyA]; a[i] = { ...a[i], time: e.target.value }; return { ...f, penaltyA: a }; })} />
-                          <input type="number" className="form-input" placeholder={`Blue — lượt ${i + 1} điểm`} value={form.penaltyB[i]?.score ?? ''}
+                          <input type="number" className="form-input" placeholder={`Blue — round ${i + 1} score`} value={form.penaltyB[i]?.score ?? ''}
                             onChange={(e) => setForm((f) => { const b = [...f.penaltyB]; b[i] = { ...b[i], score: e.target.value }; return { ...f, penaltyB: b }; })} />
-                          <input type="text" className="form-input" placeholder="Thời gian" value={form.penaltyB[i]?.time ?? ''}
+                          <input type="text" className="form-input" placeholder="Time" value={form.penaltyB[i]?.time ?? ''}
                             onChange={(e) => setForm((f) => { const b = [...f.penaltyB]; b[i] = { ...b[i], time: e.target.value }; return { ...f, penaltyB: b }; })} />
                         </div>
                       ))}
@@ -548,23 +573,23 @@ export default function RefereeCombatMatchScore({ format }) {
                   <div className="ts-bigbtns-container" style={{ gridTemplateColumns: '1fr 1fr auto', marginTop: 16 }}>
                     <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${form.winner_id === match.team_a_id && !form.is_draw ? 'selected' : ''}`}
                       onClick={() => setForm({ ...form, winner_id: match.team_a_id, is_draw: false })}>
-                      {match.team_a?.name} thắng
+                      {match.team_a?.name} wins
                     </button>
                     <button type="button" className={`ts-bigbtn ts-bigbtn-pass ${form.winner_id === match.team_b_id && !form.is_draw ? 'selected' : ''}`}
                       onClick={() => setForm({ ...form, winner_id: match.team_b_id, is_draw: false })}>
-                      {match.team_b?.name} thắng
+                      {match.team_b?.name} wins
                     </button>
                     <button type="button" className={`ts-bigbtn ts-bigbtn-fail ${form.is_draw ? 'selected' : ''}`}
                       onClick={() => setForm({ ...form, is_draw: true, winner_id: '' })}>
-                      Hòa
+                      Draw
                     </button>
                   </div>
                 </>
               )}
 
               <div className="ts-task-nav">
-                <button type="button" className="ts-btn ts-btn-secondary" onClick={() => navigate(listUrl)}>← Đóng</button>
-                <button type="button" className="ts-btn ts-btn-primary ts-btn-lg" onClick={gotoStep2}>Xem lại & ký để lưu →</button>
+                <button type="button" className="ts-btn ts-btn-secondary" onClick={() => navigate(listUrl)}>← Close</button>
+                <button type="button" className="ts-btn ts-btn-primary ts-btn-lg" onClick={gotoStep2}>Review & sign to save →</button>
               </div>
             </div>
           </main>
@@ -575,64 +600,64 @@ export default function RefereeCombatMatchScore({ format }) {
         <div className="ts-card ts-sheet-card">
           <div className="ts-sheet-header">
             <div>
-              <h2 className="ts-card-title" style={{ fontSize: 20, margin: 0 }}>XÁC NHẬN KẾT QUẢ TRẬN</h2>
+              <h2 className="ts-card-title" style={{ fontSize: 20, margin: 0 }}>CONFIRM MATCH RESULT</h2>
               <div className="ts-sheet-sub">
                 {match.team_a?.name} (Red) vs {match.team_b?.name} (Blue)
-                {match.boards?.name ? ` · Bảng: ${match.boards.name}` : ''}
+                {match.boards?.name ? ` · Board: ${match.boards.name}` : ''}
               </div>
             </div>
             <div className="ts-sheet-total-badge">
-              <span className="ts-st-label">KẾT QUẢ</span>
+              <span className="ts-st-label">RESULT</span>
               <span className="ts-st-val" style={{ fontSize: 16 }}>
-                {isStars ? starsResultText : (form.is_draw ? 'Hòa' : form.winner_id ? (form.winner_id === match.team_a_id ? match.team_a?.name : match.team_b?.name) : '—')}
+                {isStars ? starsResultText : (form.is_draw ? 'Draw' : form.winner_id ? (form.winner_id === match.team_a_id ? match.team_a?.name : match.team_b?.name) : '—')}
               </span>
             </div>
           </div>
 
           <div className="ts-sheet-form-grid">
             <div className="ts-form-row">
-              <label className="ts-label">Học sinh/đội trưởng — Red ({match.team_a?.name})</label>
+              <label className="ts-label">Student / Team Captain — Red ({match.team_a?.name})</label>
               <input type="text" className="ts-input" value={form.teamMembersA} onChange={(e) => setForm({ ...form, teamMembersA: e.target.value })} />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Học sinh/đội trưởng — Blue ({match.team_b?.name})</label>
+              <label className="ts-label">Student / Team Captain — Blue ({match.team_b?.name})</label>
               <input type="text" className="ts-input" value={form.teamMembersB} onChange={(e) => setForm({ ...form, teamMembersB: e.target.value })} />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label="Chữ ký đội Red" value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
+              <SignatureBox label="Red Team Signature" value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label="Chữ ký đội Blue" value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
+              <SignatureBox label="Blue Team Signature" value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Tên trọng tài</label>
+              <label className="ts-label">Referee Name</label>
               <input type="text" className="ts-input" value={form.refereeSignature} onChange={(e) => setForm({ ...form, refereeSignature: e.target.value })} />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label="Chữ ký trọng tài" value={form.refereeSigImage} onChange={(v) => setForm({ ...form, refereeSigImage: v })} required />
+              <SignatureBox label="Referee Signature" value={form.refereeSigImage} onChange={(v) => setForm({ ...form, refereeSigImage: v })} required />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Trưởng ban trọng tài</label>
+              <label className="ts-label">Chief Referee</label>
               <input type="text" className="ts-input" value={form.headRefereeName} onChange={(e) => setForm({ ...form, headRefereeName: e.target.value })} />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Người ghi điểm</label>
+              <label className="ts-label">Scorekeeper</label>
               <input type="text" className="ts-input" value={form.scorekeeperName} onChange={(e) => setForm({ ...form, scorekeeperName: e.target.value })} />
             </div>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Ghi chú</label>
+              <label className="ts-label">Remarks</label>
               <textarea className="ts-input" rows={2} value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} />
             </div>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Kiến nghị</label>
+              <label className="ts-label">Objection</label>
               <textarea className="ts-input" rows={2} value={form.objection} onChange={(e) => setForm({ ...form, objection: e.target.value })} />
             </div>
           </div>
 
           <div className="ts-footer">
-            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Sửa lại điểm</button>
+            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Edit scores</button>
             <button type="button" className="ts-btn ts-btn-primary ts-btn-xl" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Đang lưu...' : '✓ XÁC NHẬN & LƯU PHIẾU ĐIỂM'}
+              {submitting ? 'Saving...' : '✓ CONFIRM & SAVE SCORE SHEET'}
             </button>
           </div>
         </div>
