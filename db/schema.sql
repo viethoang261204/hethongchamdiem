@@ -473,18 +473,6 @@ create table if not exists referee_content_fields (
 create index if not exists idx_referee_content_fields_content on referee_content_fields(contest_content_id);
 create index if not exists idx_referee_content_fields_field on referee_content_fields(field_id);
 
--- Trạng thái trận đối kháng — bắt buộc cho Fly Smart Cup (combat_drone) để
--- phân biệt trận chưa đấu / đang đấu / đã có kết quả hợp lệ / bị hủy / có
--- đội bị truất quyền, KHÔNG coi các trường hợp đó là 1 trận bình thường tỷ
--- số 0-0 (xem server/flySmartCup.cjs). Cột dùng chung combat_matches — Battle
--- of Stars (combat_stars) không dùng cột này, vẫn suy ra "đã chấm" từ
--- winner_id/is_draw như cũ, không ảnh hưởng gì.
-alter table combat_matches add column if not exists status text not null default 'scheduled'
-  check (status in ('scheduled', 'live', 'completed', 'cancelled', 'disqualified'));
-update combat_matches set status = 'completed' where status = 'scheduled' and (winner_id is not null or is_draw = true);
-create index if not exists idx_combat_matches_status on combat_matches(status);
-
-
 -- ============================================================
 -- 2. INDEXES
 -- ============================================================

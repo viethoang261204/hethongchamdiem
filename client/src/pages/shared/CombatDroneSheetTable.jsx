@@ -24,7 +24,7 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
   const legacyPenaltyA = Array.isArray(d.penaltyA) ? d.penaltyA : [];
   const legacyPenaltyB = Array.isArray(d.penaltyB) ? d.penaltyB : [];
 
-  const isVoid = match?.status === 'cancelled' || match?.status === 'disqualified';
+  const isVoid = d.status === 'cancelled' || d.status === 'disqualified';
   const winnerSide = match?.winner_id
     ? (match.winner_id === match?.team_a_id ? 'Red' : match.winner_id === match?.team_b_id ? 'Blue' : '')
     : '';
@@ -50,7 +50,7 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
         {isVoid && (
           <tr>
             <td colSpan={7} className="ss-section" style={{ color: '#b91c1c', fontWeight: 700 }}>
-              {match.status === 'cancelled' ? 'MATCH CANCELLED' : 'MATCH — TEAM DISQUALIFIED'}
+              {d.status === 'cancelled' ? 'MATCH CANCELLED' : 'MATCH — TEAM DISQUALIFIED'}
               {d.disqualifiedTeam && ` (${d.disqualifiedTeam === 'A' ? match?.team_a?.name : match?.team_b?.name})`}
               {d.disqualificationReason ? ` — ${d.disqualificationReason}` : ''}
             </td>
@@ -148,7 +148,7 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
         <tr>
           <td className="ss-label" colSpan={2}>Winner</td>
           <td colSpan={5}>
-            {isVoid ? <strong style={{ color: '#b91c1c' }}>N/A — {match.status}</strong> : (
+            {isVoid ? <strong style={{ color: '#b91c1c' }}>N/A — {d.status}</strong> : (
               <>
                 <strong>{winnerSide ? `${winnerSide} Side` : (match?.is_draw ? 'Draw' : '')}</strong>
                 {winnerNo ? ` — No. ${winnerNo}` : ''}

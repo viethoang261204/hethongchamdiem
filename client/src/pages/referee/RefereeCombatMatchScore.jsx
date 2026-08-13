@@ -132,7 +132,7 @@ export default function RefereeCombatMatchScore({ format }) {
       }
       // Match already has a result / is past "scheduled" (re-editing) — skip
       // straight to scoring, don't force another "Start" click.
-      if (m.winner_id || m.is_draw || (m.status && m.status !== 'scheduled')) setEntered(true);
+      if (m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled')) setEntered(true);
     }).catch(() => { if (!cancelled) setNotFound(true); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [contentId, matchId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -155,7 +155,7 @@ export default function RefereeCombatMatchScore({ format }) {
     setEntered(true);
     // Fly Smart Cup: match lifecycle status (mục 2/13 luật) — Battle of Stars
     // không dùng status nên không đụng tới để không ảnh hưởng module đó.
-    if (!isStars && match?.status === 'scheduled') {
+    if (!isStars && (!match?.details?.status || match.details.status === 'scheduled')) {
       api.putCombatMatch(match.id, { status: 'live' }).catch(() => {});
     }
   };
@@ -319,7 +319,7 @@ export default function RefereeCombatMatchScore({ format }) {
       await api.putCombatMatch(match.id, body);
       // The PUT response doesn't include nested team_a/team_b/boards (only the
       // GET list joins those) — merge into the match we already have loaded.
-      setSavedMatch({ ...match, details: body.details, winner_id: body.winner_id, is_draw: body.is_draw, status: 'completed' });
+      setSavedMatch({ ...match, details: { ...body.details, status: 'completed' }, winner_id: body.winner_id, is_draw: body.is_draw });
       setSuccess(true);
     } catch (e) {
       showAlert(e.message || 'Failed to save.', 'error');
@@ -441,7 +441,7 @@ export default function RefereeCombatMatchScore({ format }) {
             {match.team_a?.name || '—'} <span style={{ color: '#64748b', fontWeight: 400 }}>vs</span> {match.team_b?.name || '—'}
             {match.stage && <span className="ts-board-chip">{match.stage}</span>}
             {match.group_label && <span className="ts-board-chip">{match.group_label}</span>}
-            {!isStars && match.status && match.status !== 'scheduled' && <span className="ts-board-chip">{match.status.toUpperCase()}</span>}
+            {!isStars && match.details?.status && match.details.status !== 'scheduled' && <span className="ts-board-chip">{match.details.status.toUpperCase()}</span>}
           </div>
           <div className="ts-content-name">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'} — Combat</div>
         </div>
@@ -498,15 +498,15 @@ export default function RefereeCombatMatchScore({ format }) {
               <div className="ts-card ts-sidebar-card" style={{ marginTop: 12 }}>
                 <div className="ts-sidebar-title">MATCH STATUS</div>
                 <div style={{ marginBottom: 10 }}>
-                  <span className="rt-badge">{(match.status || 'scheduled').toUpperCase()}</span>
+                  <span className="rt-badge">{(match.details?.status || 'scheduled').toUpperCase()}</span>
                 </div>
-                {match.status !== 'cancelled' && match.status !== 'disqualified' && !statusAction && (
+                {match.details?.status !== 'cancelled' && match.details?.status !== 'disqualified' && !statusAction && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('cancel'); setStatusReason(''); }}>Cancel Match</button>
                     <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('disqualify'); setStatusReason(''); setDisqualifiedSide('A'); }}>Disqualify a Team</button>
                   </div>
                 )}
-                {(match.status === 'cancelled' || match.status === 'disqualified') && (
+                {(match.details?.status === 'cancelled' || match.details?.status === 'disqualified') && (
                   <p style={{ fontSize: 12, color: '#f87171' }}>
                     {match.details?.disqualificationReason || 'This match was closed without a normal result.'}
                   </p>

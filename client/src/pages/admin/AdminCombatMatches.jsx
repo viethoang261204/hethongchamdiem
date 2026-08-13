@@ -793,8 +793,8 @@ export default function AdminCombatMatches() {
                       <td>{m.team_a?.name || '-'}{m.team_a_no ? ` (No.${m.team_a_no})` : ''}</td>
                       <td>{m.team_b?.name || '-'}{m.team_b_no ? ` (No.${m.team_b_no})` : ''}</td>
                       <td style={{ fontSize: 13 }}>
-                        {m.status === 'cancelled' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Đã hủy</span>
-                          : m.status === 'disqualified' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Truất quyền</span>
+                        {m.details?.status === 'cancelled' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Đã hủy</span>
+                          : m.details?.status === 'disqualified' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Truất quyền</span>
                           : m.is_draw ? 'Hòa' : m.winner_id ? `Thắng: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}` : 'Chưa có kết quả'}
                       </td>
                       <td>
@@ -1012,8 +1012,8 @@ export default function AdminCombatMatches() {
                               <td>{m.team_a?.name || '-'}</td>
                               <td>{m.team_b?.name || '-'}</td>
                               <td style={{ fontSize: 13 }}>
-                                {m.status === 'cancelled' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>CANCELLED</span>
-                                  : m.status === 'disqualified' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>DISQUALIFIED</span>
+                                {m.details?.status === 'cancelled' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>CANCELLED</span>
+                                  : m.details?.status === 'disqualified' ? <span style={{ color: '#dc2626', fontWeight: 600 }}>DISQUALIFIED</span>
                                   : m.winner_id
                                   ? <strong style={{ color: '#16a34a' }}>Đi tiếp: {m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name} ({totalA} - {totalB})</strong>
                                   : tied ? <span style={{ color: '#dc2626', fontWeight: 600 }}>Bằng {totalA}-{totalB} — cần Penalty Shootout</span>
@@ -1391,7 +1391,7 @@ export default function AdminCombatMatches() {
                 <textarea className="form-input" rows={2} value={detailForm.objection || ''} onChange={(e) => setDetailForm({ ...detailForm, objection: e.target.value })} />
               </div>
 
-              {!isStars && detailModal.status !== 'cancelled' && detailModal.status !== 'disqualified' && (
+              {!isStars && detailModal.details?.status !== 'cancelled' && detailModal.details?.status !== 'disqualified' && (
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #e5e7eb' }}>
                   <h4 style={{ margin: '0 0 8px', fontSize: 14, color: '#b91c1c' }}>Hủy trận / Truất quyền (mục 13)</h4>
                   {!statusAction ? (
@@ -1418,9 +1418,9 @@ export default function AdminCombatMatches() {
                   )}
                 </div>
               )}
-              {!isStars && (detailModal.status === 'cancelled' || detailModal.status === 'disqualified') && (
+              {!isStars && (detailModal.details?.status === 'cancelled' || detailModal.details?.status === 'disqualified') && (
                 <p style={{ marginTop: 12, fontSize: 12, color: '#dc2626' }}>
-                  Trận này đã ở trạng thái "{detailModal.status}" — {detailModal.details?.disqualificationReason || 'không có lý do ghi nhận'}.
+                  Trận này đã ở trạng thái "{detailModal.details?.status}" — {detailModal.details?.disqualificationReason || 'không có lý do ghi nhận'}.
                 </p>
               )}
             </div>

@@ -115,7 +115,8 @@ function resolveMatchResult({ details, groupLabel, teamAId, teamBId, currentStat
   if (result === 'B') return { winner_id: teamBId, is_draw: false, status: 'completed' };
   // Bằng điểm, cần Penalty Shootout nhưng chưa có round nào phân định được —
   // KHÔNG có kết quả, giữ nguyên status hiện tại (không tự ý coi là completed).
-  return { winner_id: null, is_draw: false, status: shootoutNeeded && shootoutPending ? (currentStatus === 'scheduled' ? 'live' : currentStatus) : currentStatus };
+  const base = currentStatus || 'scheduled';
+  return { winner_id: null, is_draw: false, status: shootoutNeeded && shootoutPending ? (base === 'scheduled' ? 'live' : base) : base };
 }
 
 module.exports = {

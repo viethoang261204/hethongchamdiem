@@ -36,6 +36,17 @@ export function computeSideScore(side) {
   return { half1, half2, refereeAwarded, total };
 }
 
+// ── Match Status (mục 2/13 luật) — LƯU TRONG details.status (jsonb), KHÔNG
+// phải cột riêng trên combat_matches, để không cần migrate schema. Trận cũ
+// (chấm trước khi có khái niệm status) không có details.status → suy ra
+// 'completed' nếu đã có winner_id/is_draw (đúng như Battle of Stars vẫn làm
+// từ trước), ngược lại 'scheduled'.
+export function effectiveStatus(m) {
+  if (m?.details?.status) return m.details.status;
+  if (m?.winner_id || m?.is_draw) return 'completed';
+  return 'scheduled';
+}
+
 export function sideFromDetails(details, side) {
   const d = details || {};
   const suf = side; // 'A' | 'B'
@@ -161,7 +172,7 @@ export function computeGroupStandings(teams, matches) {
   const h2h = new Map(); // key "idA|idB" (đã sort) -> { [teamId]: winCount }
 
   for (const m of matches) {
-    if (m.status !== 'completed') continue;
+    if (effectiveStatus(m) !== 'completed') continue;
     const aIn = stats.has(m.team_a_id);
     const bIn = stats.has(m.team_b_id);
     if (!aIn && !bIn) continue;
