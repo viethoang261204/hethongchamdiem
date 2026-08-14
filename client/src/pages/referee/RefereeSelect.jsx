@@ -22,7 +22,12 @@ export default function RefereeSelect() {
 
   useEffect(() => {
     if (!selectedComp) return;
-    capi.getContents(selectedComp.id).then(setContents).catch(console.error);
+    Promise.all([capi.getContents(selectedComp.id), api.getMyPermissions()])
+      .then(([allContents, perms]) => {
+        const allowedContentIds = new Set(perms.map((p) => p.contest_content_id));
+        setContents(allContents.filter((c) => allowedContentIds.has(c.id)));
+      })
+      .catch(console.error);
   }, [selectedComp?.id]);
 
   const selectCompetition = (c) => {
@@ -54,9 +59,11 @@ export default function RefereeSelect() {
     }
     setBoardsLoading(true);
     try {
-      // Phân quyền trọng tài giờ theo (Nội dung × Field), áp dụng ở tầng dữ
-      // liệu (server tự lọc đội/trận theo field khi trọng tài mở danh sách) —
-      // không cần lọc bảng đấu ở bước chọn này nữa, hiện đủ mọi bảng để chọn.
+      // Bước chọn NỘI DUNG đã lọc theo referee_content_fields ở trên (chỉ hiện
+      // nội dung trọng tài có ít nhất 1 dòng phân quyền). Trong 1 nội dung đã
+      // được phép vào, bước chọn BẢNG ĐẤU/field vẫn không lọc ở đây — áp dụng
+      // ở tầng dữ liệu (server tự lọc đội/trận theo field), rỗng field cho
+      // nội dung đó = chưa giới hạn field nào, hiện đủ mọi bảng để chọn.
       const contentBoards = await capi.getBoards(c.id);
       if (contentBoards.length === 0) {
         navigate(`/referee/competition/${selectedComp.id}/content/${c.id}/region/all/teams`);
@@ -126,16 +133,22 @@ export default function RefereeSelect() {
       )}
 
       {step === 'content' && selectedComp && (
-        <div className="referee-grid">
-          {contents.map((c) => (
-            <button key={c.id} type="button" className="referee-card" onClick={() => selectContent(c)} disabled={boardsLoading}>
-              <div className="card-badge">Nội dung</div>
-              <h3>{c.name}</h3>
-              <p>{c.description || 'Chưa có mô tả chi tiết'}</p>
-              <div className="card-action">Chọn bảng đấu & chấm điểm →</div>
-            </button>
-          ))}
-        </div>
+        contents.length === 0 ? (
+          <p style={{ color: '#64748b', padding: '20px 0' }}>
+            Bạn chưa được phân quyền chấm nội dung nào trong cuộc thi này — liên hệ Admin để được gán quyền.
+          </p>
+        ) : (
+          <div className="referee-grid">
+            {contents.map((c) => (
+              <button key={c.id} type="button" className="referee-card" onClick={() => selectContent(c)} disabled={boardsLoading}>
+                <div className="card-badge">Nội dung</div>
+                <h3>{c.name}</h3>
+                <p>{c.description || 'Chưa có mô tả chi tiết'}</p>
+                <div className="card-action">Chọn bảng đấu & chấm điểm →</div>
+              </button>
+            ))}
+          </div>
+        )
       )}
 
       {step === 'board' && selectedContent && (

@@ -124,6 +124,8 @@ export default function RefereeCombatMatchScore({ format }) {
           division: d.division || '',
           firstHalfA: d.firstHalfA ?? 0, firstHalfB: d.firstHalfB ?? 0,
           secondHalfA: d.secondHalfA ?? 0, secondHalfB: d.secondHalfB ?? 0,
+          half1RedTeam: d.half1RedTeam === 'B' ? 'B' : 'A',
+          half2RedTeam: d.half2RedTeam === 'B' ? 'B' : 'A',
           refereeAwardedA: d.refereeAwardedA ?? 0, refereeAwardedB: d.refereeAwardedB ?? 0,
           refereeAwardedReasonA: d.refereeAwardedReasonA || '', refereeAwardedReasonB: d.refereeAwardedReasonB || '',
           shootoutRounds: Array.isArray(d.shootoutRounds) ? d.shootoutRounds : [],
@@ -239,11 +241,11 @@ export default function RefereeCombatMatchScore({ format }) {
         return;
       }
       if ((Number(form.refereeAwardedA) || 0) > 0 && !String(form.refereeAwardedReasonA || '').trim()) {
-        showAlert('A reason is required for Red Referee Awarded Points.', 'error');
+        showAlert(`A reason is required for ${match.team_a?.name}'s Referee Awarded Points.`, 'error');
         return;
       }
       if ((Number(form.refereeAwardedB) || 0) > 0 && !String(form.refereeAwardedReasonB || '').trim()) {
-        showAlert('A reason is required for Blue Referee Awarded Points.', 'error');
+        showAlert(`A reason is required for ${match.team_b?.name}'s Referee Awarded Points.`, 'error');
         return;
       }
     }
@@ -292,6 +294,7 @@ export default function RefereeCombatMatchScore({ format }) {
           division: form.division || null,
           firstHalfA: Math.max(0, Number(form.firstHalfA) || 0), firstHalfB: Math.max(0, Number(form.firstHalfB) || 0),
           secondHalfA: Math.max(0, Number(form.secondHalfA) || 0), secondHalfB: Math.max(0, Number(form.secondHalfB) || 0),
+          half1RedTeam: form.half1RedTeam === 'B' ? 'B' : 'A', half2RedTeam: form.half2RedTeam === 'B' ? 'B' : 'A',
           refereeAwardedA: Math.max(0, Number(form.refereeAwardedA) || 0), refereeAwardedB: Math.max(0, Number(form.refereeAwardedB) || 0),
           refereeAwardedReasonA: form.refereeAwardedReasonA || null, refereeAwardedReasonB: form.refereeAwardedReasonB || null,
           shootoutRounds: (form.shootoutRounds || []).map((r) => ({
@@ -515,8 +518,8 @@ export default function RefereeCombatMatchScore({ format }) {
                   <div style={{ marginTop: 6, padding: 10, background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>
                     {statusAction === 'disqualify' && (
                       <select className="form-input form-select" value={disqualifiedSide} onChange={(e) => setDisqualifiedSide(e.target.value)} style={{ marginBottom: 6 }}>
-                        <option value="A">{match.team_a?.name} (Red)</option>
-                        <option value="B">{match.team_b?.name} (Blue)</option>
+                        <option value="A">{match.team_a?.name}</option>
+                        <option value="B">{match.team_b?.name}</option>
                       </select>
                     )}
                     <textarea className="form-input" rows={2} placeholder="Reason (required)" value={statusReason} onChange={(e) => setStatusReason(e.target.value)} />
@@ -653,27 +656,45 @@ export default function RefereeCombatMatchScore({ format }) {
                       <thead>
                         <tr>
                           <th></th>
-                          <th style={{ textAlign: 'center' }}>{match.team_a?.name} (Red)</th>
-                          <th style={{ textAlign: 'center' }}>{match.team_b?.name} (Blue)</th>
+                          <th style={{ textAlign: 'center' }}>{match.team_a?.name}</th>
+                          <th style={{ textAlign: 'center' }}>{match.team_b?.name}</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Half 1</td>
+                          <td style={{ fontSize: 13 }}>
+                            Half 1
+                            <select className="form-input form-select" style={{ marginTop: 4, fontSize: 12, padding: '2px 6px' }}
+                              value={form.half1RedTeam} onChange={(e) => setForm({ ...form, half1RedTeam: e.target.value })}>
+                              <option value="A">{match.team_a?.name} = Red</option>
+                              <option value="B">{match.team_b?.name} = Red</option>
+                            </select>
+                          </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfA} onChange={(e) => setForm({ ...form, firstHalfA: e.target.value })} />
+                            <div style={{ fontSize: 11, color: form.half1RedTeam === 'A' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half1RedTeam === 'A' ? 'Red' : 'Blue'}</div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfB} onChange={(e) => setForm({ ...form, firstHalfB: e.target.value })} />
+                            <div style={{ fontSize: 11, color: form.half1RedTeam === 'B' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half1RedTeam === 'B' ? 'Red' : 'Blue'}</div>
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Half 2</td>
+                          <td style={{ fontSize: 13 }}>
+                            Half 2
+                            <select className="form-input form-select" style={{ marginTop: 4, fontSize: 12, padding: '2px 6px' }}
+                              value={form.half2RedTeam} onChange={(e) => setForm({ ...form, half2RedTeam: e.target.value })}>
+                              <option value="A">{match.team_a?.name} = Red</option>
+                              <option value="B">{match.team_b?.name} = Red</option>
+                            </select>
+                          </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfA} onChange={(e) => setForm({ ...form, secondHalfA: e.target.value })} />
+                            <div style={{ fontSize: 11, color: form.half2RedTeam === 'A' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half2RedTeam === 'A' ? 'Red' : 'Blue'}</div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfB} onChange={(e) => setForm({ ...form, secondHalfB: e.target.value })} />
+                            <div style={{ fontSize: 11, color: form.half2RedTeam === 'B' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half2RedTeam === 'B' ? 'Red' : 'Blue'}</div>
                           </td>
                         </tr>
                         <tr>
@@ -713,12 +734,12 @@ export default function RefereeCombatMatchScore({ format }) {
                             <div key={r.roundNo} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
                               <strong style={{ width: 70 }}>Round {r.roundNo}</strong>
                               <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateShootoutRound(idx, { aSuccess: e.target.checked })} /> Red scored
+                                <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateShootoutRound(idx, { aSuccess: e.target.checked })} /> {match.team_a?.name} scored
                               </label>
                               <input type="number" className="form-input" style={{ width: 90 }} placeholder="sec" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
                                 disabled={!r.aSuccess} value={r.aTimeSeconds} onChange={(e) => updateShootoutRound(idx, { aTimeSeconds: e.target.value })} />
                               <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateShootoutRound(idx, { bSuccess: e.target.checked })} /> Blue scored
+                                <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateShootoutRound(idx, { bSuccess: e.target.checked })} /> {match.team_b?.name} scored
                               </label>
                               <input type="number" className="form-input" style={{ width: 90 }} placeholder="sec" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
                                 disabled={!r.bSuccess} value={r.bTimeSeconds} onChange={(e) => updateShootoutRound(idx, { bTimeSeconds: e.target.value })} />
@@ -753,7 +774,7 @@ export default function RefereeCombatMatchScore({ format }) {
             <div>
               <h2 className="ts-card-title" style={{ fontSize: 20, margin: 0 }}>CONFIRM MATCH RESULT</h2>
               <div className="ts-sheet-sub">
-                {match.team_a?.name} (Red) vs {match.team_b?.name} (Blue)
+                {match.team_a?.name}{isStars ? ' (Red)' : ''} vs {match.team_b?.name}{isStars ? ' (Blue)' : ''}
                 {match.boards?.name ? ` · Board: ${match.boards.name}` : ''}
               </div>
             </div>
@@ -771,18 +792,18 @@ export default function RefereeCombatMatchScore({ format }) {
 
           <div className="ts-sheet-form-grid">
             <div className="ts-form-row">
-              <label className="ts-label">Student / Team Captain — Red ({match.team_a?.name}) <span className="ts-hint-inline">(locked)</span></label>
+              <label className="ts-label">Student / Team Captain — {match.team_a?.name}{isStars ? ' (Red)' : ''} <span className="ts-hint-inline">(locked)</span></label>
               <input type="text" className="ts-input ts-input-locked" value={form.teamMembersA} readOnly placeholder="No members recorded" />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Student / Team Captain — Blue ({match.team_b?.name}) <span className="ts-hint-inline">(locked)</span></label>
+              <label className="ts-label">Student / Team Captain — {match.team_b?.name}{isStars ? ' (Blue)' : ''} <span className="ts-hint-inline">(locked)</span></label>
               <input type="text" className="ts-input ts-input-locked" value={form.teamMembersB} readOnly placeholder="No members recorded" />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label="Red Team Signature" value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
+              <SignatureBox label={isStars ? 'Red Team Signature' : `${match.team_a?.name} Signature`} value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label="Blue Team Signature" value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
+              <SignatureBox label={isStars ? 'Blue Team Signature' : `${match.team_b?.name} Signature`} value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
             </div>
             <div className="ts-form-row">
               <label className="ts-label">Referee Name <span className="ts-hint-inline">(locked)</span></label>

@@ -25,10 +25,13 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
   const legacyPenaltyB = Array.isArray(d.penaltyB) ? d.penaltyB : [];
 
   const isVoid = d.status === 'cancelled' || d.status === 'disqualified';
-  const winnerSide = match?.winner_id
-    ? (match.winner_id === match?.team_a_id ? 'Red' : match.winner_id === match?.team_b_id ? 'Blue' : '')
+  const half1RedTeam = d.half1RedTeam === 'B' ? 'B' : 'A';
+  const half2RedTeam = d.half2RedTeam === 'B' ? 'B' : 'A';
+  const colorFor = (side, half) => ((half === 1 ? half1RedTeam : half2RedTeam) === side ? 'Red' : 'Blue');
+  const winnerName = match?.winner_id
+    ? (match.winner_id === match?.team_a_id ? match?.team_a?.name : match.winner_id === match?.team_b_id ? match?.team_b?.name : '')
     : '';
-  const winnerNo = winnerSide === 'Red' ? match?.team_a_no : winnerSide === 'Blue' ? match?.team_b_no : '';
+  const winnerNo = match?.winner_id === match?.team_a_id ? match?.team_a_no : match?.winner_id === match?.team_b_id ? match?.team_b_no : '';
 
   const legacyPenaltyRow = (label, attempts) => (
     <tr key={label}>
@@ -64,35 +67,30 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
         </tr>
 
         <tr>
-          <td colSpan={2}><span className="ss-label">Red No.:</span> {match?.team_a_no || ''}</td>
-          <td colSpan={2}><span className="ss-label">Blue No.:</span> {match?.team_b_no || ''}</td>
+          <td colSpan={2}><span className="ss-label">{match?.team_a?.name || 'Team 1'} No.:</span> {match?.team_a_no || ''}</td>
+          <td colSpan={2}><span className="ss-label">{match?.team_b?.name || 'Team 2'} No.:</span> {match?.team_b_no || ''}</td>
           <td colSpan={3}><span className="ss-label">Group:</span> {match?.group_label || ''}</td>
-        </tr>
-
-        <tr>
-          <td colSpan={3}><span className="ss-label">Red team:</span> {match?.team_a?.name || ''}</td>
-          <td colSpan={4}><span className="ss-label">Blue team:</span> {match?.team_b?.name || ''}</td>
         </tr>
 
         <tr className="ss-header-row">
           <th colSpan={2}></th>
-          <th className="ss-center">Red</th>
+          <th className="ss-center">{match?.team_a?.name || 'Team 1'}</th>
           <th className="ss-center" colSpan={2}></th>
-          <th className="ss-center">Blue</th>
+          <th className="ss-center">{match?.team_b?.name || 'Team 2'}</th>
           <th></th>
         </tr>
         <tr>
           <td className="ss-label" colSpan={2}>First-half scoring</td>
-          <td className="ss-center"><strong>{firstHalfA}</strong></td>
+          <td className="ss-center"><strong>{firstHalfA}</strong> <span className="ss-small">({colorFor('A', 1)})</span></td>
           <td colSpan={2}></td>
-          <td className="ss-center"><strong>{firstHalfB}</strong></td>
+          <td className="ss-center"><strong>{firstHalfB}</strong> <span className="ss-small">({colorFor('B', 1)})</span></td>
           <td></td>
         </tr>
         <tr>
           <td className="ss-label" colSpan={2}>Second-half scoring</td>
-          <td className="ss-center"><strong>{secondHalfA}</strong></td>
+          <td className="ss-center"><strong>{secondHalfA}</strong> <span className="ss-small">({colorFor('A', 2)})</span></td>
           <td colSpan={2}></td>
-          <td className="ss-center"><strong>{secondHalfB}</strong></td>
+          <td className="ss-center"><strong>{secondHalfB}</strong> <span className="ss-small">({colorFor('B', 2)})</span></td>
           <td></td>
         </tr>
         {(refereeAwardedA > 0 || refereeAwardedB > 0) && (
@@ -118,8 +116,8 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
           <>
             <tr className="ss-header-row">
               <th>Round</th>
-              <th className="ss-center" colSpan={2}>Red (success / time)</th>
-              <th className="ss-center" colSpan={2}>Blue (success / time)</th>
+              <th className="ss-center" colSpan={2}>{match?.team_a?.name || 'Team 1'} (success / time)</th>
+              <th className="ss-center" colSpan={2}>{match?.team_b?.name || 'Team 2'} (success / time)</th>
               <th colSpan={2}></th>
             </tr>
             {shootoutRounds.map((r) => (
@@ -140,8 +138,8 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
               <th className="ss-center">3</th>
               <th colSpan={2}>Score / Time</th>
             </tr>
-            {legacyPenaltyRow('Red', legacyPenaltyA)}
-            {legacyPenaltyRow('Blue', legacyPenaltyB)}
+            {legacyPenaltyRow(match?.team_a?.name || 'Team 1', legacyPenaltyA)}
+            {legacyPenaltyRow(match?.team_b?.name || 'Team 2', legacyPenaltyB)}
           </>
         )}
 
@@ -150,7 +148,7 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
           <td colSpan={5}>
             {isVoid ? <strong style={{ color: '#b91c1c' }}>N/A — {d.status}</strong> : (
               <>
-                <strong>{winnerSide ? `${winnerSide} Side` : (match?.is_draw ? 'Draw' : '')}</strong>
+                <strong>{winnerName || (match?.is_draw ? 'Draw' : '')}</strong>
                 {winnerNo ? ` — No. ${winnerNo}` : ''}
               </>
             )}
@@ -163,12 +161,12 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
           <td colSpan={4}>
             <div className="ss-label">Team's confirmation</div>
             <div>
-              Red: <strong>{d.teamMembersA || ''}</strong>
-              {d.studentSignatureImageA && <div><img src={d.studentSignatureImageA} alt="Red team signature" style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
+              {match?.team_a?.name || 'Team 1'}: <strong>{d.teamMembersA || ''}</strong>
+              {d.studentSignatureImageA && <div><img src={d.studentSignatureImageA} alt={`${match?.team_a?.name || 'Team 1'} signature`} style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
             </div>
             <div>
-              Blue: <strong>{d.teamMembersB || ''}</strong>
-              {d.studentSignatureImageB && <div><img src={d.studentSignatureImageB} alt="Blue team signature" style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
+              {match?.team_b?.name || 'Team 2'}: <strong>{d.teamMembersB || ''}</strong>
+              {d.studentSignatureImageB && <div><img src={d.studentSignatureImageB} alt={`${match?.team_b?.name || 'Team 2'} signature`} style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
             </div>
           </td>
           <td colSpan={3}>

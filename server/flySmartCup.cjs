@@ -92,6 +92,12 @@ function validateDetails(details) {
   if (d.disqualifiedTeam && !['A', 'B'].includes(d.disqualifiedTeam)) {
     return 'Invalid disqualified team.';
   }
+  if (d.half1RedTeam && !['A', 'B'].includes(d.half1RedTeam)) {
+    return 'Invalid half1RedTeam.';
+  }
+  if (d.half2RedTeam && !['A', 'B'].includes(d.half2RedTeam)) {
+    return 'Invalid half2RedTeam.';
+  }
   return null;
 }
 

@@ -87,6 +87,7 @@ export default function AdminCombatMatches() {
   const [exporting, setExporting] = useState(false);
   const [pendingExport, setPendingExport] = useState(null);
   const [generatingGroup, setGeneratingGroup] = useState(null);
+  const [generatingReturnGroup, setGeneratingReturnGroup] = useState(null);
   const [groupDivModal, setGroupDivModal] = useState(null); // { count } khi mở modal Phân chia bảng
   const [dividingGroups, setDividingGroups] = useState(false);
   const [statusAction, setStatusAction] = useState(null); // 'cancel' | 'disqualify' | null
@@ -133,9 +134,9 @@ export default function AdminCombatMatches() {
   // tài dù admin đã tạo (lỗi đã xảy ra thật, giờ chặn ngay từ form).
   const validate = () => {
     const errs = {};
-    if (!form.team_a_id) errs.team_a_id = 'Chọn đội Đỏ.';
-    if (!form.team_b_id) errs.team_b_id = 'Chọn đội Xanh.';
-    if (form.team_a_id && form.team_a_id === form.team_b_id) errs.team_b_id = 'Đội Xanh phải khác đội Đỏ.';
+    if (!form.team_a_id) errs.team_a_id = isDrone ? 'Chọn đội 1.' : 'Chọn đội Đỏ.';
+    if (!form.team_b_id) errs.team_b_id = isDrone ? 'Chọn đội 2.' : 'Chọn đội Xanh.';
+    if (form.team_a_id && form.team_a_id === form.team_b_id) errs.team_b_id = isDrone ? 'Đội 2 phải khác đội 1.' : 'Đội Xanh phải khác đội Đỏ.';
     if (!form.board_id) errs.board_id = 'Chọn bảng đấu — thiếu bảng thì trọng tài sẽ không thấy trận này.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -241,6 +242,7 @@ export default function AdminCombatMatches() {
         division: d.division || '',
         firstHalfA: d.firstHalfA ?? 0, firstHalfB: d.firstHalfB ?? 0,
         secondHalfA: d.secondHalfA ?? 0, secondHalfB: d.secondHalfB ?? 0,
+        half1RedTeam: d.half1RedTeam === 'B' ? 'B' : 'A', half2RedTeam: d.half2RedTeam === 'B' ? 'B' : 'A',
         refereeAwardedA: d.refereeAwardedA ?? 0, refereeAwardedB: d.refereeAwardedB ?? 0,
         refereeAwardedReasonA: d.refereeAwardedReasonA || '', refereeAwardedReasonB: d.refereeAwardedReasonB || '',
         shootoutRounds: Array.isArray(d.shootoutRounds) ? d.shootoutRounds : [],
@@ -301,6 +303,7 @@ export default function AdminCombatMatches() {
           division: detailForm.division || null,
           firstHalfA: Math.max(0, Number(detailForm.firstHalfA) || 0), firstHalfB: Math.max(0, Number(detailForm.firstHalfB) || 0),
           secondHalfA: Math.max(0, Number(detailForm.secondHalfA) || 0), secondHalfB: Math.max(0, Number(detailForm.secondHalfB) || 0),
+          half1RedTeam: detailForm.half1RedTeam === 'B' ? 'B' : 'A', half2RedTeam: detailForm.half2RedTeam === 'B' ? 'B' : 'A',
           refereeAwardedA: Math.max(0, Number(detailForm.refereeAwardedA) || 0), refereeAwardedB: Math.max(0, Number(detailForm.refereeAwardedB) || 0),
           refereeAwardedReasonA: detailForm.refereeAwardedReasonA || null, refereeAwardedReasonB: detailForm.refereeAwardedReasonB || null,
           shootoutRounds: (detailForm.shootoutRounds || []).map((r) => ({
@@ -454,6 +457,8 @@ export default function AdminCombatMatches() {
 
   // Lịch vòng tròn — dùng chung cho cả Battle of Stars lẫn Fly Smart Cup, thuật
   // toán round-robin không phụ thuộc format (client/src/lib/battleScoring.js).
+  // Chỉ khớp trận "lượt đi" (details.leg mặc định 1 nếu thiếu) — trận "lượt về"
+  // (details.leg === 2, xem returnLegByGroup) không được tính là đã đủ lượt đi.
   const scheduleByGroup = useMemo(() => {
     if (!isCombat) return [];
     return teamGroups.map((g) => {
@@ -461,7 +466,7 @@ export default function AdminCombatMatches() {
       const rounds = generateRoundRobin(teamIds).map((pairs, idx) => ({
         roundNo: idx + 1,
         pairs: pairs.map(([aId, bId]) => {
-          const existing = matches.find((m) => m.group_label === g.label &&
+          const existing = matches.find((m) => m.group_label === g.label && (m.details?.leg ?? 1) === 1 &&
             ((m.team_a_id === aId && m.team_b_id === bId) || (m.team_a_id === bId && m.team_b_id === aId)));
           const teamA = g.teams.find((t) => t.id === aId);
           const teamB = g.teams.find((t) => t.id === bId);
@@ -472,6 +477,25 @@ export default function AdminCombatMatches() {
       return { label: g.label, teamIds, rounds, missingPairs };
     });
   }, [isCombat, teamGroups, matches]);
+
+  // "Lượt về" (Battle of Stars only) — thêm 1 vòng tròn nữa cho 1 group khi
+  // group đó ít đội (thêm trận để có thêm dữ liệu tính bảng xếp hạng), team_a/
+  // team_b ĐẢO NGƯỢC so với lượt đi (quy ước sân nhà/sân khách đảo vị trí).
+  // Chỉ cho sinh lượt về khi group đã đủ lượt đi (leg 1) — tránh tạo lượt về
+  // trước khi có đủ dữ liệu lượt đi để đối chiếu.
+  const returnLegByGroup = useMemo(() => {
+    if (!isStars) return [];
+    return scheduleByGroup
+      .filter((g) => g.teamIds.length >= 2 && g.missingPairs.length === 0)
+      .map((g) => {
+        const missingReturnPairs = g.rounds.flatMap((r) => r.pairs).filter((p) => {
+          const exists = matches.some((m) => m.group_label === g.label && (m.details?.leg ?? 1) === 2 &&
+            ((m.team_a_id === p.teamAId && m.team_b_id === p.teamBId) || (m.team_a_id === p.teamBId && m.team_b_id === p.teamAId)));
+          return !exists;
+        });
+        return { label: g.label, teamIds: g.teamIds, missingReturnPairs };
+      });
+  }, [isStars, scheduleByGroup, matches]);
 
   // Sinh trận còn thiếu của 1 bảng, rải đều field: chọn field đang được dùng ÍT
   // NHẤT trong toàn nội dung (tính cả trận đã có) cho mỗi trận mới, để tổng số
@@ -514,6 +538,45 @@ export default function AdminCombatMatches() {
       showAlert(e.message || 'Lỗi', 'error');
     } finally {
       setGeneratingGroup(null);
+    }
+  };
+
+  // Sinh "lượt về" cho 1 group (Battle of Stars) — mỗi cặp còn thiếu ở leg 2,
+  // team_a/team_b ĐẢO NGƯỢC so với lượt đi (đúng quy ước sân nhà/sân khách),
+  // đánh dấu details.leg = 2. computeGroupStandings không lọc theo leg nên
+  // điểm lượt đi + lượt về tự cộng dồn vào đúng bảng xếp hạng của group.
+  const generateReturnLeg = async (returnGroup) => {
+    if (!returnGroup.missingReturnPairs.length) return;
+    const teamsById = new Map(returnGroup.teamIds.map((id) => [id, teams.find((t) => t.id === id)]));
+    const fieldUsage = new Map();
+    for (const m of matches) { if (m.field_id) fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1); }
+    const pickField = () => {
+      if (!allFields.length) return null;
+      let best = allFields[0], bestCount = Infinity;
+      for (const f of allFields) {
+        const c = fieldUsage.get(f.id) || 0;
+        if (c < bestCount) { bestCount = c; best = f; }
+      }
+      fieldUsage.set(best.id, bestCount + 1);
+      return best;
+    };
+    setGeneratingReturnGroup(returnGroup.label);
+    try {
+      for (const p of returnGroup.missingReturnPairs) {
+        const homeTeam = teamsById.get(p.teamBId); // đảo ngược: đội B lượt đi thành đội A lượt về
+        const field = pickField();
+        await api.postCombatMatch(selectedContentId, {
+          team_a_id: p.teamBId, team_b_id: p.teamAId,
+          group_label: returnGroup.label, board_id: homeTeam.board_id, field_id: field?.id || null,
+          details: { leg: 2 },
+        });
+      }
+      await reloadMatches();
+      showAlert('Đã sinh lượt về.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setGeneratingReturnGroup(null);
     }
   };
 
@@ -727,13 +790,32 @@ export default function AdminCombatMatches() {
                 <div key={g.label} style={{ marginBottom: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
                     <h4 style={{ margin: 0, color: '#0f172a' }}>{g.label} <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: 13 }}>({g.teamIds.length} đội)</span></h4>
-                    <button
-                      type="button" className="btn btn-secondary"
-                      disabled={!g.missingPairs.length || generatingGroup === g.label}
-                      onClick={() => generateSchedule(g)}
-                    >
-                      {generatingGroup === g.label ? 'Đang sinh...' : g.missingPairs.length ? `Sinh lịch vòng tròn (còn thiếu ${g.missingPairs.length} trận)` : 'Đã đủ lịch vòng tròn'}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button" className="btn btn-secondary"
+                        disabled={!g.missingPairs.length || generatingGroup === g.label}
+                        onClick={() => generateSchedule(g)}
+                      >
+                        {generatingGroup === g.label ? 'Đang sinh...' : g.missingPairs.length ? `Sinh lịch vòng tròn (còn thiếu ${g.missingPairs.length} trận)` : 'Đã đủ lịch vòng tròn'}
+                      </button>
+                      {isStars && (() => {
+                        const rg = returnLegByGroup.find((x) => x.label === g.label);
+                        if (!rg) return (
+                          <button type="button" className="btn btn-secondary" disabled title="Cần sinh đủ lượt đi trước">
+                            Sinh lượt về
+                          </button>
+                        );
+                        return (
+                          <button
+                            type="button" className="btn btn-secondary"
+                            disabled={!rg.missingReturnPairs.length || generatingReturnGroup === g.label}
+                            onClick={() => generateReturnLeg(rg)}
+                          >
+                            {generatingReturnGroup === g.label ? 'Đang sinh...' : rg.missingReturnPairs.length ? `Sinh lượt về (còn thiếu ${rg.missingReturnPairs.length} trận)` : 'Đã đủ lượt về'}
+                          </button>
+                        );
+                      })()}
+                    </div>
                   </div>
                   {g.rounds.map((r) => (
                     <div key={r.roundNo} style={{ marginBottom: 8 }}>
@@ -774,8 +856,8 @@ export default function AdminCombatMatches() {
                   <tr>
                     <th>Vòng / Bảng</th>
                     <th>Sân</th>
-                    <th>Đội Đỏ</th>
-                    <th>Đội Xanh</th>
+                    <th>{isDrone ? 'Đội 1' : 'Đội Đỏ'}</th>
+                    <th>{isDrone ? 'Đội 2' : 'Đội Xanh'}</th>
                     <th>Kết quả</th>
                     <th></th>
                   </tr>
@@ -787,7 +869,12 @@ export default function AdminCombatMatches() {
                     <tr key={m.id}>
                       <td>
                         {m.stage || '-'}
-                        {m.group_label && <div style={{ fontSize: 12, color: '#64748b' }}>Bảng: {m.group_label}</div>}
+                        {m.group_label && (
+                          <div style={{ fontSize: 12, color: '#64748b' }}>
+                            Bảng: {m.group_label}
+                            {isStars && (m.details?.leg ?? 1) === 2 && <span style={{ marginLeft: 6, color: '#7c3aed', fontWeight: 600 }}>[Lượt về]</span>}
+                          </div>
+                        )}
                       </td>
                       <td>{m.field?.name || '-'}</td>
                       <td>{m.team_a?.name || '-'}{m.team_a_no ? ` (No.${m.team_a_no})` : ''}</td>
@@ -998,7 +1085,7 @@ export default function AdminCombatMatches() {
                   <div className="table-container">
                     <table>
                       <thead>
-                        <tr><th>Đội Đỏ</th><th>Đội Xanh</th><th>Kết quả</th><th></th></tr>
+                        <tr><th>Đội 1</th><th>Đội 2</th><th>Kết quả</th><th></th></tr>
                       </thead>
                       <tbody>
                         {r.matches.map((m) => {
@@ -1068,20 +1155,20 @@ export default function AdminCombatMatches() {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Đội Đỏ <span style={{ color: '#dc2626' }}>*</span></label>
+                  <label className="form-label">{isDrone ? 'Đội 1' : 'Đội Đỏ'} <span style={{ color: '#dc2626' }}>*</span></label>
                   <select className={`form-input form-select ${errors.team_a_id ? 'form-input-error' : ''}`} value={form.team_a_id} onChange={(e) => setForm({ ...form, team_a_id: e.target.value })}>
                     <option value="">-- Chọn đội --</option>
                     {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Số báo danh Đỏ</label>
+                  <label className="form-label">{isDrone ? 'Số báo danh đội 1' : 'Số báo danh Đỏ'}</label>
                   <input className="form-input" value={form.team_a_no} onChange={(e) => setForm({ ...form, team_a_no: e.target.value })} />
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Đội Xanh <span style={{ color: '#dc2626' }}>*</span></label>
+                  <label className="form-label">{isDrone ? 'Đội 2' : 'Đội Xanh'} <span style={{ color: '#dc2626' }}>*</span></label>
                   <select className={`form-input form-select ${errors.team_b_id ? 'form-input-error' : ''}`} value={form.team_b_id} onChange={(e) => setForm({ ...form, team_b_id: e.target.value })}>
                     <option value="">-- Chọn đội --</option>
                     {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -1089,7 +1176,7 @@ export default function AdminCombatMatches() {
                   {errors.team_b_id && <div className="form-error-text">{errors.team_b_id}</div>}
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Số báo danh Xanh</label>
+                  <label className="form-label">{isDrone ? 'Số báo danh đội 2' : 'Số báo danh Xanh'}</label>
                   <input className="form-input" value={form.team_b_no} onChange={(e) => setForm({ ...form, team_b_no: e.target.value })} />
                 </div>
               </div>
@@ -1235,36 +1322,50 @@ export default function AdminCombatMatches() {
                 </>
               ) : (
                 <>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Hiệp 1 — Đỏ</label>
-                      <input type="number" min="0" className="form-input" value={detailForm.firstHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfA: e.target.value })} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Hiệp 1 — Xanh</label>
-                      <input type="number" min="0" className="form-input" value={detailForm.firstHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfB: e.target.value })} />
-                    </div>
+                  <div className="form-group">
+                    <label className="form-label">Màu Hiệp 1 (đội nào là Đỏ)</label>
+                    <select className="form-input form-select" value={detailForm.half1RedTeam ?? 'A'} onChange={(e) => setDetailForm({ ...detailForm, half1RedTeam: e.target.value })}>
+                      <option value="A">{detailModal.team_a?.name} = Đỏ, {detailModal.team_b?.name} = Xanh</option>
+                      <option value="B">{detailModal.team_b?.name} = Đỏ, {detailModal.team_a?.name} = Xanh</option>
+                    </select>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Hiệp 2 — Đỏ</label>
+                      <label className="form-label">Hiệp 1 — {detailModal.team_a?.name}</label>
+                      <input type="number" min="0" className="form-input" value={detailForm.firstHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfA: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Hiệp 1 — {detailModal.team_b?.name}</label>
+                      <input type="number" min="0" className="form-input" value={detailForm.firstHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, firstHalfB: e.target.value })} />
+                    </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Màu Hiệp 2 (đội nào là Đỏ)</label>
+                    <select className="form-input form-select" value={detailForm.half2RedTeam ?? 'A'} onChange={(e) => setDetailForm({ ...detailForm, half2RedTeam: e.target.value })}>
+                      <option value="A">{detailModal.team_a?.name} = Đỏ, {detailModal.team_b?.name} = Xanh</option>
+                      <option value="B">{detailModal.team_b?.name} = Đỏ, {detailModal.team_a?.name} = Xanh</option>
+                    </select>
+                  </div>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Hiệp 2 — {detailModal.team_a?.name}</label>
                       <input type="number" min="0" className="form-input" value={detailForm.secondHalfA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, secondHalfA: e.target.value })} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Hiệp 2 — Xanh</label>
+                      <label className="form-label">Hiệp 2 — {detailModal.team_b?.name}</label>
                       <input type="number" min="0" className="form-input" value={detailForm.secondHalfB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, secondHalfB: e.target.value })} />
                     </div>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Referee Awarded Points — Đỏ <span style={{ color: '#94a3b8' }}>(mục 12, cần lý do)</span></label>
+                      <label className="form-label">Referee Awarded Points — {detailModal.team_a?.name} <span style={{ color: '#94a3b8' }}>(mục 12, cần lý do)</span></label>
                       <input type="number" min="0" className="form-input" value={detailForm.refereeAwardedA ?? 0} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedA: e.target.value })} />
                       {(Number(detailForm.refereeAwardedA) || 0) > 0 && (
                         <input type="text" className="form-input" style={{ marginTop: 6 }} placeholder="Lý do" value={detailForm.refereeAwardedReasonA} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedReasonA: e.target.value })} />
                       )}
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Referee Awarded Points — Xanh</label>
+                      <label className="form-label">Referee Awarded Points — {detailModal.team_b?.name}</label>
                       <input type="number" min="0" className="form-input" value={detailForm.refereeAwardedB ?? 0} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedB: e.target.value })} />
                       {(Number(detailForm.refereeAwardedB) || 0) > 0 && (
                         <input type="text" className="form-input" style={{ marginTop: 6 }} placeholder="Lý do" value={detailForm.refereeAwardedReasonB} onChange={(e) => setDetailForm({ ...detailForm, refereeAwardedReasonB: e.target.value })} />
@@ -1289,7 +1390,7 @@ export default function AdminCombatMatches() {
                     return (
                       <>
                         <div style={{ margin: '12px 0', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13 }}>
-                          <div>Total Score — Đỏ: <strong>{tA.total}</strong> · Xanh: <strong>{tB.total}</strong></div>
+                          <div>Total Score — {detailModal.team_a?.name}: <strong>{tA.total}</strong> · {detailModal.team_b?.name}: <strong>{tB.total}</strong></div>
                           <div style={{ marginTop: 4, fontWeight: 700, color: '#16a34a' }}>Kết quả (tự động): {resultText}</div>
                         </div>
                         {isKnockout && tied && (
@@ -1302,7 +1403,7 @@ export default function AdminCombatMatches() {
                                 {detailForm.shootoutRounds.map((r, idx) => (
                                   <div className="form-row" key={r.roundNo} style={{ alignItems: 'center' }}>
                                     <div className="form-group">
-                                      <label className="form-label">Round {r.roundNo} — Đỏ</label>
+                                      <label className="form-label">Round {r.roundNo} — {detailModal.team_a?.name}</label>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
                                           <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateDroneShootoutRound(idx, { aSuccess: e.target.checked })} /> Ghi điểm
@@ -1312,7 +1413,7 @@ export default function AdminCombatMatches() {
                                       </div>
                                     </div>
                                     <div className="form-group">
-                                      <label className="form-label">Round {r.roundNo} — Xanh</label>
+                                      <label className="form-label">Round {r.roundNo} — {detailModal.team_b?.name}</label>
                                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
                                           <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateDroneShootoutRound(idx, { bSuccess: e.target.checked })} /> Ghi điểm
@@ -1347,20 +1448,20 @@ export default function AdminCombatMatches() {
               <h4 style={{ marginBottom: 8 }}>Xác nhận điểm</h4>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Học sinh/đội trưởng — Đỏ</label>
+                  <label className="form-label">Học sinh/đội trưởng — {isStars ? 'Đỏ' : detailModal.team_a?.name}</label>
                   <input className="form-input" value={detailForm.teamMembersA || ''} onChange={(e) => setDetailForm({ ...detailForm, teamMembersA: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Học sinh/đội trưởng — Xanh</label>
+                  <label className="form-label">Học sinh/đội trưởng — {isStars ? 'Xanh' : detailModal.team_b?.name}</label>
                   <input className="form-input" value={detailForm.teamMembersB || ''} onChange={(e) => setDetailForm({ ...detailForm, teamMembersB: e.target.value })} />
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <SignatureBox label="Chữ ký đội Đỏ" value={detailForm.studentSigImageA} onChange={(v) => setDetailForm({ ...detailForm, studentSigImageA: v })} />
+                  <SignatureBox label={isStars ? 'Chữ ký đội Đỏ' : `Chữ ký đội ${detailModal.team_a?.name}`} value={detailForm.studentSigImageA} onChange={(v) => setDetailForm({ ...detailForm, studentSigImageA: v })} />
                 </div>
                 <div className="form-group">
-                  <SignatureBox label="Chữ ký đội Xanh" value={detailForm.studentSigImageB} onChange={(v) => setDetailForm({ ...detailForm, studentSigImageB: v })} />
+                  <SignatureBox label={isStars ? 'Chữ ký đội Xanh' : `Chữ ký đội ${detailModal.team_b?.name}`} value={detailForm.studentSigImageB} onChange={(v) => setDetailForm({ ...detailForm, studentSigImageB: v })} />
                 </div>
               </div>
               <div className="form-row">
@@ -1403,8 +1504,8 @@ export default function AdminCombatMatches() {
                     <div style={{ padding: 12, background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
                       {statusAction === 'disqualify' && (
                         <select className="form-input form-select" style={{ marginBottom: 8 }} value={disqualifiedSide} onChange={(e) => setDisqualifiedSide(e.target.value)}>
-                          <option value="A">{detailModal.team_a?.name} (Đỏ)</option>
-                          <option value="B">{detailModal.team_b?.name} (Xanh)</option>
+                          <option value="A">{detailModal.team_a?.name}</option>
+                          <option value="B">{detailModal.team_b?.name}</option>
                         </select>
                       )}
                       <textarea className="form-input" rows={2} placeholder="Lý do (bắt buộc)" value={statusReason} onChange={(e) => setStatusReason(e.target.value)} />
