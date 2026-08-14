@@ -2,6 +2,7 @@ services:
   - type: web
     name: hethongchamdiem
     env: node
+    region: singapore
     buildCommand: cd client && npm install && npm run build && cd ../server && npm install
     startCommand: node server/index.cjs
     envVars:
