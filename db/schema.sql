@@ -276,6 +276,14 @@ create index if not exists idx_referee_boards_board on referee_boards(board_id);
 -- trang chủ) — chỉ là bật/tắt tính năng hiển thị trong khu vực trọng tài.
 alter table users add column if not exists can_view_scoreboard boolean not null default false;
 
+-- Ngôn ngữ giao diện chấm điểm cho trọng tài — 'en' (mặc định, giữ đúng hành
+-- vi hiện tại của toàn bộ UI chấm điểm) hoặc 'vi'. Admin chọn khi tạo/sửa tài
+-- khoản trọng tài (AdminRefereeAccounts.jsx); client đọc user.language để
+-- quyết định render bản tiếng Anh hay tiếng Việt (client/src/lib/i18n.js).
+alter table users add column if not exists language text not null default 'en';
+alter table users drop constraint if exists users_language_check;
+alter table users add constraint users_language_check check (language in ('en', 'vi'));
+
 -- Mỗi đội thi 2 lượt độc lập / nội dung (lượt 1 + lượt 2), có thể chấm ở 2
 -- thời điểm khác nhau — thay cho "mỗi đội 1 phiếu duy nhất" trước đây.
 drop index if exists uq_scores_team_content;

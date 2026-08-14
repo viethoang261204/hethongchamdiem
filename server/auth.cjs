@@ -11,7 +11,7 @@ if (!JWT_SECRET) {
 }
 const TOKEN_TTL = '30d';
 
-const PROFILE_FIELDS = 'id, email, username, full_name, role, area_id, can_view_scoreboard';
+const PROFILE_FIELDS = 'id, email, username, full_name, role, area_id, can_view_scoreboard, language';
 
 function signToken(user) {
   return jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_TTL });

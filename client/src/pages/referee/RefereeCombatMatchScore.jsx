@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api, taskImageUrl } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
+import { useLang, t } from '../../lib/i18n';
 import SignatureBox from '../../components/SignaturePad';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { exportToPdf } from './exportPdf';
@@ -24,6 +25,8 @@ const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
 const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: '', bSuccess: false, bTimeSeconds: '' });
 
+const STATUS_LABEL_VI = { scheduled: 'Chưa bắt đầu', live: 'Đang diễn ra', completed: 'Đã hoàn thành', cancelled: 'Đã hủy', disqualified: 'Truất quyền' };
+
 // Score sheet for 1 combat match — replaces the old inline accordion: clicking
 // a match in the list opens this dedicated page (same shape as the "pure"
 // TaskScoringWizard flow): a Start Match gate, a live stopwatch while
@@ -33,11 +36,16 @@ const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: ''
 // Battle of Stars (isStars) keeps its existing rules untouched. Fly Smart Cup
 // (drone) uses its OWN, independent rule set (client/src/lib/flySmartCupScoring.js)
 // — goals/score only, no Meteor Tower/Direct Win/Task Score/Retry.
+//
+// UI text renders in English or Vietnamese based on the logged-in referee's
+// user.language (client/src/lib/i18n.js) — EN is the original/default text,
+// unchanged from before this feature existed.
 export default function RefereeCombatMatchScore({ format }) {
   const isStars = format === 'combat_stars';
   const { competitionId, contentId, matchId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const lang = useLang();
   const { showAlert } = useNotify();
   const sheetRef = useRef(null);
 
@@ -182,11 +190,11 @@ export default function RefereeCombatMatchScore({ format }) {
   const scoreB = isStars ? computeTaskScore(sideData('B')) : null;
   const starsOutcome = isStars ? determineGroupMatchResult(sideData('A'), sideData('B')) : null;
   const starsResultText = isStars ? (
-    form.directWinA ? `${match?.team_a?.name} wins — Direct Win (Final Fortress)`
-      : form.directWinB ? `${match?.team_b?.name} wins — Direct Win (Final Fortress)`
-      : starsOutcome.result === 'DRAW' ? `Draw (${scoreA.taskScore} - ${scoreB.taskScore})`
-      : starsOutcome.result === 'A' ? `${match?.team_a?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`
-      : `${match?.team_b?.name} wins (${scoreA.taskScore} - ${scoreB.taskScore})`
+    form.directWinA ? `${match?.team_a?.name} ${t(lang, 'wins', 'thắng')} — Direct Win (Final Fortress)`
+      : form.directWinB ? `${match?.team_b?.name} ${t(lang, 'wins', 'thắng')} — Direct Win (Final Fortress)`
+      : starsOutcome.result === 'DRAW' ? `${t(lang, 'Draw', 'Hòa')} (${scoreA.taskScore} - ${scoreB.taskScore})`
+      : starsOutcome.result === 'A' ? `${match?.team_a?.name} ${t(lang, 'wins', 'thắng')} (${scoreA.taskScore} - ${scoreB.taskScore})`
+      : `${match?.team_b?.name} ${t(lang, 'wins', 'thắng')} (${scoreA.taskScore} - ${scoreB.taskScore})`
   ) : '';
 
   // ── Fly Smart Cup: live score & result — independent rules, no relation to Battle of Stars ──
@@ -217,13 +225,13 @@ export default function RefereeCombatMatchScore({ format }) {
   const droneResultText = () => {
     if (!match) return '';
     if (isKnockout) {
-      if (droneOutcome.result === 'A') return `${match.team_a?.name} advances (${droneScoreA.total} - ${droneScoreB.total})${droneOutcome.shootoutNeeded ? ' — decided by Penalty Shootout' : ''}`;
-      if (droneOutcome.result === 'B') return `${match.team_b?.name} advances (${droneScoreA.total} - ${droneScoreB.total})${droneOutcome.shootoutNeeded ? ' — decided by Penalty Shootout' : ''}`;
-      return `Tied ${droneScoreA.total} - ${droneScoreB.total} — Penalty Shootout required`;
+      if (droneOutcome.result === 'A') return `${match.team_a?.name} ${t(lang, 'advances', 'đi tiếp')} (${droneScoreA.total} - ${droneScoreB.total})${droneOutcome.shootoutNeeded ? t(lang, ' — decided by Penalty Shootout', ' — quyết định bằng đá luân lưu') : ''}`;
+      if (droneOutcome.result === 'B') return `${match.team_b?.name} ${t(lang, 'advances', 'đi tiếp')} (${droneScoreA.total} - ${droneScoreB.total})${droneOutcome.shootoutNeeded ? t(lang, ' — decided by Penalty Shootout', ' — quyết định bằng đá luân lưu') : ''}`;
+      return t(lang, `Tied ${droneScoreA.total} - ${droneScoreB.total} — Penalty Shootout required`, `Hòa ${droneScoreA.total} - ${droneScoreB.total} — cần đá luân lưu`);
     }
-    if (droneOutcome.result === 'DRAW') return `Draw (${droneScoreA.total} - ${droneScoreB.total}) — 1 Match Point each`;
-    if (droneOutcome.result === 'A') return `${match.team_a?.name} wins (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`;
-    return `${match.team_b?.name} wins (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`;
+    if (droneOutcome.result === 'DRAW') return t(lang, `Draw (${droneScoreA.total} - ${droneScoreB.total}) — 1 Match Point each`, `Hòa (${droneScoreA.total} - ${droneScoreB.total}) — mỗi đội 1 Match Point`);
+    if (droneOutcome.result === 'A') return t(lang, `${match.team_a?.name} wins (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`, `${match.team_a?.name} thắng (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`);
+    return t(lang, `${match.team_b?.name} wins (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`, `${match.team_b?.name} thắng (${droneScoreA.total} - ${droneScoreB.total}) — 3 Match Points`);
   };
 
   const startShootout = () => setForm((f) => ({ ...f, shootoutRounds: [1, 2, 3].map(newShootoutRound) }));
@@ -237,15 +245,15 @@ export default function RefereeCombatMatchScore({ format }) {
   const gotoStep2 = () => {
     if (!isStars) {
       if (isKnockout && droneTied && !shootoutWinnerInfo.winner) {
-        showAlert('Penalty Shootout is not resolved yet — add rounds until there is a winner.', 'error');
+        showAlert(t(lang, 'Penalty Shootout is not resolved yet — add rounds until there is a winner.', 'Đá luân lưu chưa có kết quả — thêm vòng cho đến khi có đội thắng.'), 'error');
         return;
       }
       if ((Number(form.refereeAwardedA) || 0) > 0 && !String(form.refereeAwardedReasonA || '').trim()) {
-        showAlert(`A reason is required for ${match.team_a?.name}'s Referee Awarded Points.`, 'error');
+        showAlert(t(lang, `A reason is required for ${match.team_a?.name}'s Referee Awarded Points.`, `Cần nhập lý do cho Điểm trọng tài thưởng của ${match.team_a?.name}.`), 'error');
         return;
       }
       if ((Number(form.refereeAwardedB) || 0) > 0 && !String(form.refereeAwardedReasonB || '').trim()) {
-        showAlert(`A reason is required for ${match.team_b?.name}'s Referee Awarded Points.`, 'error');
+        showAlert(t(lang, `A reason is required for ${match.team_b?.name}'s Referee Awarded Points.`, `Cần nhập lý do cho Điểm trọng tài thưởng của ${match.team_b?.name}.`), 'error');
         return;
       }
     }
@@ -255,11 +263,11 @@ export default function RefereeCombatMatchScore({ format }) {
 
   const handleSubmit = async () => {
     if (!form.studentSigImageA || !form.studentSigImageB || !form.refereeSigImage) {
-      showAlert('Please collect signatures from both teams and the referee before saving.', 'error');
+      showAlert(t(lang, 'Please collect signatures from both teams and the referee before saving.', 'Vui lòng lấy đủ chữ ký của cả 2 đội và trọng tài trước khi lưu.'), 'error');
       return;
     }
     if (isStars && form.directWinA && form.directWinB) {
-      showAlert('Both teams cannot have Direct Win at the same time.', 'error');
+      showAlert(t(lang, 'Both teams cannot have Direct Win at the same time.', 'Không thể cả 2 đội cùng có Direct Win.'), 'error');
       return;
     }
     setSubmitting(true);
@@ -325,14 +333,14 @@ export default function RefereeCombatMatchScore({ format }) {
       setSavedMatch({ ...match, details: { ...body.details, status: 'completed' }, winner_id: body.winner_id, is_draw: body.is_draw });
       setSuccess(true);
     } catch (e) {
-      showAlert(e.message || 'Failed to save.', 'error');
+      showAlert(e.message || t(lang, 'Failed to save.', 'Lưu thất bại.'), 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
   const submitStatusAction = async () => {
-    if (!statusReason.trim()) { showAlert('A reason is required.', 'error'); return; }
+    if (!statusReason.trim()) { showAlert(t(lang, 'A reason is required.', 'Cần nhập lý do.'), 'error'); return; }
     setStatusSaving(true);
     try {
       const status = statusAction === 'cancel' ? 'cancelled' : 'disqualified';
@@ -343,11 +351,11 @@ export default function RefereeCombatMatchScore({ format }) {
         disqualificationReason: statusReason,
       };
       await api.putCombatMatch(match.id, { status, details });
-      showAlert(`Match marked as ${status}.`, 'success');
+      showAlert(t(lang, `Match marked as ${status}.`, `Đã đánh dấu trận là "${STATUS_LABEL_VI[status]}".`), 'success');
       setStatusAction(null);
       navigate(listUrl);
     } catch (e) {
-      showAlert(e.message || 'Failed to update match status.', 'error');
+      showAlert(e.message || t(lang, 'Failed to update match status.', 'Cập nhật trạng thái trận thất bại.'), 'error');
     } finally {
       setStatusSaving(false);
     }
@@ -365,15 +373,15 @@ export default function RefereeCombatMatchScore({ format }) {
 
   if (loading) return (
     <div className="ts-wrapper ts-center-screen">
-      <p style={{ color: '#94a3b8' }}>Loading...</p>
+      <p style={{ color: '#94a3b8' }}>{t(lang, 'Loading...', 'Đang tải...')}</p>
     </div>
   );
 
   if (notFound) return (
     <div className="ts-wrapper ts-center-screen">
       <div className="ts-card ts-gate-card">
-        <p style={{ color: '#f87171' }}>Match not found.</p>
-        <Link to={listUrl} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>← Back</Link>
+        <p style={{ color: '#f87171' }}>{t(lang, 'Match not found.', 'Không tìm thấy trận đấu.')}</p>
+        <Link to={listUrl} className="ts-btn ts-btn-ghost" style={{ marginTop: 16, display: 'inline-flex' }}>{t(lang, '← Back', '← Quay lại')}</Link>
       </div>
     </div>
   );
@@ -386,12 +394,12 @@ export default function RefereeCombatMatchScore({ format }) {
       <div className="ts-wrapper ts-center-screen">
         <div className="ts-success">
           <div className="ts-success-icon">✓</div>
-          <strong>Match score sheet saved!</strong>
+          <strong>{t(lang, 'Match score sheet saved!', 'Đã lưu phiếu điểm trận đấu!')}</strong>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', marginTop: 20 }}>
             <button type="button" className="ts-btn ts-btn-primary" onClick={handleExportPdf} disabled={exporting}>
-              {exporting ? 'Exporting...' : 'Download PDF'}
+              {exporting ? t(lang, 'Exporting...', 'Đang xuất...') : t(lang, 'Download PDF', 'Tải PDF')}
             </button>
-            <Link to={listUrl} className="ts-btn ts-btn-secondary">← Back to match list</Link>
+            <Link to={listUrl} className="ts-btn ts-btn-secondary">{t(lang, '← Back to match list', '← Về danh sách trận')}</Link>
           </div>
         </div>
         <div style={{ position: 'fixed', top: 0, left: -99999, zIndex: -1 }}>
@@ -420,13 +428,13 @@ export default function RefereeCombatMatchScore({ format }) {
           <div className="ts-gate-action">
             <button type="button" className="ts-btn ts-btn-primary ts-btn-xl ts-gate-start-btn" onClick={startMatch}>
               <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M8 5v14l11-7z"/></svg>
-              START MATCH
+              {t(lang, 'START MATCH', 'BẮT ĐẦU TRẬN')}
             </button>
-            <p className="ts-gate-hint">⏱ The stopwatch starts automatically — use it to record the match time on the sheet.</p>
+            <p className="ts-gate-hint">{t(lang, '⏱ The stopwatch starts automatically — use it to record the match time on the sheet.', '⏱ Đồng hồ bấm giờ tự động chạy — dùng để ghi lại thời gian trận đấu vào phiếu điểm.')}</p>
           </div>
 
           <div className="ts-gate-footer">
-            <Link to={listUrl} className="ts-btn ts-btn-ghost">← Back to match list</Link>
+            <Link to={listUrl} className="ts-btn ts-btn-ghost">{t(lang, '← Back to match list', '← Về danh sách trận')}</Link>
           </div>
         </div>
       </div>
@@ -436,7 +444,7 @@ export default function RefereeCombatMatchScore({ format }) {
   return (
     <div className="ts-wrapper ts-tablet-layout">
       <header className="ts-header">
-        <Link to={listUrl} className="ts-back" title="Back to match list">
+        <Link to={listUrl} className="ts-back" title={t(lang, 'Back to match list', 'Về danh sách trận')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
         </Link>
         <div className="ts-header-info">
@@ -444,12 +452,14 @@ export default function RefereeCombatMatchScore({ format }) {
             {match.team_a?.name || '—'} <span style={{ color: '#64748b', fontWeight: 400 }}>vs</span> {match.team_b?.name || '—'}
             {match.stage && <span className="ts-board-chip">{match.stage}</span>}
             {match.group_label && <span className="ts-board-chip">{match.group_label}</span>}
-            {!isStars && match.details?.status && match.details.status !== 'scheduled' && <span className="ts-board-chip">{match.details.status.toUpperCase()}</span>}
+            {!isStars && match.details?.status && match.details.status !== 'scheduled' && (
+              <span className="ts-board-chip">{t(lang, match.details.status.toUpperCase(), (STATUS_LABEL_VI[match.details.status] || match.details.status).toUpperCase())}</span>
+            )}
           </div>
-          <div className="ts-content-name">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'} — Combat</div>
+          <div className="ts-content-name">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'} — {t(lang, 'Combat', 'Đối kháng')}</div>
         </div>
         <div className="ts-header-score">
-          <div className="ts-score-label">LIVE SCORE</div>
+          <div className="ts-score-label">{t(lang, 'LIVE SCORE', 'ĐIỂM TRỰC TIẾP')}</div>
           <div className="ts-score-value" style={{ fontSize: 20 }}>
             {isStars ? `${scoreA.taskScore} - ${scoreB.taskScore}` : `${droneScoreA.total} - ${droneScoreB.total}`}
           </div>
@@ -459,12 +469,12 @@ export default function RefereeCombatMatchScore({ format }) {
       <div className="ts-stepper">
         <div className={`ts-step ${step >= 1 ? 'active' : ''} ${step > 1 ? 'done' : ''}`} onClick={() => setStep(1)}>
           <span className="ts-step-num">1</span>
-          <span className="ts-step-label">Score both teams</span>
+          <span className="ts-step-label">{t(lang, 'Score both teams', 'Chấm điểm cả 2 đội')}</span>
         </div>
         <div className="ts-step-line" />
         <div className={`ts-step ${step >= 2 ? 'active' : ''}`} onClick={() => setStep(2)}>
           <span className="ts-step-num">2</span>
-          <span className="ts-step-label">Confirm & sign to save</span>
+          <span className="ts-step-label">{t(lang, 'Confirm & sign to save', 'Xác nhận & ký để lưu')}</span>
         </div>
       </div>
 
@@ -472,7 +482,7 @@ export default function RefereeCombatMatchScore({ format }) {
         <div className="ts-split-container">
           <aside className="ts-sidebar-pane">
             <div className="ts-card ts-sidebar-card">
-              <div className="ts-sidebar-title">STOPWATCH</div>
+              <div className="ts-sidebar-title">{t(lang, 'STOPWATCH', 'ĐỒNG HỒ BẤM GIỜ')}</div>
               <div className="ts-stopwatch-widget">
                 <div className="ts-stopwatch-display">
                   <span className="ts-stopwatch-digits">{formatSecondsAsMinutes(stopwatchSeconds)}</span>
@@ -480,9 +490,9 @@ export default function RefereeCombatMatchScore({ format }) {
                 </div>
                 <div className="ts-stopwatch-controls">
                   <button type="button" className={`ts-timer-btn ${isTimerRunning ? 'pause' : 'start'}`} onClick={toggleStopwatch}>
-                    {isTimerRunning ? '⏸ PAUSE' : '▶ START'}
+                    {isTimerRunning ? t(lang, '⏸ PAUSE', '⏸ TẠM DỪNG') : t(lang, '▶ START', '▶ BẮT ĐẦU')}
                   </button>
-                  <button type="button" className="ts-timer-btn reset" onClick={resetStopwatch} title="Reset to 0">↺</button>
+                  <button type="button" className="ts-timer-btn reset" onClick={resetStopwatch} title={t(lang, 'Reset to 0', 'Đặt lại về 0')}>↺</button>
                 </div>
               </div>
 
@@ -499,19 +509,19 @@ export default function RefereeCombatMatchScore({ format }) {
 
             {!isStars && (
               <div className="ts-card ts-sidebar-card" style={{ marginTop: 12 }}>
-                <div className="ts-sidebar-title">MATCH STATUS</div>
+                <div className="ts-sidebar-title">{t(lang, 'MATCH STATUS', 'TRẠNG THÁI TRẬN')}</div>
                 <div style={{ marginBottom: 10 }}>
-                  <span className="rt-badge">{(match.details?.status || 'scheduled').toUpperCase()}</span>
+                  <span className="rt-badge">{t(lang, (match.details?.status || 'scheduled').toUpperCase(), (STATUS_LABEL_VI[match.details?.status || 'scheduled']).toUpperCase())}</span>
                 </div>
                 {match.details?.status !== 'cancelled' && match.details?.status !== 'disqualified' && !statusAction && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('cancel'); setStatusReason(''); }}>Cancel Match</button>
-                    <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('disqualify'); setStatusReason(''); setDisqualifiedSide('A'); }}>Disqualify a Team</button>
+                    <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('cancel'); setStatusReason(''); }}>{t(lang, 'Cancel Match', 'Hủy trận')}</button>
+                    <button type="button" className="ts-btn ts-btn-secondary" onClick={() => { setStatusAction('disqualify'); setStatusReason(''); setDisqualifiedSide('A'); }}>{t(lang, 'Disqualify a Team', 'Truất quyền 1 đội')}</button>
                   </div>
                 )}
                 {(match.details?.status === 'cancelled' || match.details?.status === 'disqualified') && (
                   <p style={{ fontSize: 12, color: '#f87171' }}>
-                    {match.details?.disqualificationReason || 'This match was closed without a normal result.'}
+                    {match.details?.disqualificationReason || t(lang, 'This match was closed without a normal result.', 'Trận này đã kết thúc không có kết quả bình thường.')}
                   </p>
                 )}
                 {statusAction && (
@@ -522,11 +532,11 @@ export default function RefereeCombatMatchScore({ format }) {
                         <option value="B">{match.team_b?.name}</option>
                       </select>
                     )}
-                    <textarea className="form-input" rows={2} placeholder="Reason (required)" value={statusReason} onChange={(e) => setStatusReason(e.target.value)} />
+                    <textarea className="form-input" rows={2} placeholder={t(lang, 'Reason (required)', 'Lý do (bắt buộc)')} value={statusReason} onChange={(e) => setStatusReason(e.target.value)} />
                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                      <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStatusAction(null)} disabled={statusSaving}>Back</button>
+                      <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStatusAction(null)} disabled={statusSaving}>{t(lang, 'Back', 'Quay lại')}</button>
                       <button type="button" className="ts-btn ts-btn-primary" onClick={submitStatusAction} disabled={statusSaving}>
-                        {statusSaving ? 'Saving...' : statusAction === 'cancel' ? 'Confirm Cancel' : 'Confirm Disqualify'}
+                        {statusSaving ? t(lang, 'Saving...', 'Đang lưu...') : statusAction === 'cancel' ? t(lang, 'Confirm Cancel', 'Xác nhận hủy') : t(lang, 'Confirm Disqualify', 'Xác nhận truất quyền')}
                       </button>
                     </div>
                   </div>
@@ -547,27 +557,27 @@ export default function RefereeCombatMatchScore({ format }) {
                   <table>
                     <thead>
                       <tr>
-                        <th>Task</th>
+                        <th>{t(lang, 'Task', 'Nhiệm vụ')}</th>
                         <th style={{ textAlign: 'center' }}>{match.team_a?.name} (Red)</th>
                         <th style={{ textAlign: 'center' }}>{match.team_b?.name} (Blue)</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} if completed)</span>{missionImageThumb('Meteor Tower')}</td>
+                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} {t(lang, 'if completed', 'nếu hoàn thành')})</span>{missionImageThumb('Meteor Tower')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <input type="checkbox" checked={!!form.meteorCompletedA} onChange={(e) => setForm({ ...form, meteorCompletedA: e.target.checked })} /> Completed
+                            <input type="checkbox" checked={!!form.meteorCompletedA} onChange={(e) => setForm({ ...form, meteorCompletedA: e.target.checked })} /> {t(lang, 'Completed', 'Hoàn thành')}
                           </label>
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                            <input type="checkbox" checked={!!form.meteorCompletedB} onChange={(e) => setForm({ ...form, meteorCompletedB: e.target.checked })} /> Completed
+                            <input type="checkbox" checked={!!form.meteorCompletedB} onChange={(e) => setForm({ ...form, meteorCompletedB: e.target.checked })} /> {t(lang, 'Completed', 'Hoàn thành')}
                           </label>
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}pts/block, max {ENERGY_BLOCK_MAX})</span>{missionImageThumb('Energy Defense')}</td>
+                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}{t(lang, 'pts/block', 'đ/khối')}, {t(lang, 'max', 'tối đa')} {ENERGY_BLOCK_MAX})</span>{missionImageThumb('Energy Defense')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.energyBlocksA} onChange={(e) => setForm({ ...form, energyBlocksA: clampEnergy(e.target.value) })} />
@@ -578,7 +588,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}pts/ball, max {FIREPOWER_BALL_MAX})</span>{missionImageThumb('Full Firepower')}</td>
+                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}{t(lang, 'pts/ball', 'đ/quả')}, {t(lang, 'max', 'tối đa')} {FIREPOWER_BALL_MAX})</span>{missionImageThumb('Full Firepower')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.firepowerBallsA} onChange={(e) => setForm({ ...form, firepowerBallsA: clampFirepower(e.target.value) })} />
@@ -589,7 +599,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>(no points — Direct Win only)</span>{missionImageThumb('Final Fortress')}</td>
+                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>({t(lang, 'no points — Direct Win only', 'không tính điểm — chỉ Direct Win')})</span>{missionImageThumb('Final Fortress')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.directWinA} onChange={(e) => setDirectWin('A', e.target.checked)} /> Direct Win
@@ -602,7 +612,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Retries</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Retries', 'Số lần thử lại')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.retryCountA} onChange={(e) => setForm({ ...form, retryCountA: Math.max(0, parseInt(e.target.value, 10) || 0) })} />
@@ -613,12 +623,12 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Extra Reward <span style={{ color: '#94a3b8' }}>(auto — 40/30/20/10/0 by retries)</span></td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Extra Reward', 'Điểm thưởng thêm')} <span style={{ color: '#94a3b8' }}>({t(lang, 'auto — 40/30/20/10/0 by retries', 'tự động — 40/30/20/10/0 theo số lần thử lại')})</span></td>
                         <td style={{ textAlign: 'center' }}>{scoreA.extraReward}</td>
                         <td style={{ textAlign: 'center' }}>{scoreB.extraReward}</td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Points lost (penalty)</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Points lost (penalty)', 'Điểm bị trừ (phạt)')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.pointsLostA} onChange={(e) => setForm({ ...form, pointsLostA: Math.max(0, Number(e.target.value) || 0) })} />
@@ -629,7 +639,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Total duration (seconds)</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Total duration (seconds)', 'Tổng thời gian (giây)')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
                             value={form.durationA} onChange={(e) => setForm({ ...form, durationA: e.target.value })} />
@@ -642,7 +652,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr style={{ fontWeight: 700 }}>
-                        <td style={{ fontSize: 13 }}>Task Score</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Task Score', 'Điểm nhiệm vụ')}</td>
                         <td style={{ textAlign: 'center' }}>{scoreA.taskScore}</td>
                         <td style={{ textAlign: 'center' }}>{scoreB.taskScore}</td>
                       </tr>
@@ -663,59 +673,59 @@ export default function RefereeCombatMatchScore({ format }) {
                       <tbody>
                         <tr>
                           <td style={{ fontSize: 13 }}>
-                            Half 1
+                            {t(lang, 'Half 1', 'Hiệp 1')}
                             <select className="form-input form-select" style={{ marginTop: 4, fontSize: 12, padding: '2px 6px' }}
                               value={form.half1RedTeam} onChange={(e) => setForm({ ...form, half1RedTeam: e.target.value })}>
-                              <option value="A">{match.team_a?.name} = Red</option>
-                              <option value="B">{match.team_b?.name} = Red</option>
+                              <option value="A">{match.team_a?.name} = {t(lang, 'Red', 'Đỏ')}</option>
+                              <option value="B">{match.team_b?.name} = {t(lang, 'Red', 'Đỏ')}</option>
                             </select>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfA} onChange={(e) => setForm({ ...form, firstHalfA: e.target.value })} />
-                            <div style={{ fontSize: 11, color: form.half1RedTeam === 'A' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half1RedTeam === 'A' ? 'Red' : 'Blue'}</div>
+                            <div style={{ fontSize: 11, color: form.half1RedTeam === 'A' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half1RedTeam === 'A' ? t(lang, 'Red', 'Đỏ') : t(lang, 'Blue', 'Xanh')}</div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.firstHalfB} onChange={(e) => setForm({ ...form, firstHalfB: e.target.value })} />
-                            <div style={{ fontSize: 11, color: form.half1RedTeam === 'B' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half1RedTeam === 'B' ? 'Red' : 'Blue'}</div>
+                            <div style={{ fontSize: 11, color: form.half1RedTeam === 'B' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half1RedTeam === 'B' ? t(lang, 'Red', 'Đỏ') : t(lang, 'Blue', 'Xanh')}</div>
                           </td>
                         </tr>
                         <tr>
                           <td style={{ fontSize: 13 }}>
-                            Half 2
+                            {t(lang, 'Half 2', 'Hiệp 2')}
                             <select className="form-input form-select" style={{ marginTop: 4, fontSize: 12, padding: '2px 6px' }}
                               value={form.half2RedTeam} onChange={(e) => setForm({ ...form, half2RedTeam: e.target.value })}>
-                              <option value="A">{match.team_a?.name} = Red</option>
-                              <option value="B">{match.team_b?.name} = Red</option>
+                              <option value="A">{match.team_a?.name} = {t(lang, 'Red', 'Đỏ')}</option>
+                              <option value="B">{match.team_b?.name} = {t(lang, 'Red', 'Đỏ')}</option>
                             </select>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfA} onChange={(e) => setForm({ ...form, secondHalfA: e.target.value })} />
-                            <div style={{ fontSize: 11, color: form.half2RedTeam === 'A' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half2RedTeam === 'A' ? 'Red' : 'Blue'}</div>
+                            <div style={{ fontSize: 11, color: form.half2RedTeam === 'A' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half2RedTeam === 'A' ? t(lang, 'Red', 'Đỏ') : t(lang, 'Blue', 'Xanh')}</div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.secondHalfB} onChange={(e) => setForm({ ...form, secondHalfB: e.target.value })} />
-                            <div style={{ fontSize: 11, color: form.half2RedTeam === 'B' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half2RedTeam === 'B' ? 'Red' : 'Blue'}</div>
+                            <div style={{ fontSize: 11, color: form.half2RedTeam === 'B' ? '#dc2626' : '#2563eb', marginTop: 2 }}>{form.half2RedTeam === 'B' ? t(lang, 'Red', 'Đỏ') : t(lang, 'Blue', 'Xanh')}</div>
                           </td>
                         </tr>
                         <tr>
-                          <td style={{ fontSize: 13 }}>Referee Awarded Points <span style={{ color: '#94a3b8' }}>(mục 12 — cần lý do)</span></td>
+                          <td style={{ fontSize: 13 }}>{t(lang, 'Referee Awarded Points', 'Điểm trọng tài thưởng')} <span style={{ color: '#94a3b8' }}>({t(lang, 'section 12 — a reason is required', 'mục 12 — cần lý do')})</span></td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.refereeAwardedA} onChange={(e) => setForm({ ...form, refereeAwardedA: e.target.value })} />
                             {(Number(form.refereeAwardedA) || 0) > 0 && (
-                              <input type="text" className="form-input" style={{ marginTop: 4, fontSize: 12 }} placeholder="Reason"
+                              <input type="text" className="form-input" style={{ marginTop: 4, fontSize: 12 }} placeholder={t(lang, 'Reason', 'Lý do')}
                                 value={form.refereeAwardedReasonA} onChange={(e) => setForm({ ...form, refereeAwardedReasonA: e.target.value })} />
                             )}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <input type="number" min="0" className="form-input" style={{ textAlign: 'center' }} value={form.refereeAwardedB} onChange={(e) => setForm({ ...form, refereeAwardedB: e.target.value })} />
                             {(Number(form.refereeAwardedB) || 0) > 0 && (
-                              <input type="text" className="form-input" style={{ marginTop: 4, fontSize: 12 }} placeholder="Reason"
+                              <input type="text" className="form-input" style={{ marginTop: 4, fontSize: 12 }} placeholder={t(lang, 'Reason', 'Lý do')}
                                 value={form.refereeAwardedReasonB} onChange={(e) => setForm({ ...form, refereeAwardedReasonB: e.target.value })} />
                             )}
                           </td>
                         </tr>
                         <tr style={{ fontWeight: 700 }}>
-                          <td style={{ fontSize: 13 }}>Total Score</td>
+                          <td style={{ fontSize: 13 }}>{t(lang, 'Total Score', 'Tổng điểm')}</td>
                           <td style={{ textAlign: 'center' }}>{droneScoreA.total}</td>
                           <td style={{ textAlign: 'center' }}>{droneScoreB.total}</td>
                         </tr>
@@ -725,32 +735,32 @@ export default function RefereeCombatMatchScore({ format }) {
 
                   {isKnockout && droneTied && (
                     <div style={{ marginTop: 20, padding: 16, border: '1px solid rgba(239,68,68,0.35)', borderRadius: 12, background: 'rgba(239,68,68,0.06)' }}>
-                      <h4 style={{ margin: '0 0 8px', color: '#f87171' }}>PENALTY SHOOTOUT — scores tied {droneScoreA.total} - {droneScoreB.total}</h4>
+                      <h4 style={{ margin: '0 0 8px', color: '#f87171' }}>{t(lang, `PENALTY SHOOTOUT — scores tied ${droneScoreA.total} - ${droneScoreB.total}`, `ĐÁ LUÂN LƯU — hòa ${droneScoreA.total} - ${droneScoreB.total}`)}</h4>
                       {form.shootoutRounds.length === 0 ? (
-                        <button type="button" className="ts-btn ts-btn-primary" onClick={startShootout}>Start Penalty Shootout</button>
+                        <button type="button" className="ts-btn ts-btn-primary" onClick={startShootout}>{t(lang, 'Start Penalty Shootout', 'Bắt đầu đá luân lưu')}</button>
                       ) : (
                         <>
                           {form.shootoutRounds.map((r, idx) => (
                             <div key={r.roundNo} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-                              <strong style={{ width: 70 }}>Round {r.roundNo}</strong>
+                              <strong style={{ width: 70 }}>{t(lang, 'Round', 'Vòng')} {r.roundNo}</strong>
                               <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateShootoutRound(idx, { aSuccess: e.target.checked })} /> {match.team_a?.name} scored
+                                <input type="checkbox" checked={!!r.aSuccess} onChange={(e) => updateShootoutRound(idx, { aSuccess: e.target.checked })} /> {match.team_a?.name} {t(lang, 'scored', 'ghi điểm')}
                               </label>
-                              <input type="number" className="form-input" style={{ width: 90 }} placeholder="sec" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
+                              <input type="number" className="form-input" style={{ width: 90 }} placeholder={t(lang, 'sec', 'giây')} min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
                                 disabled={!r.aSuccess} value={r.aTimeSeconds} onChange={(e) => updateShootoutRound(idx, { aTimeSeconds: e.target.value })} />
                               <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateShootoutRound(idx, { bSuccess: e.target.checked })} /> {match.team_b?.name} scored
+                                <input type="checkbox" checked={!!r.bSuccess} onChange={(e) => updateShootoutRound(idx, { bSuccess: e.target.checked })} /> {match.team_b?.name} {t(lang, 'scored', 'ghi điểm')}
                               </label>
-                              <input type="number" className="form-input" style={{ width: 90 }} placeholder="sec" min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
+                              <input type="number" className="form-input" style={{ width: 90 }} placeholder={t(lang, 'sec', 'giây')} min="0.01" max={PENALTY_MAX_SECONDS} step="0.01"
                                 disabled={!r.bSuccess} value={r.bTimeSeconds} onChange={(e) => updateShootoutRound(idx, { bTimeSeconds: e.target.value })} />
                             </div>
                           ))}
                           {shootoutWinnerInfo.winner ? (
                             <p style={{ color: '#4ade80', fontWeight: 700 }}>
-                              Shootout winner: {shootoutWinnerInfo.winner === 'A' ? match.team_a?.name : match.team_b?.name} (Round {shootoutWinnerInfo.decidingRound})
+                              {t(lang, 'Shootout winner', 'Thắng đá luân lưu')}: {shootoutWinnerInfo.winner === 'A' ? match.team_a?.name : match.team_b?.name} ({t(lang, 'Round', 'Vòng')} {shootoutWinnerInfo.decidingRound})
                             </p>
                           ) : (
-                            <button type="button" className="ts-btn ts-btn-secondary" onClick={addShootoutRound}>+ Add Round</button>
+                            <button type="button" className="ts-btn ts-btn-secondary" onClick={addShootoutRound}>{t(lang, '+ Add Round', '+ Thêm vòng')}</button>
                           )}
                         </>
                       )}
@@ -760,8 +770,8 @@ export default function RefereeCombatMatchScore({ format }) {
               )}
 
               <div className="ts-task-nav">
-                <button type="button" className="ts-btn ts-btn-secondary" onClick={() => navigate(listUrl)}>← Close</button>
-                <button type="button" className="ts-btn ts-btn-primary ts-btn-lg" onClick={gotoStep2}>Review & sign to save →</button>
+                <button type="button" className="ts-btn ts-btn-secondary" onClick={() => navigate(listUrl)}>{t(lang, '← Close', '← Đóng')}</button>
+                <button type="button" className="ts-btn ts-btn-primary ts-btn-lg" onClick={gotoStep2}>{t(lang, 'Review & sign to save →', 'Xem lại & ký để lưu →')}</button>
               </div>
             </div>
           </main>
@@ -772,68 +782,68 @@ export default function RefereeCombatMatchScore({ format }) {
         <div className="ts-card ts-sheet-card">
           <div className="ts-sheet-header">
             <div>
-              <h2 className="ts-card-title" style={{ fontSize: 20, margin: 0 }}>CONFIRM MATCH RESULT</h2>
+              <h2 className="ts-card-title" style={{ fontSize: 20, margin: 0 }}>{t(lang, 'CONFIRM MATCH RESULT', 'XÁC NHẬN KẾT QUẢ TRẬN ĐẤU')}</h2>
               <div className="ts-sheet-sub">
                 {match.team_a?.name}{isStars ? ' (Red)' : ''} vs {match.team_b?.name}{isStars ? ' (Blue)' : ''}
-                {match.boards?.name ? ` · Board: ${match.boards.name}` : ''}
+                {match.boards?.name ? ` · ${t(lang, 'Board', 'Bảng')}: ${match.boards.name}` : ''}
               </div>
             </div>
             <div className="ts-sheet-total-badge">
-              <span className="ts-st-label">RESULT</span>
+              <span className="ts-st-label">{t(lang, 'RESULT', 'KẾT QUẢ')}</span>
               <span className="ts-st-val" style={{ fontSize: 16 }}>
                 {isStars
                   ? starsResultText
                   : (isKnockout
-                    ? (droneOutcome.result === 'A' ? match.team_a?.name : droneOutcome.result === 'B' ? match.team_b?.name : 'Pending shootout')
-                    : (droneOutcome.result === 'DRAW' ? 'Draw' : droneOutcome.result === 'A' ? match.team_a?.name : match.team_b?.name))}
+                    ? (droneOutcome.result === 'A' ? match.team_a?.name : droneOutcome.result === 'B' ? match.team_b?.name : t(lang, 'Pending shootout', 'Chờ đá luân lưu'))
+                    : (droneOutcome.result === 'DRAW' ? t(lang, 'Draw', 'Hòa') : droneOutcome.result === 'A' ? match.team_a?.name : match.team_b?.name))}
               </span>
             </div>
           </div>
 
           <div className="ts-sheet-form-grid">
             <div className="ts-form-row">
-              <label className="ts-label">Student / Team Captain — {match.team_a?.name}{isStars ? ' (Red)' : ''} <span className="ts-hint-inline">(locked)</span></label>
-              <input type="text" className="ts-input ts-input-locked" value={form.teamMembersA} readOnly placeholder="No members recorded" />
+              <label className="ts-label">{t(lang, 'Student / Team Captain', 'Học sinh / Đội trưởng')} — {match.team_a?.name}{isStars ? ' (Red)' : ''} <span className="ts-hint-inline">({t(lang, 'locked', 'đã khóa')})</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.teamMembersA} readOnly placeholder={t(lang, 'No members recorded', 'Chưa có tên')} />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Student / Team Captain — {match.team_b?.name}{isStars ? ' (Blue)' : ''} <span className="ts-hint-inline">(locked)</span></label>
-              <input type="text" className="ts-input ts-input-locked" value={form.teamMembersB} readOnly placeholder="No members recorded" />
+              <label className="ts-label">{t(lang, 'Student / Team Captain', 'Học sinh / Đội trưởng')} — {match.team_b?.name}{isStars ? ' (Blue)' : ''} <span className="ts-hint-inline">({t(lang, 'locked', 'đã khóa')})</span></label>
+              <input type="text" className="ts-input ts-input-locked" value={form.teamMembersB} readOnly placeholder={t(lang, 'No members recorded', 'Chưa có tên')} />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label={isStars ? 'Red Team Signature' : `${match.team_a?.name} Signature`} value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
+              <SignatureBox label={isStars ? t(lang, 'Red Team Signature', 'Chữ ký đội Đỏ') : t(lang, `${match.team_a?.name} Signature`, `Chữ ký đội ${match.team_a?.name}`)} value={form.studentSigImageA} onChange={(v) => setForm({ ...form, studentSigImageA: v })} required />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label={isStars ? 'Blue Team Signature' : `${match.team_b?.name} Signature`} value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
+              <SignatureBox label={isStars ? t(lang, 'Blue Team Signature', 'Chữ ký đội Xanh') : t(lang, `${match.team_b?.name} Signature`, `Chữ ký đội ${match.team_b?.name}`)} value={form.studentSigImageB} onChange={(v) => setForm({ ...form, studentSigImageB: v })} required />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Referee Name <span className="ts-hint-inline">(locked)</span></label>
+              <label className="ts-label">{t(lang, 'Referee Name', 'Tên trọng tài')} <span className="ts-hint-inline">({t(lang, 'locked', 'đã khóa')})</span></label>
               <input type="text" className="ts-input ts-input-locked" value={form.refereeSignature} readOnly />
             </div>
             <div className="ts-form-row">
-              <SignatureBox label="Referee Signature" value={form.refereeSigImage} onChange={(v) => setForm({ ...form, refereeSigImage: v })} required />
+              <SignatureBox label={t(lang, 'Referee Signature', 'Chữ ký trọng tài')} value={form.refereeSigImage} onChange={(v) => setForm({ ...form, refereeSigImage: v })} required />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Chief Referee <span className="ts-hint-inline">(locked)</span></label>
+              <label className="ts-label">{t(lang, 'Chief Referee', 'Trưởng ban trọng tài')} <span className="ts-hint-inline">({t(lang, 'locked', 'đã khóa')})</span></label>
               <input type="text" className="ts-input ts-input-locked" value={form.headRefereeName} readOnly />
             </div>
             <div className="ts-form-row">
-              <label className="ts-label">Scorekeeper <span className="ts-hint-inline">(locked)</span></label>
+              <label className="ts-label">{t(lang, 'Scorekeeper', 'Người ghi điểm')} <span className="ts-hint-inline">({t(lang, 'locked', 'đã khóa')})</span></label>
               <input type="text" className="ts-input ts-input-locked" value={form.scorekeeperName} readOnly />
             </div>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Remarks</label>
+              <label className="ts-label">{t(lang, 'Remarks', 'Ghi chú')}</label>
               <textarea className="ts-input" rows={2} value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} />
             </div>
             <div className="ts-form-row ts-full">
-              <label className="ts-label">Objection</label>
+              <label className="ts-label">{t(lang, 'Objection', 'Kiến nghị')}</label>
               <textarea className="ts-input" rows={2} value={form.objection} onChange={(e) => setForm({ ...form, objection: e.target.value })} />
             </div>
           </div>
 
           <div className="ts-footer">
-            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>← Edit scores</button>
+            <button type="button" className="ts-btn ts-btn-ghost" onClick={() => setStep(1)}>{t(lang, '← Edit scores', '← Sửa điểm')}</button>
             <button type="button" className="ts-btn ts-btn-primary ts-btn-xl" onClick={handleSubmit} disabled={submitting}>
-              {submitting ? 'Saving...' : '✓ CONFIRM & SAVE SCORE SHEET'}
+              {submitting ? t(lang, 'Saving...', 'Đang lưu...') : t(lang, '✓ CONFIRM & SAVE SCORE SHEET', '✓ XÁC NHẬN & LƯU PHIẾU ĐIỂM')}
             </button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api';
+import { useLang } from '../../lib/i18n';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
@@ -10,6 +11,7 @@ import './TaskScoringWizard.css';
 export default function RefereeCombatStars() {
   const { competitionId, contentId } = useParams();
   const navigate = useNavigate();
+  const lang = useLang();
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,18 +26,24 @@ export default function RefereeCombatStars() {
     navigate(`/referee/competition/${competitionId}/content/${contentId}/combat-stars/match/${m.id}`);
   };
 
-  if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>Loading...</p>;
+  if (loading) return <p style={{ color: '#94a3b8', padding: 24 }}>{lang === 'vi' ? 'Đang tải...' : 'Loading...'}</p>;
 
   return (
     <div>
       <div className="breadcrumb" style={{ marginBottom: 14 }}>
         <Link to="/referee">Chấm điểm</Link>
       </div>
-      <h1 className="referee-page-title">Battle of Stars — Combat</h1>
-      <p style={{ color: '#64748b', marginBottom: 20 }}>Select a match to score both teams. The win/draw result is calculated automatically from the scores.</p>
+      <h1 className="referee-page-title">Battle of Stars — {lang === 'vi' ? 'Đối kháng' : 'Combat'}</h1>
+      <p style={{ color: '#64748b', marginBottom: 20 }}>
+        {lang === 'vi'
+          ? 'Chọn 1 trận để chấm điểm cả 2 đội. Kết quả thắng/hòa được tự động tính từ điểm số.'
+          : 'Select a match to score both teams. The win/draw result is calculated automatically from the scores.'}
+      </p>
 
       {matches.length === 0 ? (
-        <div className="card" style={{ padding: 32, textAlign: 'center' }}>No matches yet — please contact the admin.</div>
+        <div className="card" style={{ padding: 32, textAlign: 'center' }}>
+          {lang === 'vi' ? 'Chưa có trận nào — liên hệ admin.' : 'No matches yet — please contact the admin.'}
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {matches.map((m) => {
@@ -56,7 +64,7 @@ export default function RefereeCombatStars() {
                   {m.group_label && <span className="ts-board-chip">{m.group_label}</span>}
                   {done && (
                     <span className="rt-badge rt-badge-done">
-                      {m.is_draw ? 'Draw' : `Winner: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}`}
+                      {m.is_draw ? (lang === 'vi' ? 'Hòa' : 'Draw') : `${lang === 'vi' ? 'Thắng' : 'Winner'}: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}`}
                     </span>
                   )}
                 </div>
