@@ -32,6 +32,7 @@ export default function RefereeComplaints() {
   const [competitions, setCompetitions] = useState([]);
   const [competitionId, setCompetitionId] = useState('');
   const [combatContents, setCombatContents] = useState([]);
+  const [permittedContentIds, setPermittedContentIds] = useState(null);
   const [contentId, setContentId] = useState('');
   const [combatMatches, setCombatMatches] = useState([]);
   const [combatMatchId, setCombatMatchId] = useState('');
@@ -54,12 +55,19 @@ export default function RefereeComplaints() {
       ),
       api.getCompetitions(),
       api.getMyComplaints(),
+      api.getMyPermissions(),
     ])
-      .then(([scores, names, comps, myComplaints]) => {
+      .then(([scores, names, comps, myComplaints, perms]) => {
         setMyScores(scores);
         setContentNames(names || {});
         setCompetitions(comps.filter((c) => c.is_active !== false));
         setComplaints(myComplaints);
+        // Phân quyền trọng tài theo (Nội dung × Field) — chỉ cho khiếu nại về
+        // nội dung đối kháng mà trọng tài thực sự có ít nhất 1 dòng phân quyền,
+        // giống bước chọn nội dung ở RefereeSelect.jsx (không hiện nội dung
+        // trọng tài không được phân công, vd Fly Smart Cup khi chỉ được gán
+        // Inventions Trail).
+        setPermittedContentIds(new Set((perms || []).map((p) => p.contest_content_id)));
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -69,11 +77,13 @@ export default function RefereeComplaints() {
   useEffect(() => {
     if (!competitionId) { setCombatContents([]); return; }
     api.getContents(competitionId)
-      .then((list) => setCombatContents(list.filter((c) => c.content_format !== 'scoring')))
+      .then((list) => setCombatContents(list.filter((c) =>
+        c.content_format !== 'scoring' && (!permittedContentIds || permittedContentIds.has(c.id))
+      )))
       .catch(() => setCombatContents([]));
     setContentId('');
     setCombatMatchId('');
-  }, [competitionId]);
+  }, [competitionId, permittedContentIds]);
 
   useEffect(() => {
     if (!contentId) { setCombatMatches([]); return; }
