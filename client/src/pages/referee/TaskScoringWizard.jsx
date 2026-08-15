@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { api, taskImageUrl } from '../../api';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
@@ -243,7 +243,7 @@ export default function TaskScoringWizard({
   if (tasks.length === 0) {
     return (
       <div className="ts-wrapper">
-        <a href={backUrl} className="btn-ghost">{t(lang, '← Back', '← Quay lại')}</a>
+        <Link to={backUrl} className="btn-ghost">{t(lang, '← Back', '← Quay lại')}</Link>
         <div className="ts-card" style={{ textAlign: 'center', padding: 40 }}>
           <p>{t(lang, 'This content has no tasks configured yet.', 'Nội dung này chưa có nhiệm vụ nào được cấu hình.')}</p>
           <p style={{ color: '#94a3b8', fontSize: 13, marginTop: 8 }}>{t(lang, 'Please contact the admin to set up the task list.', 'Vui lòng liên hệ admin để thiết lập danh sách nhiệm vụ.')}</p>
@@ -260,9 +260,9 @@ export default function TaskScoringWizard({
     <div className="ts-wrapper ts-tablet-layout">
       {/* ── Sticky header ── */}
       <header className="ts-header">
-        <a href={backUrl} className="ts-back" title={t(lang, 'Back to team list', 'Về danh sách đội')}>
+        <Link to={backUrl} className="ts-back" title={t(lang, 'Back to team list', 'Về danh sách đội')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        </a>
+        </Link>
         <div className="ts-header-info">
           <div className="ts-team-name">
             {team?.name}
