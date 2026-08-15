@@ -154,9 +154,12 @@ export default function RefereeTeams() {
                   <h3>{t.name}</h3>
                   {roundsDone(t.id) >= 2 && <span className="rt-badge rt-badge-done">✓ Xong 2 lượt</span>}
                 </div>
-                {t.boards?.name && (
-                  <div className="card-badge" style={{ marginBottom: 6 }}>
-                    {t.boards.name}{t.boards.age_group ? ` — ${t.boards.age_group}` : ''}{isCombat ? ' · Đối kháng' : ''}
+                {(t.boards?.name || t.fields?.name) && (
+                  <div className="referee-card-meta">
+                    {t.boards?.name && <span className="referee-meta-chip">{t.boards.name}</span>}
+                    {t.boards?.age_group && <span className="referee-meta-text">{t.boards.age_group}</span>}
+                    {isCombat && <span className="referee-meta-text">Đối kháng</span>}
+                    {t.fields?.name && <span className="referee-meta-text referee-meta-field">Sân {t.fields.name}</span>}
                   </div>
                 )}
                 <p className="referee-card-members">
