@@ -453,9 +453,11 @@ export default function TaskScoringWizard({
 
                       {/* Phím tăng nhanh kích thước lớn cho Tablet */}
                       <div className="ts-quick-chips">
-                        <button type="button" onClick={() => setTask(currentTask.id, { qty: (taskState[currentTask.id]?.qty || 0) + 1 })}>+1</button>
-                        <button type="button" onClick={() => setTask(currentTask.id, { qty: (taskState[currentTask.id]?.qty || 0) + 2 })}>+2</button>
-                        <button type="button" onClick={() => setTask(currentTask.id, { qty: (taskState[currentTask.id]?.qty || 0) + 5 })}>+5</button>
+                        {[1, 2, 5].filter((n) => !currentTask.max_count || currentTask.max_count >= n).map((n) => (
+                          <button key={n} type="button" onClick={() => setTask(currentTask.id, {
+                            qty: Math.min(currentTask.max_count || Infinity, (taskState[currentTask.id]?.qty || 0) + n),
+                          })}>+{n}</button>
+                        ))}
                         <button type="button" onClick={() => setTask(currentTask.id, { qty: 0 })}>{t(lang, 'Reset to 0', 'Đặt lại về 0')}</button>
                         {currentTask.max_count && (
                           <button type="button" className="ts-chip-full" onClick={() => setTask(currentTask.id, { qty: currentTask.max_count })}>
