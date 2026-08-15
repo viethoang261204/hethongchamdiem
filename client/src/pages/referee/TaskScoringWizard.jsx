@@ -109,6 +109,19 @@ export default function TaskScoringWizard({
     return () => clearInterval(interval);
   }, [isTimerRunning]);
 
+  // Tự động dừng đồng hồ khi chạm giới hạn thời gian thi của nội dung
+  // (content.time_limit_seconds) — trọng tài có thể quên tự bấm Tạm dừng,
+  // để đồng hồ chạy quá giờ quy định sẽ ghi sai thời gian vào phiếu điểm.
+  useEffect(() => {
+    if (isTimerRunning && content?.time_limit_seconds && stopwatchSeconds >= content.time_limit_seconds) {
+      setIsTimerRunning(false);
+      showAlert(
+        t(lang, `Time's up — timer stopped automatically at ${content.time_limit_seconds}s.`, `Đã hết giờ — đồng hồ tự động dừng ở ${content.time_limit_seconds}s.`),
+        'info'
+      );
+    }
+  }, [stopwatchSeconds, isTimerRunning, content?.time_limit_seconds]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const toggleStopwatch = () => setIsTimerRunning((r) => !r);
   const resetStopwatch = () => { setIsTimerRunning(false); setStopwatchSeconds(0); };
   const applyStopwatchToTime = () => {
