@@ -473,6 +473,19 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* Đội thi có card cao thấp khác nhau (tên đội/thành viên dài ngắn khác nhau)
+   — ép card thành cột flex + đẩy .referee-card-foot xuống sát đáy bằng
+   margin-top: auto, để hàng nút "Chấm lượt 1/2" luôn thẳng hàng giữa các
+   card thay vì trồi lên tụt xuống theo chiều cao nội dung phía trên. */
+.referee-card-scoreboard {
+  display: flex;
+  flex-direction: column;
+}
+
+.referee-card-scoreboard .referee-card-foot {
+  margin-top: auto;
+}
+
 /* ─── Score Sheet frame (RefereeScoreDetail) ─────────────────── */
 /* Bọc phiếu điểm nền trắng (mẫu in .ss-sheet, dùng chung với admin) trong
    1 khung kính tối cho hợp giao diện dark — không đụng vào .ss-sheet để
@@ -754,6 +767,13 @@
   background: rgba(245, 158, 11, 0.15);
   border: 1px solid rgba(245, 158, 11, 0.35);
   color: #fbbf24;
+}
+
+.rt-badge-locked {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #64748b;
+  cursor: not-allowed;
 }
 
 .rt-badge-rejected {

@@ -149,7 +149,7 @@ export default function RefereeTeams() {
             const r = scoresByTeam[t.id] || {};
 
             return (
-              <div key={t.id} className={`referee-card ${roundsDone(t.id) >= 2 ? 'is-done' : ''}`} style={{ cursor: 'default' }}>
+              <div key={t.id} className={`referee-card referee-card-scoreboard ${roundsDone(t.id) >= 2 ? 'is-done' : ''}`} style={{ cursor: 'default' }}>
                 <div className="referee-card-head">
                   <h3>{t.name}</h3>
                   {roundsDone(t.id) >= 2 && <span className="rt-badge rt-badge-done">✓ Xong 2 lượt</span>}
@@ -167,7 +167,7 @@ export default function RefereeTeams() {
                   <Link
                     to={`/referee/competition/${competitionId}/content/${contentId}/region/${t.board_id}/matches`}
                     className="btn btn-ghost"
-                    style={{ marginTop: 10, display: 'inline-flex' }}
+                    style={{ marginTop: 'auto', display: 'inline-flex' }}
                   >
                     Xem danh sách trận đấu →
                   </Link>
@@ -175,6 +175,14 @@ export default function RefereeTeams() {
                   <div className="referee-card-foot">
                     {[1, 2].map((roundNo) => {
                       const s = r[roundNo];
+                      const locked = roundNo === 2 && !r[1];
+                      if (locked) {
+                        return (
+                          <span key={roundNo} className="rt-badge rt-badge-locked" title="Cần chấm xong Lượt 1 trước">
+                            🔒 Chấm lượt {roundNo}
+                          </span>
+                        );
+                      }
                       const url = `/referee/competition/${competitionId}/content/${contentId}/region/${region}/team/${t.id}/round/${roundNo}/score`;
                       return (
                         <Link key={roundNo} to={url} state={{ memberNames }} className={`rt-badge ${s ? 'rt-badge-done' : 'rt-badge-pending'}`} style={{ textDecoration: 'none' }}>

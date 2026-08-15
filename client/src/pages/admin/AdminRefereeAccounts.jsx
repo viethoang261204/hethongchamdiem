@@ -137,10 +137,16 @@ export default function AdminRefereeAccounts() {
 
   const validate = () => {
     const errs = {};
-    if (!form.email.trim()) errs.email = 'Email không được để trống.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ.';
-    if (modal === 'add' && !form.password) errs.password = 'Mật khẩu không được để trống.';
-    if (modal === 'add' && form.password && form.password.length < 6) errs.password = 'Mật khẩu phải ít nhất 6 ký tự.';
+    // Sửa tài khoản KHÔNG gửi email lên (xem save() — body chỉ có full_name/
+    // can_view_scoreboard/language/password), ô "Email đăng nhập" lúc sửa chỉ
+    // hiện username cũ để tham khảo — validate định dạng email đầy đủ (@...)
+    // ở đây sẽ luôn fail vì username không có "@". Chỉ validate email khi tạo mới.
+    if (modal === 'add') {
+      if (!form.email.trim()) errs.email = 'Email không được để trống.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email không hợp lệ.';
+      if (!form.password) errs.password = 'Mật khẩu không được để trống.';
+    }
+    if (form.password && form.password.length < 6) errs.password = 'Mật khẩu phải ít nhất 6 ký tự.';
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
