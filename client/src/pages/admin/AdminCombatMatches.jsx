@@ -117,6 +117,7 @@ export default function AdminCombatMatches() {
   // rối, để trọng tài/admin xem riêng từng bảng. "Finals" gộp các trận
   // group_label rỗng (vòng loại trực tiếp).
   const FINALS_FILTER = '__finals__';
+  const [matchListGroupFilter, setMatchListGroupFilter] = useState('');
   const matchGroupOptions = useMemo(
     () => [...new Set(matches.map((m) => m.group_label).filter(Boolean))].sort(),
     [matches]
@@ -144,7 +145,6 @@ export default function AdminCombatMatches() {
   const [generatingReturnGroup, setGeneratingReturnGroup] = useState(null);
   const [groupDivModal, setGroupDivModal] = useState(null); // { count } khi mở modal Phân chia bảng
   const [dividingGroups, setDividingGroups] = useState(false);
-  const [matchListGroupFilter, setMatchListGroupFilter] = useState('');
   const [statusAction, setStatusAction] = useState(null); // 'cancel' | 'disqualify' | null
   const [statusReason, setStatusReason] = useState('');
   const [disqualifiedSide, setDisqualifiedSide] = useState('A');
