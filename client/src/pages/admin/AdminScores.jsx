@@ -33,6 +33,8 @@ export default function AdminScores() {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [imageModal, setImageModal] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const SECURITY_CODE = '26122004';
@@ -210,6 +212,36 @@ export default function AdminScores() {
     }
   };
 
+  // Xóa toàn bộ phiếu điểm ĐANG LỌC (không nhất thiết là toàn hệ thống —
+  // nếu chưa chọn bộ lọc nào thì "đang lọc" = tất cả) — cùng cách "Xóa tất
+  // cả trận" ở AdminCombatMatches.jsx đang làm với danh sách đang xem.
+  const removeAll = async () => {
+    if (!filtered.length) return;
+    const ok = await showConfirm({
+      message: `Xóa TẤT CẢ ${filtered.length} phiếu điểm đang hiển thị? Không thể hoàn tác.`,
+      confirmText: 'Xóa tất cả', cancelText: 'Hủy', danger: true,
+    });
+    if (!ok) return;
+    setDeleteAllConfirm({ securityCode: '' });
+  };
+
+  const confirmDeleteAll = async () => {
+    if (!deleteAllConfirm) return;
+    if (deleteAllConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    setDeletingAll(true);
+    try {
+      await api.bulkDeleteScores(filtered.map((s) => s.id));
+      clearApiCache();
+      setDeleteAllConfirm(null);
+      load();
+      showAlert('Đã xóa toàn bộ phiếu điểm.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const teamsInContent = useMemo(() => {
     if (!form.contest_content_id) return [];
     let list = teams.filter(t => t.contest_content_id === form.contest_content_id);
@@ -270,14 +302,19 @@ export default function AdminScores() {
           <h1 className="page-title">Quản lý phiếu điểm</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} phiếu</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={openAdd}
-          disabled={contents.length === 0 || teams.length === 0}
-        >
-          Thêm phiếu điểm
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-danger" onClick={removeAll} disabled={filtered.length === 0}>
+            Xóa toàn bộ phiếu điểm
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={openAdd}
+            disabled={contents.length === 0 || teams.length === 0}
+          >
+            Thêm phiếu điểm
+          </button>
+        </div>
       </div>
 
       {loadError && <ErrorBox error={loadError} onRetry={load} />}
@@ -619,6 +656,31 @@ export default function AdminScores() {
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Hủy</button>
               <button type="button" className="btn btn-danger" onClick={confirmDelete}>Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteAllConfirm && (
+        <div className="modal-overlay" onClick={() => !deletingAll && setDeleteAllConfirm(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">Xác nhận xóa tất cả phiếu điểm</h3>
+              <button type="button" className="form-modal-close" onClick={() => setDeleteAllConfirm(null)} aria-label="Đóng" disabled={deletingAll}>×</button>
+            </div>
+            <div className="form-modal-body">
+              <p style={{ marginBottom: 16, color: '#374151' }}>Nhập mã bảo mật để xóa TẤT CẢ {filtered.length} phiếu điểm đang hiển thị:</p>
+              <div className="form-group">
+                <label className="form-label">Mã bảo mật</label>
+                <input type="password" className="form-input" value={deleteAllConfirm.securityCode}
+                  onChange={(e) => setDeleteAllConfirm({ ...deleteAllConfirm, securityCode: e.target.value })} autoFocus disabled={deletingAll} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteAllConfirm(null)} disabled={deletingAll}>Hủy</button>
+              <button type="button" className="btn btn-danger" onClick={confirmDeleteAll} disabled={deletingAll}>
+                {deletingAll ? 'Đang xóa...' : 'Xóa tất cả'}
+              </button>
             </div>
           </div>
         </div>

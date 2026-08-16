@@ -849,6 +849,16 @@ router.delete('/scores/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Xóa hàng loạt phiếu điểm theo danh sách id (vd "Xóa toàn bộ phiếu điểm"
+// đang lọc ở AdminScores.jsx) — cascade xóa luôn score_edits/score_images/
+// complaints liên quan (FK on delete cascade sẵn có).
+router.post('/scores/bulk-delete', requireAdmin, h(async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.json({ deleted: 0 });
+  const { rowCount } = await query('delete from scores where id = any($1::uuid[])', [ids]);
+  res.json({ deleted: rowCount });
+}));
+
 // ============================================================
 // Xếp hạng gộp 2 lượt (đo lường) + Đối kháng (nhánh đấu loại trực tiếp)
 // ============================================================
@@ -1640,6 +1650,19 @@ router.put('/users/:id', requireAdmin, h(async (req, res) => {
 router.delete('/users/:id', requireAdmin, h(async (req, res) => {
   await query('delete from users where id = $1', [req.params.id]);
   res.json({ ok: true });
+}));
+
+// Xóa hàng loạt tài khoản trọng tài theo danh sách id (vd "Xóa toàn bộ tài
+// khoản trọng tài" ở AdminRefereeAccounts.jsx) — chặn cứng role='referee'
+// ngay trong câu lệnh, phòng trường hợp lỡ gửi nhầm id tài khoản admin.
+router.post('/users/referee/bulk-delete', requireAdmin, h(async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  if (!ids.length) return res.json({ deleted: 0 });
+  const { rowCount } = await query(
+    "delete from users where id = any($1::uuid[]) and role = 'referee'",
+    [ids]
+  );
+  res.json({ deleted: rowCount });
 }));
 
 // Tổng số dòng (Nội dung × Field) đã gán cho MỖI trọng tài — dùng để hiện

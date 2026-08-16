@@ -37,6 +37,8 @@ export default function AdminRefereeAccounts() {
   const [errorMsg, setError] = useState('');
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [permModal, setPermModal] = useState(null); // { user, selected: Set<"contentId:fieldId">, loading, saving }
   const SECURITY_CODE = '26122004';
 
@@ -210,6 +212,33 @@ export default function AdminRefereeAccounts() {
     }
   };
 
+  // Xóa toàn bộ tài khoản trọng tài ĐANG LỌC (tìm kiếm rỗng = toàn bộ).
+  const removeAll = async () => {
+    if (!filtered.length) return;
+    const ok = await showConfirm({
+      message: `Xóa TẤT CẢ ${filtered.length} tài khoản trọng tài đang hiển thị? Không thể hoàn tác.`,
+      confirmText: 'Xóa tất cả', cancelText: 'Hủy', danger: true,
+    });
+    if (!ok) return;
+    setDeleteAllConfirm({ securityCode: '' });
+  };
+
+  const confirmDeleteAll = async () => {
+    if (!deleteAllConfirm) return;
+    if (deleteAllConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    setDeletingAll(true);
+    try {
+      await api.bulkDeleteRefereeUsers(filtered.map((u) => u.id));
+      setDeleteAllConfirm(null);
+      load();
+      showAlert('Đã xóa toàn bộ tài khoản trọng tài.', 'success');
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   return (
     <div className="nhutin-admin">
       <div className="page-header">
@@ -218,6 +247,7 @@ export default function AdminRefereeAccounts() {
           <p className="page-subtitle">Tổng số: {filtered.length} tài khoản</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" className="btn btn-danger" onClick={removeAll} disabled={filtered.length === 0}>Xóa toàn bộ tài khoản trọng tài</button>
           <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
           <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm tài khoản</button>
         </div>
@@ -471,6 +501,31 @@ export default function AdminRefereeAccounts() {
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>Hủy</button>
               <button type="button" className="btn btn-danger" onClick={confirmDelete}>Xóa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteAllConfirm && (
+        <div className="modal-overlay" onClick={() => !deletingAll && setDeleteAllConfirm(null)}>
+          <div className="form-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="form-modal-header">
+              <h3 className="form-modal-title">Xác nhận xóa tất cả tài khoản trọng tài</h3>
+              <button type="button" className="form-modal-close" onClick={() => setDeleteAllConfirm(null)} aria-label="Đóng" disabled={deletingAll}>×</button>
+            </div>
+            <div className="form-modal-body">
+              <p style={{ marginBottom: 16, color: '#374151' }}>Nhập mã bảo mật để xóa TẤT CẢ {filtered.length} tài khoản trọng tài đang hiển thị:</p>
+              <div className="form-group">
+                <label className="form-label">Mã bảo mật</label>
+                <input type="password" className="form-input" value={deleteAllConfirm.securityCode}
+                  onChange={(e) => setDeleteAllConfirm({ ...deleteAllConfirm, securityCode: e.target.value })} autoFocus disabled={deletingAll} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteAllConfirm(null)} disabled={deletingAll}>Hủy</button>
+              <button type="button" className="btn btn-danger" onClick={confirmDeleteAll} disabled={deletingAll}>
+                {deletingAll ? 'Đang xóa...' : 'Xóa tất cả'}
+              </button>
             </div>
           </div>
         </div>

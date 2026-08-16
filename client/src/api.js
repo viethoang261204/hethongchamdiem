@@ -365,6 +365,7 @@ export const api = {
   },
 
   deleteScore: (id) => withRetry(() => request(`/scores/${id}`, { method: 'DELETE' }), 'deleteScore'),
+  bulkDeleteScores: (ids) => withRetry(() => request('/scores/bulk-delete', { method: 'POST', body: { ids } }), 'bulkDeleteScores'),
 
   // Lịch sử sửa điểm (ai sửa, lúc nào, trước/sau)
   getScoreEdits: (scoreId) => withRetry(() => request(`/scores/${scoreId}/edits`), 'getScoreEdits'),
@@ -411,6 +412,7 @@ export const api = {
   },
 
   deleteUser: (id) => withRetry(() => request(`/users/${id}`, { method: 'DELETE' }), 'deleteUser'),
+  bulkDeleteRefereeUsers: (ids) => withRetry(() => request('/users/referee/bulk-delete', { method: 'POST', body: { ids } }), 'bulkDeleteRefereeUsers'),
 
   // Phân quyền trọng tài theo (Nội dung × Field) — trả về mảng
   // {contest_content_id, field_id} (rỗng cho 1 nội dung = chưa giới hạn field nào trong nội dung đó)
