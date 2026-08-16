@@ -115,18 +115,31 @@ export default function AdminCombatMatches() {
 
   // Lọc "Danh sách trận" theo Bảng (group_label) — nhiều trận dồn 1 chỗ dễ
   // rối, để trọng tài/admin xem riêng từng bảng. "Finals" gộp các trận
-  // group_label rỗng (vòng loại trực tiếp).
+  // group_label rỗng (vòng loại trực tiếp). Lọc thêm theo Sân (field) — các
+  // đội khác bảng vẫn có thể thi chung 1 sân, cần xem riêng theo sân được.
   const FINALS_FILTER = '__finals__';
   const [matchListGroupFilter, setMatchListGroupFilter] = useState('');
+  const [matchListFieldFilter, setMatchListFieldFilter] = useState('');
   const matchGroupOptions = useMemo(
     () => [...new Set(matches.map((m) => m.group_label).filter(Boolean))].sort(),
     [matches]
   );
+  const matchFieldOptions = useMemo(() => {
+    const map = new Map();
+    for (const m of matches) {
+      if (m.field?.id && !map.has(m.field.id)) map.set(m.field.id, m.field.name);
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [matches]);
   const matchesForList = useMemo(() => {
-    if (!matchListGroupFilter) return matches;
-    if (matchListGroupFilter === FINALS_FILTER) return matches.filter((m) => !m.group_label);
-    return matches.filter((m) => m.group_label === matchListGroupFilter);
-  }, [matches, matchListGroupFilter]);
+    let l = matches;
+    if (matchListGroupFilter === FINALS_FILTER) l = l.filter((m) => !m.group_label);
+    else if (matchListGroupFilter) l = l.filter((m) => m.group_label === matchListGroupFilter);
+    if (matchListFieldFilter) l = l.filter((m) => m.field_id === matchListFieldFilter);
+    return l;
+  }, [matches, matchListGroupFilter, matchListFieldFilter]);
 
   const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matchesForList, 10);
 
@@ -971,21 +984,34 @@ export default function AdminCombatMatches() {
           )}
 
           <div className="page-header" style={{ marginBottom: 12 }}>
-            <div><h3 className="card-title">Danh sách trận ({matchesForList.length}{matchListGroupFilter ? `/${matches.length}` : ''})</h3></div>
+            <div><h3 className="card-title">Danh sách trận ({matchesForList.length}{(matchListGroupFilter || matchListFieldFilter) ? `/${matches.length}` : ''})</h3></div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="btn btn-danger" onClick={removeAllMatches} disabled={matches.length === 0}>Xóa tất cả trận</button>
               <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận</button>
             </div>
           </div>
 
-          {matchGroupOptions.length > 0 && (
-            <div className="form-group" style={{ maxWidth: 260, marginBottom: 12 }}>
-              <label className="form-label">Lọc theo Bảng</label>
-              <select className="form-input form-select" value={matchListGroupFilter} onChange={(e) => setMatchListGroupFilter(e.target.value)}>
-                <option value="">Tất cả bảng</option>
-                {matchGroupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
-                <option value={FINALS_FILTER}>Finals / loại trực tiếp (không có bảng)</option>
-              </select>
+          {(matchGroupOptions.length > 0 || matchFieldOptions.length > 0) && (
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
+              {matchGroupOptions.length > 0 && (
+                <div className="form-group" style={{ maxWidth: 260, marginBottom: 0 }}>
+                  <label className="form-label">Lọc theo Bảng</label>
+                  <select className="form-input form-select" value={matchListGroupFilter} onChange={(e) => setMatchListGroupFilter(e.target.value)}>
+                    <option value="">Tất cả bảng</option>
+                    {matchGroupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                    <option value={FINALS_FILTER}>Finals / loại trực tiếp (không có bảng)</option>
+                  </select>
+                </div>
+              )}
+              {matchFieldOptions.length > 0 && (
+                <div className="form-group" style={{ maxWidth: 260, marginBottom: 0 }}>
+                  <label className="form-label">Lọc theo Sân</label>
+                  <select className="form-input form-select" value={matchListFieldFilter} onChange={(e) => setMatchListFieldFilter(e.target.value)}>
+                    <option value="">Tất cả sân</option>
+                    {matchFieldOptions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
           )}
 
