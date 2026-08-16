@@ -15,7 +15,6 @@ const IMPORT_COLUMNS = [
   { key: 'school_name', label: 'Tên trường', required: false, example: 'THPT Chuyên Lê Hồng Phong' },
   { key: 'grade', label: 'Khối', required: false, example: '11' },
   { key: 'gender', label: 'Giới tính', required: false, example: 'Nam' },
-  { key: 'birth_date', label: 'Ngày sinh (YYYY-MM-DD)', required: false, example: '2010-05-20' },
 ];
 
 export default function AdminStudents() {
@@ -32,7 +31,7 @@ export default function AdminStudents() {
   const [search, setSearch] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '', dateOfBirth: '' });
+  const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -62,7 +61,7 @@ export default function AdminStudents() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ fullName: '', grade: '', schoolId: '', dateOfBirth: '' });
+    setForm({ fullName: '', grade: '', schoolId: '' });
     setErrors({});
   };
 
@@ -72,7 +71,6 @@ export default function AdminStudents() {
       fullName: s.full_name || '',
       grade: s.grade || '',
       schoolId: s.school_id || '',
-      dateOfBirth: s.birth_date || '',
     });
     setErrors({});
   };
@@ -157,22 +155,20 @@ export default function AdminStudents() {
                 <th>Lớp</th>
                 <th>Trường</th>
                 <th>Khối</th>
-                <th>Ngày sinh</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
               ) : pageItems.map((s) => (
               <tr key={s.id}>
                 <td>{s.full_name}</td>
                 <td>{s.grade || '-'}</td>
                 <td>{s.school?.name || s.schools?.name || '-'}</td>
                 <td>{s.grade}</td>
-                <td>{s.birth_date || '-'}</td>
                 <td>
                   <button type="button" className="btn btn-secondary" onClick={() => openEdit(s)}>Sửa</button>
                   <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(s.id)}>Xóa</button>
@@ -198,15 +194,9 @@ export default function AdminStudents() {
               <input className={`form-input ${errors.fullName ? 'form-input-error' : ''}`} value={form.fullName} onChange={(e) => { setForm({ ...form, fullName: e.target.value }); setErrors({ ...errors, fullName: '' }); }} />
               {errors.fullName && <div className="form-error-text">{errors.fullName}</div>}
             </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Khối</label>
-                <input className="form-input" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="VD: 10, 11, 12" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Ngày sinh</label>
-                <input type="date" className="form-input" value={form.dateOfBirth} onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} />
-              </div>
+            <div className="form-group">
+              <label className="form-label">Khối</label>
+              <input className="form-input" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="VD: 10, 11, 12" />
             </div>
             <div className="form-group">
               <label className="form-label">Trường</label>
@@ -263,7 +253,7 @@ export default function AdminStudents() {
           title="Nhập học sinh từ Excel"
           columns={IMPORT_COLUMNS}
           templateFilename="mau-hoc-sinh.xlsx"
-          notePrereq="Nếu điền Tên trường mà trường chưa có trong hệ thống, hệ thống sẽ tự tạo trường mới (bậc THPT)."
+          notePrereq="Nếu điền Tên trường mà trường chưa có trong hệ thống, hệ thống sẽ tự tạo trường mới."
           onImport={(rows) => api.importStudents(rows)}
           onDone={() => { clearApiCache(); load(); }}
           onClose={() => setImportOpen(false)}
