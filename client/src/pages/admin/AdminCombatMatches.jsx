@@ -63,15 +63,26 @@ function orderPairsAcrossRounds(rounds) {
   return ordered;
 }
 
-// Số thứ tự trận tiếp theo trong 1 group — đếm tiếp từ match_no lớn nhất
-// đã có trong CHÍNH group đó (áp dụng chung cho cả lượt đi lẫn lượt về, để
-// lượt về nối tiếp số của lượt đi thay vì đánh số lại từ đầu).
-function nextMatchNoForGroup(matches, groupLabel) {
-  const nums = matches
-    .filter((m) => m.group_label === groupLabel)
-    .map((m) => parseInt(m.match_no, 10))
-    .filter((n) => !Number.isNaN(n));
-  return (nums.length ? Math.max(...nums) : 0) + 1;
+// STT (match_no) đánh theo SÂN, không theo group/bảng — nhiều group khác
+// nhau vẫn có thể thi chung 1 sân, và 1 sân chỉ chạy được từng trận một
+// theo thời gian thực nên STT phải liền mạch xuyên suốt sân đó (vd sân S03
+// có 32 trận thì STT 1-32 trên chính sân S03, bất kể trận đó thuộc group
+// nào). Bộ đếm `counters` truyền vào từ ngoài để nhiều trận SINH CÙNG 1 lượt
+// gọi (cùng đợt "Sinh lịch vòng tròn") tiếp tục tăng đúng cho cùng 1 sân
+// thay vì mỗi trận tự tính lại từ `matches` gốc (dữ liệu cũ, chưa có trận
+// vừa tạo trong vòng lặp).
+function nextMatchNoForField(matches, counters, fieldId) {
+  if (!fieldId) return null;
+  if (!counters.has(fieldId)) {
+    const nums = matches
+      .filter((m) => m.field_id === fieldId)
+      .map((m) => parseInt(m.match_no, 10))
+      .filter((n) => !Number.isNaN(n));
+    counters.set(fieldId, (nums.length ? Math.max(...nums) : 0) + 1);
+  }
+  const no = counters.get(fieldId);
+  counters.set(fieldId, no + 1);
+  return no;
 }
 
 export default function AdminCombatMatches() {
@@ -113,17 +124,11 @@ export default function AdminCombatMatches() {
   const matches = cdata?.matches || [];
   const missionTasks = cdata?.tasks || [];
 
-  // Lọc "Danh sách trận" theo Bảng (group_label) — nhiều trận dồn 1 chỗ dễ
-  // rối, để trọng tài/admin xem riêng từng bảng. "Finals" gộp các trận
-  // group_label rỗng (vòng loại trực tiếp). Lọc thêm theo Sân (field) — các
-  // đội khác bảng vẫn có thể thi chung 1 sân, cần xem riêng theo sân được.
-  const FINALS_FILTER = '__finals__';
-  const [matchListGroupFilter, setMatchListGroupFilter] = useState('');
+  // Lọc "Danh sách trận" theo Sân (field) — STT (match_no) giờ đánh liền
+  // mạch theo TỪNG SÂN chứ không theo group/bảng (nhiều group khác nhau vẫn
+  // có thể thi chung 1 sân, và 1 sân chỉ chạy được từng trận 1 theo thời
+  // gian thực nên STT phải xuyên suốt sân đó, không tách theo bảng nữa).
   const [matchListFieldFilter, setMatchListFieldFilter] = useState('');
-  const matchGroupOptions = useMemo(
-    () => [...new Set(matches.map((m) => m.group_label).filter(Boolean))].sort(),
-    [matches]
-  );
   const matchFieldOptions = useMemo(() => {
     const map = new Map();
     for (const m of matches) {
@@ -134,12 +139,9 @@ export default function AdminCombatMatches() {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [matches]);
   const matchesForList = useMemo(() => {
-    let l = matches;
-    if (matchListGroupFilter === FINALS_FILTER) l = l.filter((m) => !m.group_label);
-    else if (matchListGroupFilter) l = l.filter((m) => m.group_label === matchListGroupFilter);
-    if (matchListFieldFilter) l = l.filter((m) => m.field_id === matchListFieldFilter);
-    return l;
-  }, [matches, matchListGroupFilter, matchListFieldFilter]);
+    if (!matchListFieldFilter) return matches;
+    return matches.filter((m) => m.field_id === matchListFieldFilter);
+  }, [matches, matchListFieldFilter]);
 
   const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matchesForList, 10);
 
@@ -625,22 +627,23 @@ export default function AdminCombatMatches() {
       bumpTeamField(teamB?.id, best.id);
       return best;
     };
-    // Xếp thứ tự theo round (né 1 đội đá 2 trận liên tiếp về match_no) rồi
-    // đánh số tiếp nối từ trận lớn nhất đã có trong group.
+    // Xếp thứ tự theo round (né 1 đội đá 2 trận liên tiếp) rồi đánh STT theo
+    // SÂN được chọn cho từng trận (không theo group) — xem nextMatchNoForField.
     const orderedPairs = orderPairsAcrossRounds(
       group.rounds.map((r) => ({ ...r, pairs: r.pairs.filter((p) => !p.match) }))
     );
-    let nextNo = nextMatchNoForGroup(matches, group.label);
+    const fieldNoCounters = new Map();
     setGeneratingGroup(group.label);
     try {
       for (const p of orderedPairs) {
         const teamA = teamsById.get(p.teamAId);
         const teamB = teamsById.get(p.teamBId);
         const field = pickField(teamA, teamB);
+        const matchNo = nextMatchNoForField(matches, fieldNoCounters, field?.id);
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamAId, team_b_id: p.teamBId,
           group_label: group.label, board_id: teamA.board_id, field_id: field?.id || null,
-          match_no: String(nextNo++),
+          match_no: matchNo != null ? String(matchNo) : null,
           details: { leg: 1 },
         });
       }
@@ -689,7 +692,7 @@ export default function AdminCombatMatches() {
       return best;
     };
     const orderedPairs = orderPairsAcrossRounds(returnGroup.rounds);
-    let nextNo = nextMatchNoForGroup(matches, returnGroup.label);
+    const fieldNoCounters = new Map();
     setGeneratingReturnGroup(returnGroup.label);
     try {
       // Các trận lượt đi tạo trước khi có tính năng này chưa có details.leg
@@ -706,10 +709,11 @@ export default function AdminCombatMatches() {
         const homeTeam = teamsById.get(p.teamBId); // đảo ngược: đội B lượt đi thành đội A lượt về
         const awayTeam = teamsById.get(p.teamAId);
         const field = pickField(homeTeam, awayTeam);
+        const matchNo = nextMatchNoForField(matches, fieldNoCounters, field?.id);
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamBId, team_b_id: p.teamAId,
           group_label: returnGroup.label, board_id: homeTeam.board_id, field_id: field?.id || null,
-          match_no: String(nextNo++),
+          match_no: matchNo != null ? String(matchNo) : null,
           details: { leg: 2 },
         });
       }
@@ -984,34 +988,20 @@ export default function AdminCombatMatches() {
           )}
 
           <div className="page-header" style={{ marginBottom: 12 }}>
-            <div><h3 className="card-title">Danh sách trận ({matchesForList.length}{(matchListGroupFilter || matchListFieldFilter) ? `/${matches.length}` : ''})</h3></div>
+            <div><h3 className="card-title">Danh sách trận ({matchesForList.length}{matchListFieldFilter ? `/${matches.length}` : ''})</h3></div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="btn btn-danger" onClick={removeAllMatches} disabled={matches.length === 0}>Xóa tất cả trận</button>
               <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận</button>
             </div>
           </div>
 
-          {(matchGroupOptions.length > 0 || matchFieldOptions.length > 0) && (
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
-              {matchGroupOptions.length > 0 && (
-                <div className="form-group" style={{ maxWidth: 260, marginBottom: 0 }}>
-                  <label className="form-label">Lọc theo Bảng</label>
-                  <select className="form-input form-select" value={matchListGroupFilter} onChange={(e) => setMatchListGroupFilter(e.target.value)}>
-                    <option value="">Tất cả bảng</option>
-                    {matchGroupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
-                    <option value={FINALS_FILTER}>Finals / loại trực tiếp (không có bảng)</option>
-                  </select>
-                </div>
-              )}
-              {matchFieldOptions.length > 0 && (
-                <div className="form-group" style={{ maxWidth: 260, marginBottom: 0 }}>
-                  <label className="form-label">Lọc theo Sân</label>
-                  <select className="form-input form-select" value={matchListFieldFilter} onChange={(e) => setMatchListFieldFilter(e.target.value)}>
-                    <option value="">Tất cả sân</option>
-                    {matchFieldOptions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                </div>
-              )}
+          {matchFieldOptions.length > 0 && (
+            <div className="form-group" style={{ maxWidth: 260, marginBottom: 12 }}>
+              <label className="form-label">Lọc theo Sân</label>
+              <select className="form-input form-select" value={matchListFieldFilter} onChange={(e) => setMatchListFieldFilter(e.target.value)}>
+                <option value="">Tất cả sân</option>
+                {matchFieldOptions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
             </div>
           )}
 
