@@ -18,7 +18,7 @@ const IMPORT_COLUMNS = [
   { key: 'school_name', label: 'Tên trường', required: false, example: 'THPT Chuyên Lê Hồng Phong' },
   { key: 'board_name', label: 'Bảng đấu (Bảng A–E)', required: false, example: 'Bảng E' },
   { key: 'coach_name', label: 'Huấn luyện viên', required: false, example: '' },
-  { key: 'field_name', label: 'Field', required: false, example: '' },
+  { key: 'field_names', label: 'Field (nhiều field cách nhau bởi dấu ;)', required: false, example: 'Field 3; Field 7' },
   { key: 'region', label: 'Khu vực (bac/trung/nam)', required: false, example: 'bac' },
 ];
 
@@ -58,7 +58,7 @@ export default function AdminTeams() {
   const [filterSchool, setFilterSchool] = useState('');
   const [filterField, setFilterField] = useState('');
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '', fieldId: '', schoolId: '' });
+  const [form, setForm] = useState({ name: '', studentIds: [], competitionId: '', contestContentId: '', boardId: '', coachId: '', fieldIds: [], schoolId: '' });
   const [contents, setContents] = useState([]);
   const [boards, setBoards] = useState([]);
   const [errors, setErrors] = useState({});
@@ -69,7 +69,7 @@ export default function AdminTeams() {
   const [studentForm, setStudentForm] = useState({ fullName: '', class: '', grade: '', dateOfBirth: '', school: '' });
   const [studentErrors, setStudentErrors] = useState({});
   const [schoolModal, setSchoolModal] = useState(false);
-  const [schoolForm, setSchoolForm] = useState({ name: '', level: 'THPT', province: '', district: '' });
+  const [schoolForm, setSchoolForm] = useState({ name: '', province: '', district: '' });
   const [schoolErrors, setSchoolErrors] = useState({});
 
   const load = async () => reload();
@@ -163,10 +163,13 @@ export default function AdminTeams() {
   }, [boardFiltered, filterSchool]);
 
   // Field có mặt trong tập đội đang lọc theo giải đấu + bảng đấu + trường
+  // (1 đội có thể có nhiều field — team_fields, xem t.fields là mảng)
   const fieldOptions = useMemo(() => {
     const map = new Map();
     for (const t of schoolFiltered) {
-      if (t.field_id && !map.has(t.field_id)) map.set(t.field_id, t.fields?.name || t.field_id);
+      for (const f of t.fields || []) {
+        if (f.id && !map.has(f.id)) map.set(f.id, f.name || f.id);
+      }
     }
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
@@ -175,8 +178,8 @@ export default function AdminTeams() {
 
   const teamsFiltered = useMemo(() => {
     if (!filterField) return schoolFiltered;
-    if (filterField === UNASSIGNED) return schoolFiltered.filter(t => !t.field_id);
-    return schoolFiltered.filter(t => t.field_id === filterField);
+    if (filterField === UNASSIGNED) return schoolFiltered.filter(t => !t.fields?.length);
+    return schoolFiltered.filter(t => t.fields?.some(f => f.id === filterField));
   }, [schoolFiltered, filterField]);
 
   const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
@@ -201,7 +204,7 @@ export default function AdminTeams() {
   const getCompetitionId = (contentId) => allContents.find(x => x.id === contentId)?.competition_id || '';
 
   const openAdd = () => {
-    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '', fieldId: '', schoolId: '' });
+    setForm({ name: '', studentIds: [], competitionId: filterComp || '', contestContentId: '', boardId: '', coachId: '', fieldIds: [], schoolId: '' });
     setContents([]);
     setErrors({});
     setModal('add');
@@ -217,7 +220,7 @@ export default function AdminTeams() {
       contestContentId: team.contest_content_id || '',
       boardId: team.board_id || '',
       coachId: team.coach_id || '',
-      fieldId: team.field_id || '',
+      fieldIds: (team.fields || []).map(f => f.id),
       schoolId: team.school_id || '',
     });
     setContents(content ? allContents.filter(c => c.competition_id === content.competition_id) : []);
@@ -253,7 +256,7 @@ export default function AdminTeams() {
         if (existing) {
           schoolId = existing.id;
         } else {
-          const created = await api.postSchool({ name: schoolName, level: 'THPT' });
+          const created = await api.postSchool({ name: schoolName });
           schoolId = created.id;
           setSchools((prev) => [created, ...prev]);
           clearApiCache();
@@ -337,7 +340,7 @@ export default function AdminTeams() {
           studentIds: form.studentIds,
           boardId: form.boardId || null,
           coachId: form.coachId || null,
-          fieldId: form.fieldId || null,
+          fieldIds: form.fieldIds,
           schoolId: form.schoolId || null,
           order: teams.length + 1,
         });
@@ -347,7 +350,7 @@ export default function AdminTeams() {
           studentIds: form.studentIds,
           boardId: form.boardId || null,
           coachId: form.coachId || null,
-          fieldId: form.fieldId || null,
+          fieldIds: form.fieldIds,
           schoolId: form.schoolId || null,
         });
       }
@@ -474,7 +477,7 @@ export default function AdminTeams() {
                     <td>{getContentName(t.contest_content_id)}</td>
                     <td>{t.boards?.name || '-'}</td>
                     <td>{t.coaches?.name || '-'}</td>
-                    <td>{t.fields?.name || '-'}</td>
+                    <td>{t.fields?.length ? t.fields.map(f => f.name).join(', ') : '-'}</td>
                     <td style={{ maxWidth: 220 }}>{mems.length > 0 ? mems.map(m => m.full_name).join(', ') : '-'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -559,15 +562,28 @@ export default function AdminTeams() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Field</label>
-                <select
-                  className="form-input form-select"
-                  value={form.fieldId}
-                  onChange={(e) => setForm({ ...form, fieldId: e.target.value })}
-                >
-                  <option value="">-- Chưa gán Field --</option>
-                  {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
+                <label className="form-label">Field <span style={{ fontWeight: 400, color: '#94a3b8' }}>(chọn nhiều nếu đội thi ở nhiều field)</span></label>
+                {fields.length === 0 ? (
+                  <p style={{ color: '#888', fontSize: 13 }}>Chưa có field nào — tạo ở mục "Field".</p>
+                ) : (
+                  <div className="checkbox-list">
+                    {fields.map(f => (
+                      <label key={f.id}>
+                        <input
+                          type="checkbox"
+                          checked={form.fieldIds.includes(f.id)}
+                          onChange={() => setForm(prev => ({
+                            ...prev,
+                            fieldIds: prev.fieldIds.includes(f.id)
+                              ? prev.fieldIds.filter(id => id !== f.id)
+                              : [...prev.fieldIds, f.id],
+                          }))}
+                        />
+                        {' '}{f.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Tên đội <span style={{ color: '#dc2626' }}>*</span></label>
@@ -734,7 +750,7 @@ export default function AdminTeams() {
           title="Nhập đội thi từ Excel"
           columns={IMPORT_COLUMNS}
           templateFilename="mau-doi-thi.xlsx"
-          notePrereq='Tên nội dung thi phải khớp nội dung đã có sẵn (không tự tạo). Bảng đấu phải khớp đúng "Bảng A".."Bảng E" (không tự tạo). Trường/HLV/Field sẽ tự tạo mới nếu gõ tên chưa có. Không gán học sinh vào đội qua Excel — gán tay sau khi nhập.'
+          notePrereq='Tên nội dung thi phải khớp nội dung đã có sẵn (không tự tạo). Bảng đấu phải khớp đúng "Bảng A".."Bảng E" (không tự tạo). Trường/HLV/Field sẽ tự tạo mới nếu gõ tên chưa có — 1 đội có thể ghi nhiều Field cách nhau bởi dấu ; hoặc ,. Không gán học sinh vào đội qua Excel — gán tay sau khi nhập.'
           onImport={(rows) => api.importTeams(rows)}
           onDone={async () => {
             clearApiCache();

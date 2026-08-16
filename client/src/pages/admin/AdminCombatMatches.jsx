@@ -497,9 +497,11 @@ export default function AdminCombatMatches() {
       });
   }, [isStars, scheduleByGroup, matches]);
 
-  // Sinh trận còn thiếu của 1 bảng, rải đều field: chọn field đang được dùng ÍT
-  // NHẤT trong toàn nội dung (tính cả trận đã có) cho mỗi trận mới, để tổng số
-  // trận trên mỗi field cân bằng nhau xuyên suốt cả giải chứ không chỉ trong 1 bảng.
+  // Sinh trận còn thiếu của 1 bảng, rải đều field: ưu tiên chọn field nằm
+  // trong tập field mà 1 trong 2 đội (team_a/team_b) đã được gán riêng (đội
+  // có thể gán nhiều field — xem team_fields/AdminTeams.jsx), cân bằng theo
+  // số trận CHÍNH 2 đội đó đã chơi ở từng field ứng viên; đội chưa gán field
+  // nào thì fallback dùng field ít được dùng nhất toàn nội dung (hành vi cũ).
   const generateSchedule = async (group) => {
     if (!group.missingPairs.length) return;
     const teamsById = new Map(group.teamIds.map((id) => [id, teams.find((t) => t.id === id)]));
@@ -511,22 +513,39 @@ export default function AdminCombatMatches() {
       return;
     }
     const fieldUsage = new Map();
-    for (const m of matches) { if (m.field_id) fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1); }
-    const pickField = () => {
+    const teamFieldUsage = new Map(); // key `${teamId}:${fieldId}` -> số trận đội đó đã chơi ở field đó
+    const bumpTeamField = (teamId, fieldId) => {
+      if (!teamId) return;
+      const key = `${teamId}:${fieldId}`;
+      teamFieldUsage.set(key, (teamFieldUsage.get(key) || 0) + 1);
+    };
+    for (const m of matches) {
+      if (!m.field_id) continue;
+      fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1);
+      bumpTeamField(m.team_a_id, m.field_id);
+      bumpTeamField(m.team_b_id, m.field_id);
+    }
+    const pickField = (teamA, teamB) => {
       if (!allFields.length) return null;
-      let best = allFields[0], bestCount = Infinity;
-      for (const f of allFields) {
-        const c = fieldUsage.get(f.id) || 0;
-        if (c < bestCount) { bestCount = c; best = f; }
+      const candidateIds = new Set([...(teamA?.fields || []), ...(teamB?.fields || [])].map((f) => f.id));
+      const candidates = candidateIds.size ? allFields.filter((f) => candidateIds.has(f.id)) : allFields;
+      let best = candidates[0], bestScore = Infinity;
+      for (const f of candidates) {
+        const teamScore = (teamFieldUsage.get(`${teamA?.id}:${f.id}`) || 0) + (teamFieldUsage.get(`${teamB?.id}:${f.id}`) || 0);
+        const score = teamScore * 1000 + (fieldUsage.get(f.id) || 0);
+        if (score < bestScore) { bestScore = score; best = f; }
       }
-      fieldUsage.set(best.id, bestCount + 1);
+      fieldUsage.set(best.id, (fieldUsage.get(best.id) || 0) + 1);
+      bumpTeamField(teamA?.id, best.id);
+      bumpTeamField(teamB?.id, best.id);
       return best;
     };
     setGeneratingGroup(group.label);
     try {
       for (const p of group.missingPairs) {
         const teamA = teamsById.get(p.teamAId);
-        const field = pickField();
+        const teamB = teamsById.get(p.teamBId);
+        const field = pickField(teamA, teamB);
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamAId, team_b_id: p.teamBId,
           group_label: group.label, board_id: teamA.board_id, field_id: field?.id || null,
@@ -549,22 +568,39 @@ export default function AdminCombatMatches() {
     if (!returnGroup.missingReturnPairs.length) return;
     const teamsById = new Map(returnGroup.teamIds.map((id) => [id, teams.find((t) => t.id === id)]));
     const fieldUsage = new Map();
-    for (const m of matches) { if (m.field_id) fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1); }
-    const pickField = () => {
+    const teamFieldUsage = new Map();
+    const bumpTeamField = (teamId, fieldId) => {
+      if (!teamId) return;
+      const key = `${teamId}:${fieldId}`;
+      teamFieldUsage.set(key, (teamFieldUsage.get(key) || 0) + 1);
+    };
+    for (const m of matches) {
+      if (!m.field_id) continue;
+      fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1);
+      bumpTeamField(m.team_a_id, m.field_id);
+      bumpTeamField(m.team_b_id, m.field_id);
+    }
+    const pickField = (teamA, teamB) => {
       if (!allFields.length) return null;
-      let best = allFields[0], bestCount = Infinity;
-      for (const f of allFields) {
-        const c = fieldUsage.get(f.id) || 0;
-        if (c < bestCount) { bestCount = c; best = f; }
+      const candidateIds = new Set([...(teamA?.fields || []), ...(teamB?.fields || [])].map((f) => f.id));
+      const candidates = candidateIds.size ? allFields.filter((f) => candidateIds.has(f.id)) : allFields;
+      let best = candidates[0], bestScore = Infinity;
+      for (const f of candidates) {
+        const teamScore = (teamFieldUsage.get(`${teamA?.id}:${f.id}`) || 0) + (teamFieldUsage.get(`${teamB?.id}:${f.id}`) || 0);
+        const score = teamScore * 1000 + (fieldUsage.get(f.id) || 0);
+        if (score < bestScore) { bestScore = score; best = f; }
       }
-      fieldUsage.set(best.id, bestCount + 1);
+      fieldUsage.set(best.id, (fieldUsage.get(best.id) || 0) + 1);
+      bumpTeamField(teamA?.id, best.id);
+      bumpTeamField(teamB?.id, best.id);
       return best;
     };
     setGeneratingReturnGroup(returnGroup.label);
     try {
       for (const p of returnGroup.missingReturnPairs) {
         const homeTeam = teamsById.get(p.teamBId); // đảo ngược: đội B lượt đi thành đội A lượt về
-        const field = pickField();
+        const awayTeam = teamsById.get(p.teamAId);
+        const field = pickField(homeTeam, awayTeam);
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamBId, team_b_id: p.teamAId,
           group_label: returnGroup.label, board_id: homeTeam.board_id, field_id: field?.id || null,

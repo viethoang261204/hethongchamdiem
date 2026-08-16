@@ -506,14 +506,19 @@ const BOARDS_JSON = `case when bd.id is null then null
 // SQL fragment: nested coaches {id, name, phone}
 const COACHES_JSON = `case when co.id is null then null
   else json_build_object('id', co.id, 'name', co.name, 'phone', co.phone) end`;
-// SQL fragment: nested fields {id, name}
-const FIELDS_JSON = `case when fl.id is null then null
-  else json_build_object('id', fl.id, 'name', fl.name) end`;
+// SQL fragment: mảng field của 1 đội (bảng team_fields, không giới hạn số
+// lượng) — subquery scalar, không cần thêm left join vào FROM.
+const TEAM_FIELDS_JSON = `coalesce((
+  select json_agg(json_build_object('id', fl2.id, 'name', fl2.name) order by fl2.name)
+  from team_fields tf join fields fl2 on fl2.id = tf.field_id
+  where tf.team_id = t.id
+), '[]'::json)`;
 
 router.get('/contents/:contentId/teams', h(async (req, res) => {
   // Trọng tài được phân quyền theo (Nội dung × Field) — nếu đã có gán field
-  // cho ĐÚNG nội dung này thì chỉ thấy đội thuộc các field đó. Chưa gán field
-  // nào cho nội dung này (mảng rỗng) → coi như chưa giới hạn, thấy tất cả.
+  // cho ĐÚNG nội dung này thì chỉ thấy đội có ít nhất 1 field trong tập đó
+  // (team_fields — 1 đội có thể có nhiều field). Chưa gán field nào cho nội
+  // dung này (mảng rỗng) → coi như chưa giới hạn, thấy tất cả.
   let assignedFieldIds = null;
   if (req.user?.role === 'referee') {
     const { rows: rf } = await query(
@@ -523,14 +528,13 @@ router.get('/contents/:contentId/teams', h(async (req, res) => {
     if (rf.length) assignedFieldIds = rf.map((r) => r.field_id);
   }
   const { rows } = await query(
-    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${FIELDS_JSON} as fields
+    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${TEAM_FIELDS_JSON} as fields
      from teams t
      left join schools sch on sch.id = t.school_id
      left join boards bd on bd.id = t.board_id
      left join coaches co on co.id = t.coach_id
-     left join fields fl on fl.id = t.field_id
      where t.contest_content_id = $1
-       ${assignedFieldIds ? 'and t.field_id = any($2::uuid[])' : ''}
+       ${assignedFieldIds ? 'and exists (select 1 from team_fields tf where tf.team_id = t.id and tf.field_id = any($2::uuid[]))' : ''}
      order by t.order_index`,
     assignedFieldIds ? [req.params.contentId, assignedFieldIds] : [req.params.contentId]
   );
@@ -539,13 +543,12 @@ router.get('/contents/:contentId/teams', h(async (req, res) => {
 
 router.get('/teams', h(async (_req, res) => {
   const { rows } = await query(
-    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${FIELDS_JSON} as fields,
+    `select t.*, ${SCHOOLS_JSON} as schools, ${BOARDS_JSON} as boards, ${COACHES_JSON} as coaches, ${TEAM_FIELDS_JSON} as fields,
        json_build_object('name', cc.name, 'competitions', json_build_object('name', comp.name)) as contest_contents
      from teams t
      left join schools sch on sch.id = t.school_id
      left join boards bd on bd.id = t.board_id
      left join coaches co on co.id = t.coach_id
-     left join fields fl on fl.id = t.field_id
      left join contest_contents cc on cc.id = t.contest_content_id
      left join competitions comp on comp.id = cc.competition_id
      order by t.order_index`
@@ -553,24 +556,55 @@ router.get('/teams', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'field_id', 'region', 'order_index', 'combat_group'];
+const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'region', 'order_index', 'combat_group'];
+
+// Ghi đè toàn bộ field của 1 đội (bảng team_fields, không giới hạn số
+// lượng) — cùng pattern full-overwrite với PUT /users/:id/permissions.
+// fieldIds không truyền (undefined) = không đụng tới field hiện có; mảng
+// rỗng = xóa hết field đã gán.
+async function setTeamFields(teamId, fieldIds, runQuery) {
+  if (fieldIds === undefined) return;
+  const ids = Array.isArray(fieldIds) ? fieldIds.filter(Boolean) : [];
+  await runQuery('delete from team_fields where team_id = $1', [teamId]);
+  if (ids.length) {
+    await runQuery(
+      'insert into team_fields (team_id, field_id) select $1, unnest($2::uuid[])',
+      [teamId, ids]
+    );
+  }
+}
 
 router.post('/contents/:contentId/teams', requireAdmin, h(async (req, res) => {
   const b = pick(req.body, TEAM_FIELDS);
-  const { rows } = await query(
-    `insert into teams (contest_content_id, name, student_ids, school_id, area_id, board_id, coach_id, field_id, region, order_index)
-     values ($1, $2, coalesce($3::uuid[], '{}'::uuid[]), $4, $5, $6, $7, $8, coalesce($9, 'bac'), coalesce($10, 0)) returning *`,
-    [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.board_id ?? null, b.coach_id ?? null, b.field_id ?? null, b.region, b.order_index]
-  );
-  res.json(rows[0]);
+  const team = await withTransaction(async (q) => {
+    const { rows } = await q(
+      `insert into teams (contest_content_id, name, student_ids, school_id, area_id, board_id, coach_id, region, order_index)
+       values ($1, $2, coalesce($3::uuid[], '{}'::uuid[]), $4, $5, $6, $7, coalesce($8, 'bac'), coalesce($9, 0)) returning *`,
+      [req.params.contentId, b.name, b.student_ids ?? null, b.school_id ?? null, b.area_id ?? null, b.board_id ?? null, b.coach_id ?? null, b.region, b.order_index]
+    );
+    await setTeamFields(rows[0].id, req.body.field_ids, q);
+    return rows[0];
+  });
+  res.json(team);
 }));
 
 router.put('/teams/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, TEAM_FIELDS);
   const q = buildUpdate('teams', req.params.id, data);
-  if (!q) return res.json({});
-  const { rows } = await query(q.text, q.values);
-  res.json(rows[0]);
+  const team = await withTransaction(async (runQuery) => {
+    let row;
+    if (q) {
+      const { rows } = await runQuery(q.text, q.values);
+      row = rows[0];
+    }
+    await setTeamFields(req.params.id, req.body.field_ids, runQuery);
+    if (!row) {
+      const { rows } = await runQuery('select * from teams where id = $1', [req.params.id]);
+      row = rows[0];
+    }
+    return row;
+  });
+  res.json(team || {});
 }));
 
 router.delete('/teams/:id', requireAdmin, h(async (req, res) => {
@@ -616,13 +650,24 @@ router.post('/teams/import', requireAdmin, h(async (req, res) => {
         : (await query("insert into schools (name, source) values ($1, 'import') returning id", [row.school_name])).rows[0].id;
     }
     const coachId = await resolveOrCreateByName('coaches', row.coach_name);
-    const fieldId = await resolveOrCreateByName('fields', row.field_name);
+    // 1 đội có thể thi ở nhiều field — ô field_names ghi nhiều tên cách nhau
+    // bởi dấu ; hoặc , (vd "Field 3; Field 7"), mỗi tên tự tạo field mới nếu
+    // chưa có, giống resolveOrCreateByName đang dùng cho HLV.
+    const fieldNames = String(row.field_names || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean);
+    const fieldIds = [];
+    for (const fname of fieldNames) fieldIds.push(await resolveOrCreateByName('fields', fname));
 
-    await query(
-      `insert into teams (contest_content_id, name, school_id, board_id, coach_id, field_id, region)
-       values ($1, $2, $3, $4, $5, $6, coalesce($7, 'bac'))`,
-      [contentId, row.name, schoolId, boardId, coachId, fieldId, row.region || null]
+    const { rows: created } = await query(
+      `insert into teams (contest_content_id, name, school_id, board_id, coach_id, region)
+       values ($1, $2, $3, $4, $5, coalesce($6, 'bac')) returning id`,
+      [contentId, row.name, schoolId, boardId, coachId, row.region || null]
     );
+    if (fieldIds.length) {
+      await query(
+        'insert into team_fields (team_id, field_id) select $1, unnest($2::uuid[])',
+        [created[0].id, fieldIds]
+      );
+    }
     return {};
   });
   res.json(result);
@@ -635,7 +680,7 @@ router.post('/teams/import', requireAdmin, h(async (req, res) => {
 // SQL fragment: 1 dòng scores + teams(*, schools) + users(full_name)
 const SCORE_NESTED = `
   select s.*,
-    (to_jsonb(t.*) || jsonb_build_object('schools', ${SCHOOLS_JSON.replace(/\n/g, ' ')}, 'coaches', ${COACHES_JSON.replace(/\n/g, ' ')}, 'fields', ${FIELDS_JSON.replace(/\n/g, ' ')})) as teams,
+    (to_jsonb(t.*) || jsonb_build_object('schools', ${SCHOOLS_JSON.replace(/\n/g, ' ')}, 'coaches', ${COACHES_JSON.replace(/\n/g, ' ')}, 'fields', ${TEAM_FIELDS_JSON.replace(/\n/g, ' ')})) as teams,
     case when u.id is null then null else json_build_object('full_name', u.full_name) end as users,
     case when cc.id is null then null else json_build_object('name', cc.name) end as contest_contents,
     case when bd.id is null then null else json_build_object('id', bd.id, 'name', bd.name, 'age_group', bd.age_group) end as boards
@@ -644,7 +689,6 @@ const SCORE_NESTED = `
   left join schools sch on sch.id = t.school_id
   left join boards bd on bd.id = t.board_id
   left join coaches co on co.id = t.coach_id
-  left join fields fl on fl.id = t.field_id
   left join users u on u.id = s.referee_id
   left join contest_contents cc on cc.id = s.contest_content_id
 `;
@@ -712,9 +756,9 @@ router.post('/scores', requireAuth, h(async (req, res) => {
       [req.user.id, b.contest_content_id]
     );
     if (assigned.length) {
-      const { rows: teamRows } = await query('select field_id from teams where id = $1', [b.team_id]);
-      const teamFieldId = teamRows[0]?.field_id;
-      const allowed = teamFieldId && assigned.some((a) => a.field_id === teamFieldId);
+      const { rows: teamFieldRows } = await query('select field_id from team_fields where team_id = $1', [b.team_id]);
+      const teamFieldIds = teamFieldRows.map((r) => r.field_id);
+      const allowed = teamFieldIds.some((fid) => assigned.some((a) => a.field_id === fid));
       if (!allowed) {
         return res.status(403).json({ error: 'Bạn không được phân quyền chấm điểm đội thuộc sân thi đấu này.' });
       }
@@ -1063,9 +1107,9 @@ router.put('/matches/:id/result', requireAuth, h(async (req, res) => {
       [req.user.id, match.contest_content_id]
     );
     if (assigned.length) {
-      const { rows: teamFieldRows } = await query('select field_id from teams where id = any($1::uuid[])', [[match.team_a_id, match.team_b_id]]);
+      const { rows: teamFieldRows } = await query('select field_id from team_fields where team_id = any($1::uuid[])', [[match.team_a_id, match.team_b_id]]);
       const allowedFieldIds = assigned.map((a) => a.field_id);
-      const ok = teamFieldRows.some((t) => t.field_id && allowedFieldIds.includes(t.field_id));
+      const ok = teamFieldRows.some((t) => allowedFieldIds.includes(t.field_id));
       if (!ok) return res.status(403).json({ error: 'Bạn không được phân quyền ghi kết quả trận đấu này.' });
     }
   }

@@ -383,6 +383,23 @@ create or replace trigger trg_fields_updated
   before update on fields for each row execute function set_updated_at();
 alter table teams add column if not exists field_id uuid references fields(id) on delete set null;
 
+-- Đội thi có thể gán NHIỀU field (không giới hạn 1 như teams.field_id ở
+-- trên) — bảng join giống pattern referee_content_fields. teams.field_id
+-- giữ nguyên (không đọc/ghi nữa) để không mất dữ liệu cũ, coi như dead
+-- column — đúng cách referee_boards đã được superseded trước đây.
+create table if not exists team_fields (
+  team_id  uuid not null references teams(id) on delete cascade,
+  field_id uuid not null references fields(id) on delete cascade,
+  primary key (team_id, field_id)
+);
+create index if not exists idx_team_fields_field on team_fields(field_id);
+
+-- Backfill 1 lần: đội nào đã có field_id cũ thì tạo sẵn 1 dòng team_fields
+-- tương ứng, để không "mất" field đã gán khi chuyển sang đọc bảng mới.
+insert into team_fields (team_id, field_id)
+select id, field_id from teams where field_id is not null
+on conflict do nothing;
+
 -- Phân loại phương thức chấm ở cấp NỘI DUNG (khác content_boards.ranking_format
 -- vốn ở cấp content×board, dùng cho nhánh loại trực tiếp generic) —
 -- 'scoring' = chấm điểm bình thường (mặc định) · 'combat_drone' = Fly Smart Cup

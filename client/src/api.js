@@ -276,7 +276,7 @@ export const api = {
       area_id: body.areaId ?? body.area_id ?? null,
       board_id: body.boardId ?? body.board_id ?? null,
       coach_id: body.coachId ?? body.coach_id ?? null,
-      field_id: body.fieldId ?? body.field_id ?? null,
+      field_ids: body.fieldIds ?? body.field_ids ?? [],
       region: body.region ?? 'bac',
       order_index: body.order ?? body.order_index ?? 0,
     },
@@ -290,7 +290,7 @@ export const api = {
     if (body.areaId !== undefined || body.area_id !== undefined) update.area_id = body.areaId ?? body.area_id;
     if (body.boardId !== undefined || body.board_id !== undefined) update.board_id = body.boardId ?? body.board_id;
     if (body.coachId !== undefined || body.coach_id !== undefined) update.coach_id = body.coachId ?? body.coach_id;
-    if (body.fieldId !== undefined || body.field_id !== undefined) update.field_id = body.fieldId ?? body.field_id;
+    if (body.fieldIds !== undefined || body.field_ids !== undefined) update.field_ids = body.fieldIds ?? body.field_ids;
     if (body.region !== undefined) update.region = body.region;
     if (body.order !== undefined || body.order_index !== undefined) update.order_index = body.order ?? body.order_index;
     if (body.combat_group !== undefined) update.combat_group = body.combat_group;
