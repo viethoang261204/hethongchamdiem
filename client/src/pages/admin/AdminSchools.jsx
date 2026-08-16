@@ -9,8 +9,7 @@ import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
 
 const IMPORT_COLUMNS = [
-  { key: 'name', label: 'Tên trường', required: true, example: 'THPT Chuyên Lê Hồng Phong' },
-  { key: 'level', label: 'Cấp học', required: true, example: 'THPT' },
+  { key: 'name', label: 'Tên trường/trung tâm', required: true, example: 'THPT Chuyên Lê Hồng Phong' },
   { key: 'province', label: 'Tỉnh/TP', required: false, example: 'TP. Hồ Chí Minh' },
   { key: 'district', label: 'Quận/Huyện', required: false, example: 'Quận 5' },
 ];
@@ -20,11 +19,10 @@ export default function AdminSchools() {
   const { data, loading, error, reload, setData } = useApiLoader(() => api.getSchools(), []);
   const list = data || [];
   const [search, setSearch] = useState('');
-  const [filterLevel, setFilterLevel] = useState('');
   const [filterProvince, setFilterProvince] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', level: 'THPT', province: '', district: '' });
+  const [form, setForm] = useState({ name: '', province: '', district: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const SECURITY_CODE = '26122004';
@@ -39,10 +37,9 @@ export default function AdminSchools() {
         (x.district || '').toLowerCase().includes(s)
       );
     }
-    if (filterLevel) l = l.filter(x => x.level === filterLevel);
     if (filterProvince) l = l.filter(x => (x.province || '') === filterProvince);
     return l;
-  }, [list, search, filterLevel, filterProvince]);
+  }, [list, search, filterProvince]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
@@ -62,7 +59,7 @@ export default function AdminSchools() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ name: '', level: 'THPT', province: '', district: '' });
+    setForm({ name: '', province: '', district: '' });
     setErrors({});
   };
 
@@ -70,7 +67,6 @@ export default function AdminSchools() {
     setModal({ id: s.id });
     setForm({
       name: s.name || '',
-      level: s.level || 'THPT',
       province: s.province || '',
       district: s.district || '',
     });
@@ -93,14 +89,12 @@ export default function AdminSchools() {
       if (modal === 'add') {
         await api.postSchool({
           name: form.name.trim(),
-          level: form.level,
           province: form.province.trim(),
           district: form.district.trim(),
         });
       } else {
         await api.putSchool(modal.id, {
           name: form.name.trim(),
-          level: form.level,
           province: form.province.trim(),
           district: form.district.trim(),
         });
@@ -114,7 +108,7 @@ export default function AdminSchools() {
   };
 
   const remove = async (id) => {
-    const ok = await showConfirm({ message: 'Xóa trường này?', confirmText: 'Xóa', cancelText: 'Hủy', danger: true });
+    const ok = await showConfirm({ message: 'Xóa trường/trung tâm này?', confirmText: 'Xóa', cancelText: 'Hủy', danger: true });
     if (!ok) return;
     setDeleteConfirm({ id, securityCode: '' });
   };
@@ -135,24 +129,16 @@ export default function AdminSchools() {
     }
   };
 
-  const levelLabel = (l) => {
-    if (l === 'MN') return 'Mầm non';
-    if (l === 'TH') return 'Tiểu học';
-    if (l === 'THCS') return 'THCS';
-    if (l === 'THPT') return 'THPT';
-    return l;
-  };
-
   return (
     <div className="nhutin-admin">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Quản lý trường học</h1>
+          <h1 className="page-title">Quản lý các trường - trung tâm</h1>
           <p className="page-subtitle">Tổng số: {filtered.length} trường</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
-          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trường</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trường/trung tâm</button>
         </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
@@ -160,13 +146,6 @@ export default function AdminSchools() {
         <div className="search-box">
           <input type="text" placeholder="Tìm theo tên, tỉnh, quận..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <select className="filter-select" value={filterLevel} onChange={(e) => setFilterLevel(e.target.value)}>
-          <option value="">Tất cả bậc</option>
-          <option value="MN">Mầm non</option>
-          <option value="TH">Tiểu học</option>
-          <option value="THCS">THCS</option>
-          <option value="THPT">THPT</option>
-        </select>
         <select className="filter-select" value={filterProvince} onChange={(e) => setFilterProvince(e.target.value)}>
           <option value="">Tất cả tỉnh/TP</option>
           {provinces.map(p => <option key={p} value={p}>{p}</option>)}
@@ -177,8 +156,7 @@ export default function AdminSchools() {
           <table>
             <thead>
               <tr>
-                <th>Tên trường</th>
-                <th>Bậc</th>
+                <th>Tên trường/trung tâm</th>
                 <th>Tỉnh/TP</th>
                 <th>Quận/Huyện</th>
                 <th></th>
@@ -186,13 +164,12 @@ export default function AdminSchools() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
+                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
               ) : pageItems.map((s) => (
                 <tr key={s.id}>
                   <td>{s.name}</td>
-                  <td>{levelLabel(s.level)}</td>
                   <td>{s.province || '-'}</td>
                   <td>{s.district || '-'}</td>
                   <td>
@@ -211,12 +188,12 @@ export default function AdminSchools() {
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="form-modal" onClick={(e) => e.stopPropagation()}>
             <div className="form-modal-header">
-              <h3 className="form-modal-title">{modal === 'add' ? 'Thêm trường' : 'Sửa trường'}</h3>
+              <h3 className="form-modal-title">{modal === 'add' ? 'Thêm trường/trung tâm' : 'Sửa trường/trung tâm'}</h3>
               <button type="button" className="form-modal-close" onClick={() => setModal(null)} aria-label="Đóng">×</button>
             </div>
             <div className="form-modal-body">
               <div className="form-group">
-                <label className="form-label">Tên trường <span style={{ color: '#dc2626' }}>*</span></label>
+                <label className="form-label">Tên trường/trung tâm <span style={{ color: '#dc2626' }}>*</span></label>
                 <input
                   className={`form-input ${errors.name ? 'form-input-error' : ''}`}
                   value={form.name}
@@ -224,15 +201,6 @@ export default function AdminSchools() {
                   placeholder="VD: THPT Chuyên Lê Hồng Phong"
                 />
                 {errors.name && <div className="form-error-text">{errors.name}</div>}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Bậc</label>
-                <select className="form-input form-select" value={form.level} onChange={(e) => setForm({ ...form, level: e.target.value })}>
-                  <option value="MN">Mầm non</option>
-                  <option value="TH">Tiểu học (TH)</option>
-                  <option value="THCS">THCS</option>
-                  <option value="THPT">THPT</option>
-                </select>
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -257,7 +225,7 @@ export default function AdminSchools() {
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Hủy</button>
-              <button type="button" className="btn btn-primary" onClick={save}>{modal === 'add' ? 'Lưu trường' : 'Lưu thay đổi'}</button>
+              <button type="button" className="btn btn-primary" onClick={save}>{modal === 'add' ? 'Lưu trường/trung tâm' : 'Lưu thay đổi'}</button>
             </div>
           </div>
         </div>
@@ -271,7 +239,7 @@ export default function AdminSchools() {
               <button type="button" className="form-modal-close" onClick={() => setDeleteConfirm(null)} aria-label="Đóng">×</button>
             </div>
             <div className="form-modal-body">
-              <p style={{ marginBottom: 16, color: '#374151' }}>Nhập mã bảo mật để xóa trường:</p>
+              <p style={{ marginBottom: 16, color: '#374151' }}>Nhập mã bảo mật để xóa trường/trung tâm:</p>
               <div className="form-group">
                 <label className="form-label">Mã bảo mật</label>
                 <input
@@ -294,10 +262,9 @@ export default function AdminSchools() {
 
       {importOpen && (
         <ExcelImportModal
-          title="Nhập trường học từ Excel"
+          title="Nhập trường/trung tâm từ Excel"
           columns={IMPORT_COLUMNS}
           templateFilename="mau-truong-hoc.xlsx"
-          notePrereq="Cấp học phải là một trong: MN, TH, THCS, THPT."
           onImport={(rows) => api.importSchools(rows)}
           onDone={refreshSchools}
           onClose={() => setImportOpen(false)}

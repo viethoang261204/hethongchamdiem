@@ -277,7 +277,7 @@ export default function AdminTeams() {
 
   const openAddSchool = () => {
     setSchoolModal(true);
-    setSchoolForm({ name: '', level: 'THPT', province: '', district: '' });
+    setSchoolForm({ name: '', province: '', district: '' });
     setSchoolErrors({});
   };
 
@@ -296,7 +296,6 @@ export default function AdminTeams() {
     try {
       const created = await api.postSchool({
         name: schoolForm.name.trim(),
-        level: schoolForm.level,
         province: schoolForm.province.trim(),
         district: schoolForm.district.trim(),
       });
@@ -684,20 +683,9 @@ export default function AdminTeams() {
                 <input className={`form-input ${schoolErrors.name ? 'form-input-error' : ''}`} value={schoolForm.name} onChange={(e) => { setSchoolForm({ ...schoolForm, name: e.target.value }); setSchoolErrors({ ...schoolErrors, name: '' }); }} placeholder="VD: THPT Chuyên Lê Hồng Phong" />
                 {schoolErrors.name && <div className="form-error-text">{schoolErrors.name}</div>}
               </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Bậc</label>
-                  <select className="form-input form-select" value={schoolForm.level} onChange={(e) => setSchoolForm({ ...schoolForm, level: e.target.value })}>
-                    <option value="MN">Mầm non</option>
-                    <option value="TH">TH</option>
-                    <option value="THCS">THCS</option>
-                    <option value="THPT">THPT</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Tỉnh/TP</label>
-                  <input className="form-input" value={schoolForm.province} onChange={(e) => setSchoolForm({ ...schoolForm, province: e.target.value })} placeholder="VD: TP. Hồ Chí Minh" />
-                </div>
+              <div className="form-group">
+                <label className="form-label">Tỉnh/TP</label>
+                <input className="form-input" value={schoolForm.province} onChange={(e) => setSchoolForm({ ...schoolForm, province: e.target.value })} placeholder="VD: TP. Hồ Chí Minh" />
               </div>
               <div className="form-group">
                 <label className="form-label">Quận/Huyện</label>

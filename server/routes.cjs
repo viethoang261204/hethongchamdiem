@@ -97,17 +97,17 @@ router.get('/schools', h(async (req, res) => {
 }));
 
 router.post('/schools', requireAdmin, h(async (req, res) => {
-  const data = pick(req.body, ['name', 'level', 'province', 'district', 'source']);
+  const data = pick(req.body, ['name', 'province', 'district', 'source']);
   const { rows } = await query(
-    `insert into schools (name, level, province, district, source)
-     values ($1, $2, $3, $4, coalesce($5, 'manual')) returning *`,
-    [data.name, data.level, data.province ?? null, data.district ?? null, data.source ?? null]
+    `insert into schools (name, province, district, source)
+     values ($1, $2, $3, coalesce($4, 'manual')) returning *`,
+    [data.name, data.province ?? null, data.district ?? null, data.source ?? null]
   );
   res.json(rows[0]);
 }));
 
 router.put('/schools/:id', requireAdmin, h(async (req, res) => {
-  const data = pick(req.body, ['name', 'level', 'province', 'district']);
+  const data = pick(req.body, ['name', 'province', 'district']);
   const q = buildUpdate('schools', req.params.id, data);
   if (!q) return res.json({});
   const { rows } = await query(q.text, q.values);
@@ -119,17 +119,16 @@ router.delete('/schools/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Nhập hàng loạt từ Excel — bỏ qua trùng (name, level) nhờ unique constraint sẵn có
+// Nhập hàng loạt từ Excel — bỏ qua trùng tên nhờ unique constraint sẵn có
 router.post('/schools/import', requireAdmin, h(async (req, res) => {
   const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
   const result = await bulkImport(rows, async (row) => {
     if (!row.name) throw new Error('Thiếu Tên trường.');
-    if (!['MN', 'TH', 'THCS', 'THPT'].includes(row.level)) throw new Error('Cấp học phải là MN, TH, THCS hoặc THPT.');
     const { rowCount } = await query(
-      `insert into schools (name, level, province, district, source)
-       values ($1, $2, $3, $4, 'import')
-       on conflict (name, level) do nothing`,
-      [row.name, row.level, row.province || null, row.district || null]
+      `insert into schools (name, province, district, source)
+       values ($1, $2, $3, 'import')
+       on conflict (name) do nothing`,
+      [row.name, row.province || null, row.district || null]
     );
     return rowCount === 0 ? { skipped: true } : {};
   });
@@ -478,7 +477,7 @@ router.post('/students/import', requireAdmin, h(async (req, res) => {
         schoolId = existing[0].id;
       } else {
         const { rows: created } = await query(
-          "insert into schools (name, level, source) values ($1, 'THPT', 'import') returning id",
+          "insert into schools (name, source) values ($1, 'import') returning id",
           [row.school_name]
         );
         schoolId = created[0].id;
@@ -614,7 +613,7 @@ router.post('/teams/import', requireAdmin, h(async (req, res) => {
       const { rows: s } = await query('select id from schools where lower(name) = lower($1) limit 1', [row.school_name]);
       schoolId = s[0]
         ? s[0].id
-        : (await query("insert into schools (name, level, source) values ($1, 'THPT', 'import') returning id", [row.school_name])).rows[0].id;
+        : (await query("insert into schools (name, source) values ($1, 'import') returning id", [row.school_name])).rows[0].id;
     }
     const coachId = await resolveOrCreateByName('coaches', row.coach_name);
     const fieldId = await resolveOrCreateByName('fields', row.field_name);

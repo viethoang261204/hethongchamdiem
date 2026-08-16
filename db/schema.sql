@@ -219,6 +219,17 @@ alter table schools drop constraint if exists schools_level_check;
 alter table schools add constraint schools_level_check
   check (level in ('MN', 'TH', 'THCS', 'THPT'));
 
+-- Bỏ khái niệm "Cấp học" (MN/TH/THCS/THPT) khỏi Quản lý trường - trung tâm —
+-- đội thi đã tự phân theo Bảng (A-E theo tuổi/lớp) rồi, cấp học ở trường là
+-- thông tin thừa/trùng. Giữ lại cột level (không xoá, tránh mất dữ liệu cũ)
+-- nhưng không còn bắt buộc nhập; đổi unique constraint từ (name, level)
+-- sang chỉ (name) — vì level không còn phân biệt, 2 trường trùng tên dù
+-- khác cấp cũ cũng phải coi là trùng.
+alter table schools alter column level drop not null;
+alter table schools drop constraint if exists schools_level_check;
+alter table schools drop constraint if exists schools_name_level_key;
+alter table schools add constraint schools_name_key unique (name);
+
 alter table tasks add column if not exists image_data bytea;
 alter table tasks add column if not exists image_mime text;
 alter table tasks add column if not exists max_count integer;
