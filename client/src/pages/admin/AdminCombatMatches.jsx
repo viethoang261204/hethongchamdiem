@@ -35,6 +35,45 @@ const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
 const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: '', bSuccess: false, bTimeSeconds: '' });
 
+// Sắp xếp lại thứ tự các cặp giữa các round để né việc 1 đội thi 2 trận
+// LIÊN TIẾP về số thứ tự (match_no) — round-robin gốc (generateRoundRobin)
+// đã đảm bảo 1 đội chỉ xuất hiện đúng 1 lần / round, nên rủi ro chỉ nằm ở
+// ranh giới giữa 2 round: đội đá cặp CUỐI round trước trùng đội đá cặp ĐẦU
+// round sau (2 số thứ tự liền kề). Nếu trùng và round hiện tại có >1 cặp,
+// đẩy cặp đó xuống cuối round hiện tại. Round chỉ có đúng 1 cặp thì không
+// có chỗ để hoán đổi (không tránh được) — chấp nhận giới hạn này.
+function orderPairsAcrossRounds(rounds) {
+  const ordered = [];
+  let prevPairTeams = null;
+  for (const round of rounds) {
+    const pairs = round.pairs.slice();
+    if (prevPairTeams && pairs.length > 1) {
+      const idx = pairs.findIndex((p) => prevPairTeams.has(p.teamAId) || prevPairTeams.has(p.teamBId));
+      if (idx > -1 && idx !== pairs.length - 1) {
+        const [moved] = pairs.splice(idx, 1);
+        pairs.push(moved);
+      }
+    }
+    ordered.push(...pairs);
+    if (pairs.length) {
+      const last = pairs[pairs.length - 1];
+      prevPairTeams = new Set([last.teamAId, last.teamBId]);
+    }
+  }
+  return ordered;
+}
+
+// Số thứ tự trận tiếp theo trong 1 group — đếm tiếp từ match_no lớn nhất
+// đã có trong CHÍNH group đó (áp dụng chung cho cả lượt đi lẫn lượt về, để
+// lượt về nối tiếp số của lượt đi thay vì đánh số lại từ đầu).
+function nextMatchNoForGroup(matches, groupLabel) {
+  const nums = matches
+    .filter((m) => m.group_label === groupLabel)
+    .map((m) => parseInt(m.match_no, 10))
+    .filter((n) => !Number.isNaN(n));
+  return (nums.length ? Math.max(...nums) : 0) + 1;
+}
+
 export default function AdminCombatMatches() {
   const { showConfirm, showAlert } = useNotify();
   const sheetRef = useRef(null);
@@ -73,7 +112,22 @@ export default function AdminCombatMatches() {
   const teams = cdata?.teams || [];
   const matches = cdata?.matches || [];
   const missionTasks = cdata?.tasks || [];
-  const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matches, 10);
+
+  // Lọc "Danh sách trận" theo Bảng (group_label) — nhiều trận dồn 1 chỗ dễ
+  // rối, để trọng tài/admin xem riêng từng bảng. "Finals" gộp các trận
+  // group_label rỗng (vòng loại trực tiếp).
+  const FINALS_FILTER = '__finals__';
+  const matchGroupOptions = useMemo(
+    () => [...new Set(matches.map((m) => m.group_label).filter(Boolean))].sort(),
+    [matches]
+  );
+  const matchesForList = useMemo(() => {
+    if (!matchListGroupFilter) return matches;
+    if (matchListGroupFilter === FINALS_FILTER) return matches.filter((m) => !m.group_label);
+    return matches.filter((m) => m.group_label === matchListGroupFilter);
+  }, [matches, matchListGroupFilter]);
+
+  const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matchesForList, 10);
 
   const [modal, setModal] = useState(null); // 'add' | { id }
   const [form, setForm] = useState({ team_a_id: '', team_b_id: '', team_a_no: '', team_b_no: '', stage: '', group_label: '', match_no: '', board_id: '', field_id: '' });
@@ -90,6 +144,7 @@ export default function AdminCombatMatches() {
   const [generatingReturnGroup, setGeneratingReturnGroup] = useState(null);
   const [groupDivModal, setGroupDivModal] = useState(null); // { count } khi mở modal Phân chia bảng
   const [dividingGroups, setDividingGroups] = useState(false);
+  const [matchListGroupFilter, setMatchListGroupFilter] = useState('');
   const [statusAction, setStatusAction] = useState(null); // 'cancel' | 'disqualify' | null
   const [statusReason, setStatusReason] = useState('');
   const [disqualifiedSide, setDisqualifiedSide] = useState('A');
@@ -488,12 +543,16 @@ export default function AdminCombatMatches() {
     return scheduleByGroup
       .filter((g) => g.teamIds.length >= 2 && g.missingPairs.length === 0)
       .map((g) => {
-        const missingReturnPairs = g.rounds.flatMap((r) => r.pairs).filter((p) => {
-          const exists = matches.some((m) => m.group_label === g.label && (m.details?.leg ?? 1) === 2 &&
-            ((m.team_a_id === p.teamAId && m.team_b_id === p.teamBId) || (m.team_a_id === p.teamBId && m.team_b_id === p.teamAId)));
-          return !exists;
-        });
-        return { label: g.label, teamIds: g.teamIds, missingReturnPairs };
+        const rounds = g.rounds.map((r) => ({
+          roundNo: r.roundNo,
+          pairs: r.pairs.filter((p) => {
+            const exists = matches.some((m) => m.group_label === g.label && (m.details?.leg ?? 1) === 2 &&
+              ((m.team_a_id === p.teamAId && m.team_b_id === p.teamBId) || (m.team_a_id === p.teamBId && m.team_b_id === p.teamAId)));
+            return !exists;
+          }),
+        }));
+        const missingReturnPairs = rounds.flatMap((r) => r.pairs);
+        return { label: g.label, teamIds: g.teamIds, rounds, missingReturnPairs };
       });
   }, [isStars, scheduleByGroup, matches]);
 
@@ -540,15 +599,23 @@ export default function AdminCombatMatches() {
       bumpTeamField(teamB?.id, best.id);
       return best;
     };
+    // Xếp thứ tự theo round (né 1 đội đá 2 trận liên tiếp về match_no) rồi
+    // đánh số tiếp nối từ trận lớn nhất đã có trong group.
+    const orderedPairs = orderPairsAcrossRounds(
+      group.rounds.map((r) => ({ ...r, pairs: r.pairs.filter((p) => !p.match) }))
+    );
+    let nextNo = nextMatchNoForGroup(matches, group.label);
     setGeneratingGroup(group.label);
     try {
-      for (const p of group.missingPairs) {
+      for (const p of orderedPairs) {
         const teamA = teamsById.get(p.teamAId);
         const teamB = teamsById.get(p.teamBId);
         const field = pickField(teamA, teamB);
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamAId, team_b_id: p.teamBId,
           group_label: group.label, board_id: teamA.board_id, field_id: field?.id || null,
+          match_no: String(nextNo++),
+          details: { leg: 1 },
         });
       }
       await reloadMatches();
@@ -595,15 +662,28 @@ export default function AdminCombatMatches() {
       bumpTeamField(teamB?.id, best.id);
       return best;
     };
+    const orderedPairs = orderPairsAcrossRounds(returnGroup.rounds);
+    let nextNo = nextMatchNoForGroup(matches, returnGroup.label);
     setGeneratingReturnGroup(returnGroup.label);
     try {
-      for (const p of returnGroup.missingReturnPairs) {
+      // Các trận lượt đi tạo trước khi có tính năng này chưa có details.leg
+      // tường minh (chỉ ngầm hiểu leg mặc định = 1) — gắn nhãn rõ ràng ngay
+      // khi bắt đầu sinh lượt về, để danh sách trận hiện đúng "Lượt đi" thay
+      // vì im lặng suy luận.
+      const unlabeledLeg1 = matches.filter((m) =>
+        m.group_label === returnGroup.label && !m.details?.leg
+      );
+      for (const m of unlabeledLeg1) {
+        await api.putCombatMatch(m.id, { details: { ...(m.details || {}), leg: 1 } });
+      }
+      for (const p of orderedPairs) {
         const homeTeam = teamsById.get(p.teamBId); // đảo ngược: đội B lượt đi thành đội A lượt về
         const awayTeam = teamsById.get(p.teamAId);
         const field = pickField(homeTeam, awayTeam);
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamBId, team_b_id: p.teamAId,
           group_label: returnGroup.label, board_id: homeTeam.board_id, field_id: field?.id || null,
+          match_no: String(nextNo++),
           details: { leg: 2 },
         });
       }
@@ -878,18 +958,30 @@ export default function AdminCombatMatches() {
           )}
 
           <div className="page-header" style={{ marginBottom: 12 }}>
-            <div><h3 className="card-title">Danh sách trận ({matches.length})</h3></div>
+            <div><h3 className="card-title">Danh sách trận ({matchesForList.length}{matchListGroupFilter ? `/${matches.length}` : ''})</h3></div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" className="btn btn-danger" onClick={removeAllMatches} disabled={matches.length === 0}>Xóa tất cả trận</button>
               <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận</button>
             </div>
           </div>
 
+          {matchGroupOptions.length > 0 && (
+            <div className="form-group" style={{ maxWidth: 260, marginBottom: 12 }}>
+              <label className="form-label">Lọc theo Bảng</label>
+              <select className="form-input form-select" value={matchListGroupFilter} onChange={(e) => setMatchListGroupFilter(e.target.value)}>
+                <option value="">Tất cả bảng</option>
+                {matchGroupOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                <option value={FINALS_FILTER}>Finals / loại trực tiếp (không có bảng)</option>
+              </select>
+            </div>
+          )}
+
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="table-container">
               <table>
                 <thead>
                   <tr>
+                    <th>STT</th>
                     <th>Vòng / Bảng</th>
                     <th>Sân</th>
                     <th>{isDrone ? 'Đội 1' : 'Đội Đỏ'}</th>
@@ -899,16 +991,21 @@ export default function AdminCombatMatches() {
                   </tr>
                 </thead>
                 <tbody>
-                  {matches.length === 0 ? (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có trận nào.</td></tr>
+                  {matchesForList.length === 0 ? (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có trận nào.</td></tr>
                   ) : matchesPage.map((m) => (
                     <tr key={m.id}>
+                      <td>{m.match_no || '-'}</td>
                       <td>
                         {m.stage || '-'}
                         {m.group_label && (
                           <div style={{ fontSize: 12, color: '#64748b' }}>
                             Bảng: {m.group_label}
-                            {isStars && (m.details?.leg ?? 1) === 2 && <span style={{ marginLeft: 6, color: '#7c3aed', fontWeight: 600 }}>[Lượt về]</span>}
+                            {isStars && (
+                              <span style={{ marginLeft: 6, fontWeight: 600, color: (m.details?.leg ?? 1) === 2 ? '#7c3aed' : '#0ea5e9' }}>
+                                [{(m.details?.leg ?? 1) === 2 ? 'Lượt về' : 'Lượt đi'}]
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
