@@ -217,6 +217,19 @@ export default function AdminCombatMatches() {
     }
   };
 
+  // Sửa nhanh STT (match_no) ngay tại danh sách trận — không cần mở modal
+  // "Sửa trận" đầy đủ chỉ để đổi số thứ tự sau khi sinh lịch tự động.
+  const updateMatchNo = async (m, value) => {
+    const next = value.trim() || null;
+    if (next === (m.match_no || null)) return;
+    try {
+      await api.putCombatMatch(m.id, { match_no: next });
+      await reloadMatches();
+    } catch (e) {
+      showAlert(e.message || 'Lỗi', 'error');
+    }
+  };
+
   const removeMatch = async (m) => {
     const ok = await showConfirm({ message: 'Xóa trận đấu này?', confirmText: 'Xóa', cancelText: 'Hủy', danger: true });
     if (!ok) return;
@@ -995,7 +1008,18 @@ export default function AdminCombatMatches() {
                     <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có trận nào.</td></tr>
                   ) : matchesPage.map((m) => (
                     <tr key={m.id}>
-                      <td>{m.match_no || '-'}</td>
+                      <td>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ width: 56, padding: '4px 6px', textAlign: 'center' }}
+                          defaultValue={m.match_no || ''}
+                          placeholder="-"
+                          title="Sửa số thứ tự trận"
+                          onBlur={(e) => updateMatchNo(m, e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                        />
+                      </td>
                       <td>
                         {m.stage || '-'}
                         {m.group_label && (
