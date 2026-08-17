@@ -43,7 +43,8 @@ export default function AdminReports() {
   // Danh sách phiếu điểm chi tiết (đã fetch đủ scores + tasks) đang chờ render
   // ẩn để html2canvas chụp từng phiếu, gộp thành 1 PDF cho cả group.
   const [pendingExport, setPendingExport] = useState(null);
-  const [exportingExcel, setExportingExcel] = useState(false);
+  // Tên group (trường/HLV) đang xuất Excel riêng — dùng để disable đúng nút đó
+  const [exportingExcelGroup, setExportingExcelGroup] = useState(null);
 
   const contentsForComp = useMemo(
     () => contents.filter((c) => !selectedComp || c.competition_id === selectedComp),
@@ -176,24 +177,30 @@ export default function AdminReports() {
     }
   };
 
-  // Xuất Excel TỔNG HỢP điểm toàn bộ đội thi (đo lường — có lượt 1/lượt 2)
-  // trong phạm vi báo cáo đang xem, gộp mọi trường/trung tâm vào 1 file,
-  // đúng theo mẫu Excel đã cung cấp (1 dòng/thí sinh, STT theo từng ĐỘI).
-  // Không áp dụng đội đối kháng (không có khái niệm lượt 1/2 kiểu này).
-  const handleExportExcel = async () => {
-    if (!rows) return;
-    setExportingExcel(true);
+  // Xuất Excel RIÊNG cho 1 group (1 trường/trung tâm) — đội thi đo lường (có
+  // lượt 1/lượt 2) của group đó, đúng theo mẫu Excel đã cung cấp (1 dòng/thí
+  // sinh, STT theo từng ĐỘI). Không áp dụng đội đối kháng (không có khái
+  // niệm lượt 1/2 kiểu này) — cùng phạm vi với nút "Xuất phiếu điểm" cạnh nó.
+  const handleExportExcel = async (group) => {
+    const measurementTeams = group.teams.filter((t) => t.format !== 'combat');
+    if (measurementTeams.length === 0) {
+      showAlert('Nhóm này chỉ có đội thi đối kháng — không có lượt 1/lượt 2 để xuất Excel.', 'error');
+      return;
+    }
+    setExportingExcelGroup(group.name);
     try {
-      const scopedContentIds = selectedContent ? [selectedContent] : contentsForComp.map((c) => c.id);
+      const contentIds = [...new Set(measurementTeams.map((t) => t.contest_content_id).filter(Boolean))];
+      const teamIdsInGroup = new Set(measurementTeams.map((t) => t.team_id));
       const [students, teamsArrays] = await Promise.all([
         api.getStudents(),
-        Promise.all(scopedContentIds.map((cid) => api.getTeams(cid))),
+        Promise.all(contentIds.map((cid) => api.getTeams(cid))),
       ]);
       const teamsById = new Map(teamsArrays.flat().map((t) => [t.id, t]));
       const compLocation = competitions.find((c) => c.id === selectedComp)?.location || '';
 
       const scoresByTeam = new Map();
       for (const r of rows.measurement || []) {
+        if (!teamIdsInGroup.has(r.team_id)) continue;
         if (!scoresByTeam.has(r.team_id)) scoresByTeam.set(r.team_id, {});
         scoresByTeam.get(r.team_id)[r.round] = r;
       }
@@ -201,12 +208,7 @@ export default function AdminReports() {
       const teamsSorted = Array.from(scoresByTeam.keys())
         .map((id) => teamsById.get(id))
         .filter(Boolean)
-        .sort((a, b) => (a.schools?.name || '').localeCompare(b.schools?.name || '') || a.name.localeCompare(b.name));
-
-      if (teamsSorted.length === 0) {
-        showAlert('Không có đội thi đo lường nào trong phạm vi báo cáo này để xuất Excel.', 'error');
-        return;
-      }
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       const aoa = [REPORT_EXCEL_HEADER];
       let stt = 0;
@@ -240,12 +242,12 @@ export default function AdminReports() {
       ws['!cols'] = REPORT_EXCEL_HEADER.map(() => ({ wch: 20 }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo điểm');
-      const slug = (compName || 'bao-cao-diem').replace(/\s+/g, '-').toLowerCase();
+      const slug = group.name.replace(/\s+/g, '-').toLowerCase();
       XLSX.writeFile(wb, `bao-cao-diem-${slug}.xlsx`);
     } catch (e) {
       showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
     } finally {
-      setExportingExcel(false);
+      setExportingExcelGroup(null);
     }
   };
 
@@ -293,11 +295,6 @@ export default function AdminReports() {
             <p style={{ color: '#64748b', margin: '4px 0 0' }}>
               {contentName} · Nhóm theo trung tâm · Xem lúc {new Date().toLocaleString('vi-VN')}
             </p>
-            <div className="no-print" style={{ marginTop: 12 }}>
-              <button type="button" className="btn btn-secondary" onClick={handleExportExcel} disabled={exportingExcel}>
-                {exportingExcel ? 'Đang xuất...' : 'Xuất Excel (toàn bộ đội theo trường)'}
-              </button>
-            </div>
           </div>
 
           {groups.length === 0 ? (
@@ -308,6 +305,14 @@ export default function AdminReports() {
                 <h3 className="card-title">{g.name}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="page-subtitle">{g.teams.length} đội</span>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleExportExcel(g)}
+                    disabled={exportingExcelGroup === g.name}
+                  >
+                    {exportingExcelGroup === g.name ? 'Đang xuất...' : 'Xuất Excel'}
+                  </button>
                   <button
                     type="button"
                     className="btn btn-primary"
