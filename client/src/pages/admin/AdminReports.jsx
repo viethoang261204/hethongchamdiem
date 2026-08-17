@@ -22,7 +22,21 @@ const REPORT_EXCEL_HEADER = [
   'Tổng điểm', 'Tổng thời gian',
 ];
 
+// Mẫu Excel riêng cho 2 nội dung đối kháng — không có sẵn mẫu tham chiếu
+// (khác với REPORT_EXCEL_HEADER là mẫu người dùng cung cấp), tự thiết kế dựa
+// trên đúng dữ liệu bảng xếp hạng đã tính sẵn (computeGroupStandings/
+// computeDroneStandings — Match Points 3/1/0, Total Score) — không thêm cột
+// "Xếp hạng" vì standings ở đây tính theo TOÀN BỘ đội của content (không
+// tách riêng từng bảng vòng tròn), nên xếp hạng theo cách này sẽ sai lệch
+// nếu 1 nội dung có nhiều bảng — giữ đúng những số liệu đã được tin dùng
+// trên màn hình báo cáo (không phát sinh số liệu mới có thể gây hiểu nhầm.
+const COMBAT_EXCEL_HEADER = [
+  'Stt', 'Tên đội thi', 'Trường/Trung tâm', 'Bảng đấu', 'Huấn luyện viên',
+  'Sân', 'Bảng vòng tròn', 'Số trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Tổng điểm',
+];
+
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
+const COMBAT_FORMAT_LABEL = { combat_stars: 'Battle of Stars', combat_drone: 'Fly Smart Cup' };
 
 export default function AdminReports() {
   const { showAlert } = useNotify();
@@ -45,6 +59,8 @@ export default function AdminReports() {
   const [pendingExport, setPendingExport] = useState(null);
   // Tên group (trường/HLV) đang xuất Excel riêng — dùng để disable đúng nút đó
   const [exportingExcelGroup, setExportingExcelGroup] = useState(null);
+  // key `${group.name}:${content_format}` đang xuất Excel đối kháng riêng
+  const [exportingCombatExcelKey, setExportingCombatExcelKey] = useState(null);
 
   const contentsForComp = useMemo(
     () => contents.filter((c) => !selectedComp || c.competition_id === selectedComp),
@@ -72,7 +88,7 @@ export default function AdminReports() {
           return standings.map((s) => ({
             team_id: s.teamId, team_name: s.teamName,
             school: teams.find((t) => t.id === s.teamId)?.schools?.name || 'Chưa có trường',
-            content_name: c.name, contest_content_id: c.id,
+            content_name: c.name, contest_content_id: c.id, content_format: c.content_format,
             played: s.played, wins: s.wins, draws: s.draws, losses: s.losses,
             match_points: s.matchPoints, total_score: s.totalScore,
           }));
@@ -112,7 +128,7 @@ export default function AdminReports() {
       byTeam.set(key, {
         key, team_id: r.team_id, team_name: r.team_name, school: r.school,
         content_name: r.content_name, contest_content_id: r.contest_content_id,
-        format: 'combat', total_score: r.total_score, total_time: null, rounds: r.played,
+        format: 'combat', content_format: r.content_format, total_score: r.total_score, total_time: null, rounds: r.played,
         wins: r.wins, draws: r.draws, losses: r.losses, match_points: r.match_points,
       });
     }
@@ -251,6 +267,50 @@ export default function AdminReports() {
     }
   };
 
+  // Xuất Excel RIÊNG cho 1 group (1 trường/trung tâm) × 1 nội dung đối kháng
+  // cụ thể (Battle of Stars HOẶC Fly Smart Cup — 2 luật tính điểm khác nhau
+  // nên KHÔNG gộp chung 1 mẫu như measurement). Dùng đúng số liệu standings
+  // đã tính sẵn ở rows.combat (computeGroupStandings/computeDroneStandings).
+  const handleExportCombatExcel = async (group, contentFormat) => {
+    const teamsForFormat = group.teams.filter((t) => t.format === 'combat' && t.content_format === contentFormat);
+    if (teamsForFormat.length === 0) return;
+    const key = `${group.name}:${contentFormat}`;
+    setExportingCombatExcelKey(key);
+    try {
+      const contentIds = [...new Set(teamsForFormat.map((t) => t.contest_content_id))];
+      const teamsArrays = await Promise.all(contentIds.map((cid) => api.getTeams(cid)));
+      const teamsById = new Map(teamsArrays.flat().map((t) => [t.id, t]));
+
+      const sorted = teamsForFormat.slice().sort((a, b) =>
+        (teamsById.get(a.team_id)?.combat_group || '').localeCompare(teamsById.get(b.team_id)?.combat_group || '') ||
+        a.team_name.localeCompare(b.team_name)
+      );
+
+      const aoa = [COMBAT_EXCEL_HEADER];
+      sorted.forEach((t, idx) => {
+        const team = teamsById.get(t.team_id);
+        aoa.push([
+          idx + 1, t.team_name, t.school, team?.boards?.name || '', team?.coaches?.name || '',
+          (team?.fields || []).map((f) => f.name).join(', '),
+          team?.combat_group || '',
+          t.rounds, t.wins, t.draws, t.losses, t.match_points, t.total_score,
+        ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = COMBAT_EXCEL_HEADER.map(() => ({ wch: 20 }));
+      const wb = XLSX.utils.book_new();
+      const formatLabel = COMBAT_FORMAT_LABEL[contentFormat];
+      XLSX.utils.book_append_sheet(wb, ws, formatLabel);
+      const slug = `${group.name}-${formatLabel}`.replace(/\s+/g, '-').toLowerCase();
+      XLSX.writeFile(wb, `bao-cao-${slug}.xlsx`);
+    } catch (e) {
+      showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
+    } finally {
+      setExportingCombatExcelKey(null);
+    }
+  };
+
   if (loading) return <div className="nhutin-admin"><p style={{ padding: 24 }}>Đang tải...</p></div>;
 
   return (
@@ -305,14 +365,27 @@ export default function AdminReports() {
                 <h3 className="card-title">{g.name}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="page-subtitle">{g.teams.length} đội</span>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => handleExportExcel(g)}
-                    disabled={exportingExcelGroup === g.name}
-                  >
-                    {exportingExcelGroup === g.name ? 'Đang xuất...' : 'Xuất Excel'}
-                  </button>
+                  {g.teams.some((t) => t.format !== 'combat') && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleExportExcel(g)}
+                      disabled={exportingExcelGroup === g.name}
+                    >
+                      {exportingExcelGroup === g.name ? 'Đang xuất...' : 'Xuất Excel (đo lường)'}
+                    </button>
+                  )}
+                  {COMBAT_FORMATS.filter((fmt) => g.teams.some((t) => t.content_format === fmt)).map((fmt) => (
+                    <button
+                      key={fmt}
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleExportCombatExcel(g, fmt)}
+                      disabled={exportingCombatExcelKey === `${g.name}:${fmt}`}
+                    >
+                      {exportingCombatExcelKey === `${g.name}:${fmt}` ? 'Đang xuất...' : `Xuất Excel (${COMBAT_FORMAT_LABEL[fmt]})`}
+                    </button>
+                  ))}
                   <button
                     type="button"
                     className="btn btn-primary"
