@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import { useNotify } from '../../context/NotifyContext';
@@ -15,6 +16,17 @@ export default function RefereeLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { showConfirm } = useNotify();
+  const [showLogout, setShowLogout] = useState(false);
+  const footerRef = useRef(null);
+
+  useEffect(() => {
+    if (!showLogout) return undefined;
+    const onClickOutside = (e) => {
+      if (footerRef.current && !footerRef.current.contains(e.target)) setShowLogout(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [showLogout]);
 
   const handleLogout = async () => {
     const ok = await showConfirm({ message: 'Đăng xuất?', confirmText: 'Đăng xuất', cancelText: 'Hủy', danger: true });
@@ -66,18 +78,25 @@ export default function RefereeLayout() {
           </div>
         </nav>
 
-        <div className="sidebar-footer">
-          <div className="user-info">
+        <div className="sidebar-footer" ref={footerRef}>
+          <button
+            type="button"
+            className="user-info user-info-toggle"
+            onClick={() => setShowLogout((v) => !v)}
+            aria-expanded={showLogout}
+          >
             <div className="user-avatar">{initials}</div>
             <div>
               <div className="user-name">{user?.fullName || user?.username}</div>
               <div className="user-email">Trọng tài</div>
             </div>
-          </div>
-          <button type="button" className="logout-btn" onClick={handleLogout}>
-            {NAV_ICONS.logout}
-            <span>Đăng xuất</span>
           </button>
+          {showLogout && (
+            <button type="button" className="logout-btn" onClick={handleLogout}>
+              {NAV_ICONS.logout}
+              <span>Đăng xuất</span>
+            </button>
+          )}
         </div>
       </aside>
 
