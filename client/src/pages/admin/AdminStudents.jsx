@@ -6,6 +6,7 @@ import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
+import { GRADE_OPTIONS } from '../../lib/constants';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
@@ -13,7 +14,7 @@ const capi = createCachedApi(api);
 const IMPORT_COLUMNS = [
   { key: 'full_name', label: 'Họ và tên', required: true, example: 'Nguyễn Văn A' },
   { key: 'school_name', label: 'Tên trường', required: false, example: 'THPT Chuyên Lê Hồng Phong' },
-  { key: 'grade', label: 'Khối', required: false, example: '11' },
+  { key: 'grade', label: 'Khối', required: false, example: 'Middle School' },
   { key: 'gender', label: 'Giới tính', required: false, example: 'Nam' },
 ];
 
@@ -143,7 +144,7 @@ export default function AdminStudents() {
         </div>
         <select className="filter-select" value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)}>
           <option value="">Tất cả khối</option>
-          {grades.map(g => <option key={g} value={g}>Khối {g}</option>)}
+          {grades.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
       </div>
       <div className="card">
@@ -196,7 +197,10 @@ export default function AdminStudents() {
             </div>
             <div className="form-group">
               <label className="form-label">Khối</label>
-              <input className="form-input" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="VD: 10, 11, 12" />
+              <select className="form-input form-select" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })}>
+                <option value="">-- Chưa chọn --</option>
+                {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Trường</label>

@@ -7,6 +7,7 @@ import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
+import { GRADE_OPTIONS } from '../../lib/constants';
 import './AdminLayout.css';
 
 const capi = createCachedApi(api);
@@ -660,7 +661,10 @@ export default function AdminTeams() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Khối</label>
-                  <input className="form-input" value={studentForm.grade} onChange={(e) => setStudentForm({ ...studentForm, grade: e.target.value })} placeholder="VD: 10, 11, 12" />
+                  <select className="form-input form-select" value={studentForm.grade} onChange={(e) => setStudentForm({ ...studentForm, grade: e.target.value })}>
+                    <option value="">-- Chưa chọn --</option>
+                    {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="form-group">

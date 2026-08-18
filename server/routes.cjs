@@ -439,18 +439,37 @@ router.get('/students', requireAuth, h(async (_req, res) => {
   res.json(rows);
 }));
 
+// 5 khối cố định (xem GRADE_OPTIONS ở AdminStudents.jsx) — ô "Khối" giờ là
+// dropdown ở form nhập tay nên luôn gửi đúng 1 trong 5 giá trị này, nhưng
+// Excel import vẫn là cột chữ tự do (không ép được dropdown trong Excel) —
+// chuẩn hoá theo prefix ở đây để không lặp lại tình trạng dữ liệu lệch
+// chuẩn cũ (Upper/Uppper/Middle/Middle School...). Không khớp được prefix
+// nào thì để trống thay vì lưu rác.
+const GRADE_OPTIONS = ['Early Elementary School', 'Lower Elementary School', 'Upper Elementary School', 'Middle School', 'High School'];
+function normalizeGrade(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s) return null;
+  if (s.startsWith('earl')) return 'Early Elementary School';
+  if (s.startsWith('low')) return 'Lower Elementary School';
+  if (s.startsWith('upp')) return 'Upper Elementary School';
+  if (s.startsWith('mid')) return 'Middle School';
+  if (s.startsWith('high')) return 'High School';
+  return GRADE_OPTIONS.includes(raw) ? raw : null;
+}
+
 router.post('/students', requireAdmin, h(async (req, res) => {
   const b = req.body;
   const { rows } = await query(
     `insert into students (full_name, gender, birth_date, school_id, grade)
      values ($1, $2, $3, $4, $5) returning *`,
-    [b.full_name, b.gender ?? null, b.birth_date ?? null, b.school_id ?? null, b.grade ?? null]
+    [b.full_name, b.gender ?? null, b.birth_date ?? null, b.school_id ?? null, normalizeGrade(b.grade)]
   );
   res.json(rows[0]);
 }));
 
 router.put('/students/:id', requireAdmin, h(async (req, res) => {
   const data = pick(req.body, ['full_name', 'gender', 'birth_date', 'school_id', 'grade']);
+  if (data.grade !== undefined) data.grade = normalizeGrade(data.grade);
   const q = buildUpdate('students', req.params.id, data);
   if (!q) return res.json({});
   const { rows } = await query(q.text, q.values);
@@ -490,7 +509,7 @@ router.post('/students/import', requireAdmin, h(async (req, res) => {
     if (dup[0]) return { skipped: true };
     await query(
       'insert into students (full_name, gender, birth_date, school_id, grade) values ($1, $2, $3, $4, $5)',
-      [row.full_name, row.gender || null, row.birth_date || null, schoolId, row.grade || null]
+      [row.full_name, row.gender || null, row.birth_date || null, schoolId, normalizeGrade(row.grade)]
     );
     return {};
   });
