@@ -52,6 +52,7 @@ export default function RefereeCombatMatchScore({ format }) {
   const listUrl = `/referee/competition/${competitionId}/content/${contentId}/${isStars ? 'combat-stars' : 'combat-drone'}`;
 
   const [match, setMatch] = useState(null);
+  const [content, setContent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [form, setForm] = useState({});
@@ -83,8 +84,11 @@ export default function RefereeCombatMatchScore({ format }) {
       // Ảnh minh hoạ nhiệm vụ Battle of Stars — lấy từ "Nhiệm vụ" đã tạo sẵn
       // cho content này, khớp theo tên (không phải kho ảnh riêng).
       isStars ? api.getTasks(contentId).catch(() => []) : Promise.resolve([]),
-    ]).then(([list, teams, students, tasks]) => {
+      // Thời gian tối đa (time_limit_seconds) để tự động dừng đồng hồ bấm giờ.
+      api.getContents(competitionId).catch(() => []),
+    ]).then(([list, teams, students, tasks, contents]) => {
       if (!cancelled) setMissionTasks(tasks);
+      if (!cancelled) setContent(contents.find((c) => c.id === contentId) || null);
       if (cancelled) return;
       const m = list.find((x) => x.id === matchId);
       if (!m) { setNotFound(true); return; }
@@ -145,7 +149,7 @@ export default function RefereeCombatMatchScore({ format }) {
       if (m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled')) setEntered(true);
     }).catch(() => { if (!cancelled) setNotFound(true); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [contentId, matchId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [competitionId, contentId, matchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Stopwatch ──
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
@@ -158,6 +162,19 @@ export default function RefereeCombatMatchScore({ format }) {
   }, [isTimerRunning]);
   const toggleStopwatch = () => setIsTimerRunning((r) => !r);
   const resetStopwatch = () => { setIsTimerRunning(false); setStopwatchSeconds(0); };
+
+  // Tự động dừng đồng hồ khi chạm giới hạn thời gian thi của nội dung
+  // (content.time_limit_seconds) — trọng tài có thể quên tự bấm Tạm dừng,
+  // để đồng hồ chạy quá giờ quy định sẽ ghi sai thời gian vào phiếu điểm.
+  useEffect(() => {
+    if (isTimerRunning && content?.time_limit_seconds && stopwatchSeconds >= content.time_limit_seconds) {
+      setIsTimerRunning(false);
+      showAlert(
+        t(lang, `Time's up — timer stopped automatically at ${content.time_limit_seconds}s.`, `Đã hết giờ — đồng hồ tự động dừng ở ${content.time_limit_seconds}s.`),
+        'info'
+      );
+    }
+  }, [stopwatchSeconds, isTimerRunning, content?.time_limit_seconds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startMatch = () => {
     setStartedAt(new Date().toISOString());
@@ -488,6 +505,11 @@ export default function RefereeCombatMatchScore({ format }) {
                   <span className="ts-stopwatch-digits">{formatSecondsAsMinutes(stopwatchSeconds)}</span>
                   <span className="ts-stopwatch-sec">({stopwatchSeconds}s)</span>
                 </div>
+                {content?.time_limit_seconds && (
+                  <div className="ts-stopwatch-sec" style={{ marginTop: -6, marginBottom: 6 }}>
+                    {t(lang, `Auto-stops at ${formatSecondsAsMinutes(content.time_limit_seconds)}`, `Tự dừng ở ${formatSecondsAsMinutes(content.time_limit_seconds)}`)}
+                  </div>
+                )}
                 <div className="ts-stopwatch-controls">
                   <button type="button" className={`ts-timer-btn ${isTimerRunning ? 'pause' : 'start'}`} onClick={toggleStopwatch}>
                     {isTimerRunning ? t(lang, '⏸ PAUSE', '⏸ TẠM DỪNG') : t(lang, '▶ START', '▶ BẮT ĐẦU')}

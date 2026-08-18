@@ -317,7 +317,6 @@ export default function AdminContentsPage() {
                   onChange={(e) => setForm({ ...form, order_index: parseInt(e.target.value, 10) || 1 })}
                 />
               </div>
-              {form.content_format !== 'combat_drone' && (
               <div className="form-group">
                 <label className="form-label">Thời gian trận đấu (giây)</label>
                 <input
@@ -328,8 +327,10 @@ export default function AdminContentsPage() {
                   onChange={(e) => setForm({ ...form, time_limit_seconds: e.target.value })}
                   placeholder="VD: 150 — để trống nếu không giới hạn"
                 />
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                  Đồng hồ bấm giờ của trọng tài sẽ tự động dừng khi chạm mốc thời gian này.
+                </div>
               </div>
-              )}
               {form.content_format !== 'combat_drone' && (
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
