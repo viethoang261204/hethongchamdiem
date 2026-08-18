@@ -27,6 +27,28 @@ const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: ''
 
 const STATUS_LABEL_VI = { scheduled: 'Chưa bắt đầu', live: 'Đang diễn ra', completed: 'Đã hoàn thành', cancelled: 'Đã hủy', disqualified: 'Truất quyền' };
 
+// Ô nhập số lượng nhiệm vụ (khối năng lượng, bóng hỏa lực, số lần thử lại,
+// điểm bị trừ) — thêm nút +/- để trọng tài không phải gõ tay bằng bàn phím
+// ảo trên iPad, vốn khá lích kích khi phải bấm liên tục giữa các trận.
+function MiniStepper({ value, onChange, min = 0, max }) {
+  const num = Number(value) || 0;
+  const clamp = (v) => Math.min(max ?? Infinity, Math.max(min, v));
+  return (
+    <div className="ts-mini-stepper">
+      <button type="button" onClick={() => onChange(clamp(num - 1))} disabled={num <= min}>−</button>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(clamp(parseInt(e.target.value, 10) || 0))}
+      />
+      <button type="button" onClick={() => onChange(clamp(num + 1))} disabled={max != null && num >= max}>+</button>
+    </div>
+  );
+}
+
 // Score sheet for 1 combat match — replaces the old inline accordion: clicking
 // a match in the list opens this dedicated page (same shape as the "pure"
 // TaskScoringWizard flow): a Start Match gate, a live stopwatch while
@@ -601,23 +623,19 @@ export default function RefereeCombatMatchScore({ format }) {
                       <tr>
                         <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}{t(lang, 'pts/block', 'đ/khối')}, {t(lang, 'max', 'tối đa')} {ENERGY_BLOCK_MAX})</span>{missionImageThumb('Energy Defense')}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.energyBlocksA} onChange={(e) => setForm({ ...form, energyBlocksA: clampEnergy(e.target.value) })} />
+                          <MiniStepper value={form.energyBlocksA} max={ENERGY_BLOCK_MAX} onChange={(v) => setForm({ ...form, energyBlocksA: v })} />
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.energyBlocksB} onChange={(e) => setForm({ ...form, energyBlocksB: clampEnergy(e.target.value) })} />
+                          <MiniStepper value={form.energyBlocksB} max={ENERGY_BLOCK_MAX} onChange={(v) => setForm({ ...form, energyBlocksB: v })} />
                         </td>
                       </tr>
                       <tr>
                         <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}{t(lang, 'pts/ball', 'đ/quả')}, {t(lang, 'max', 'tối đa')} {FIREPOWER_BALL_MAX})</span>{missionImageThumb('Full Firepower')}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.firepowerBallsA} onChange={(e) => setForm({ ...form, firepowerBallsA: clampFirepower(e.target.value) })} />
+                          <MiniStepper value={form.firepowerBallsA} max={FIREPOWER_BALL_MAX} onChange={(v) => setForm({ ...form, firepowerBallsA: v })} />
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.firepowerBallsB} onChange={(e) => setForm({ ...form, firepowerBallsB: clampFirepower(e.target.value) })} />
+                          <MiniStepper value={form.firepowerBallsB} max={FIREPOWER_BALL_MAX} onChange={(v) => setForm({ ...form, firepowerBallsB: v })} />
                         </td>
                       </tr>
                       <tr>
@@ -636,12 +654,10 @@ export default function RefereeCombatMatchScore({ format }) {
                       <tr>
                         <td style={{ fontSize: 13 }}>{t(lang, 'Retries', 'Số lần thử lại')}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.retryCountA} onChange={(e) => setForm({ ...form, retryCountA: Math.max(0, parseInt(e.target.value, 10) || 0) })} />
+                          <MiniStepper value={form.retryCountA} onChange={(v) => setForm({ ...form, retryCountA: v })} />
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.retryCountB} onChange={(e) => setForm({ ...form, retryCountB: Math.max(0, parseInt(e.target.value, 10) || 0) })} />
+                          <MiniStepper value={form.retryCountB} onChange={(v) => setForm({ ...form, retryCountB: v })} />
                         </td>
                       </tr>
                       <tr>
@@ -652,12 +668,10 @@ export default function RefereeCombatMatchScore({ format }) {
                       <tr>
                         <td style={{ fontSize: 13 }}>{t(lang, 'Points lost (penalty)', 'Điểm bị trừ (phạt)')}</td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.pointsLostA} onChange={(e) => setForm({ ...form, pointsLostA: Math.max(0, Number(e.target.value) || 0) })} />
+                          <MiniStepper value={form.pointsLostA} onChange={(v) => setForm({ ...form, pointsLostA: v })} />
                         </td>
                         <td style={{ textAlign: 'center' }}>
-                          <input type="number" min="0" className="form-input" style={{ textAlign: 'center', padding: '4px 6px' }}
-                            value={form.pointsLostB} onChange={(e) => setForm({ ...form, pointsLostB: Math.max(0, Number(e.target.value) || 0) })} />
+                          <MiniStepper value={form.pointsLostB} onChange={(v) => setForm({ ...form, pointsLostB: v })} />
                         </td>
                       </tr>
                       <tr>

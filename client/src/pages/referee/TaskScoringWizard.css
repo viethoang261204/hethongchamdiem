@@ -606,6 +606,50 @@
   box-sizing: border-box;
 }
 
+/* Stepper +/- gọn cho ô số lượng trong bảng (Battle of Stars / Fly Smart Cup)
+   — thay việc gõ tay bằng bàn phím ảo trên iPad, vốn khá lích kích. */
+.ts-mini-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.ts-mini-stepper button {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  font-size: 20px;
+  font-weight: 800;
+  border-radius: 8px;
+  background: #1e293b;
+  border: 2px solid #334155;
+  color: #f8fafb;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ts-mini-stepper button:hover {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+}
+.ts-mini-stepper button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ts-mini-stepper input {
+  width: 52px;
+  height: 36px;
+  padding: 0;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: center;
+  border-radius: 8px;
+  background: #0f172a;
+  border: 2px solid #334155;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+}
+
 /* Phím Chip tăng/giảm nhanh cho Tablet */
 .ts-quick-chips {
   display: flex;
