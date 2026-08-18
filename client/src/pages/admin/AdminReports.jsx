@@ -105,7 +105,13 @@ export default function AdminReports() {
       setRows({
         measurement,
         combat: combatPerContent.flatMap((c) => c.standingsRows),
-        combatMatches: combatPerContent.flatMap((c) => c.matches.map((m) => ({ match: m, content: c.content }))),
+        // Chỉ xuất phiếu cho trận ĐÃ chấm điểm — bỏ qua trận còn "scheduled"
+        // (chưa vào bàn) để không in ra phiếu trống toàn 0 điểm. Cùng điều
+        // kiện "đã chấm" mà RefereeCombatMatchScore.jsx dùng để tự điền lại
+        // dữ liệu đã lưu (setEntered) khi trọng tài mở lại một trận.
+        combatMatches: combatPerContent.flatMap((c) => c.matches
+          .filter((m) => m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled'))
+          .map((m) => ({ match: m, content: c.content }))),
       });
     } catch (e) {
       setRowsError(e.message || 'Lỗi tải báo cáo.');
