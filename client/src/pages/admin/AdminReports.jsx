@@ -6,6 +6,8 @@ import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { exportMultipleToPdf } from '../referee/exportPdf';
 import ScoreSheetTable from '../shared/ScoreSheetTable';
+import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
+import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import './AdminLayout.css';
@@ -61,6 +63,11 @@ export default function AdminReports() {
   const [exportingExcelGroup, setExportingExcelGroup] = useState(null);
   // key `${group.name}:${content_format}` đang xuất Excel đối kháng riêng
   const [exportingCombatExcelKey, setExportingCombatExcelKey] = useState(null);
+  // Đang xuất PDF toàn bộ phiếu điểm trận đối kháng (mọi trận, mọi đội, mọi
+  // nội dung đối kháng đang trong phạm vi báo cáo) + danh sách trận đang chờ
+  // render ẩn để html2canvas chụp, gộp thành 1 PDF.
+  const [exportingCombatPdf, setExportingCombatPdf] = useState(false);
+  const [pendingCombatExport, setPendingCombatExport] = useState(null);
 
   const contentsForComp = useMemo(
     () => contents.filter((c) => !selectedComp || c.competition_id === selectedComp),
@@ -78,23 +85,28 @@ export default function AdminReports() {
     try {
       const scopedCombatContents = (selectedContent ? contents.filter((c) => c.id === selectedContent) : contentsForComp)
         .filter((c) => COMBAT_FORMATS.includes(c.content_format));
-      const [measurement, combatNested] = await Promise.all([
+      const [measurement, combatPerContent] = await Promise.all([
         api.getReportScores({ competitionId: selectedComp, contentId: selectedContent || undefined }),
         Promise.all(scopedCombatContents.map(async (c) => {
           const [teams, matches] = await Promise.all([api.getTeams(c.id), api.getCombatMatches(c.id)]);
           const standings = c.content_format === 'combat_stars'
             ? computeGroupStandings(teams, matches)
             : computeDroneStandings(teams, matches);
-          return standings.map((s) => ({
+          const standingsRows = standings.map((s) => ({
             team_id: s.teamId, team_name: s.teamName,
             school: teams.find((t) => t.id === s.teamId)?.schools?.name || 'Chưa có trường',
             content_name: c.name, contest_content_id: c.id, content_format: c.content_format,
             played: s.played, wins: s.wins, draws: s.draws, losses: s.losses,
             match_points: s.matchPoints, total_score: s.totalScore,
           }));
+          return { content: c, matches, standingsRows };
         })),
       ]);
-      setRows({ measurement, combat: combatNested.flat() });
+      setRows({
+        measurement,
+        combat: combatPerContent.flatMap((c) => c.standingsRows),
+        combatMatches: combatPerContent.flatMap((c) => c.matches.map((m) => ({ match: m, content: c.content }))),
+      });
     } catch (e) {
       setRowsError(e.message || 'Lỗi tải báo cáo.');
     } finally {
@@ -311,6 +323,27 @@ export default function AdminReports() {
     }
   };
 
+  // Xuất PDF toàn bộ phiếu điểm trận đối kháng đang trong phạm vi báo cáo
+  // (mọi trận, mọi đội, cả 2 định dạng Battle of Stars/Fly Smart Cup nếu có) —
+  // dùng đúng mẫu Score Sheet đã có sẵn ở trang "Trận đối kháng" (mục 767 ở
+  // đó), chỉ khác là gộp theo phạm vi báo cáo (cuộc thi/nội dung đang chọn)
+  // thay vì phải vào từng nội dung riêng.
+  const handleExportCombatPdf = async () => {
+    const items = rows?.combatMatches || [];
+    if (!items.length) return;
+    setExportingCombatPdf(true);
+    try {
+      setPendingCombatExport(items);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const nodes = items.map((it) => document.getElementById(`combat-report-export-${it.match.id}`));
+      const slug = (contentName || 'doi-khang').replace(/\s+/g, '-').toLowerCase();
+      await exportMultipleToPdf(nodes, `phieu-doi-khang-${slug}`);
+    } finally {
+      setPendingCombatExport(null);
+      setExportingCombatPdf(false);
+    }
+  };
+
   if (loading) return <div className="nhutin-admin"><p style={{ padding: 24 }}>Đang tải...</p></div>;
 
   return (
@@ -355,6 +388,17 @@ export default function AdminReports() {
             <p style={{ color: '#64748b', margin: '4px 0 0' }}>
               {contentName} · Nhóm theo trung tâm · Xem lúc {new Date().toLocaleString('vi-VN')}
             </p>
+            {rows.combatMatches?.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-primary no-print"
+                style={{ marginTop: 12 }}
+                onClick={handleExportCombatPdf}
+                disabled={exportingCombatPdf}
+              >
+                {exportingCombatPdf ? 'Đang xuất...' : `Xuất PDF trận đối kháng (${rows.combatMatches.length} trận)`}
+              </button>
+            )}
           </div>
 
           {groups.length === 0 ? (
@@ -434,6 +478,21 @@ export default function AdminReports() {
           {pendingExport.map((s) => (
             <div key={s.key} id={`export-sheet-${s.key}`}>
               <ScoreSheetTable scores={s.scores} content={s.content} tasks={s.tasks} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Render ẩn từng phiếu điểm trận đối kháng để html2canvas chụp — mẫu
+          khác nhau theo content_format (combat_stars/combat_drone), giống hệt
+          renderSheet() ở trang "Trận đối kháng". */}
+      {pendingCombatExport && (
+        <div style={{ position: 'fixed', top: 0, left: -99999, zIndex: -1 }}>
+          {pendingCombatExport.map((it) => (
+            <div key={it.match.id} id={`combat-report-export-${it.match.id}`}>
+              {it.content.content_format === 'combat_stars'
+                ? <CombatStarsSheetTable match={it.match} sheetRef={null} />
+                : <CombatDroneSheetTable match={it.match} sheetRef={null} />}
             </div>
           ))}
         </div>
