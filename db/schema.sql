@@ -337,6 +337,24 @@ create or replace trigger trg_coaches_updated
   before update on coaches for each row execute function set_updated_at();
 alter table teams add column if not exists coach_id uuid references coaches(id) on delete set null;
 
+-- HLV xuất sắc — do admin bình chọn theo TỪNG cuộc thi, dựa trên số đội của
+-- HLV đó đạt giải. award_team_count nhập tay (chưa tự tính từ bảng xếp hạng)
+-- vì tiêu chí xét thế nào là "đạt giải" (Top mấy, theo bảng đấu nào...) chưa
+-- chốt — sẽ nối vào bảng xếp hạng thật khi có tiêu chí cụ thể.
+create table if not exists outstanding_coaches (
+  id                uuid primary key default gen_random_uuid(),
+  competition_id    uuid not null references competitions(id) on delete cascade,
+  coach_id          uuid not null references coaches(id) on delete cascade,
+  award_team_count  integer not null default 0,
+  note              text,
+  created_at        timestamptz default now(),
+  updated_at        timestamptz default now(),
+  unique(competition_id, coach_id)
+);
+create or replace trigger trg_outstanding_coaches_updated
+  before update on outstanding_coaches for each row execute function set_updated_at();
+create index if not exists idx_outstanding_coaches_competition on outstanding_coaches(competition_id);
+
 -- Luật xếp hạng riêng theo từng (nội dung thi × bảng đấu):
 --   measurement = đo lường (điểm/thời gian, mặc định) · combat = đối kháng (thắng/thua/hòa)
 alter table content_boards add column if not exists ranking_format text;

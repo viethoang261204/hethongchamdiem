@@ -18,6 +18,7 @@ import AdminTasks from './pages/admin/AdminTasks';
 import AdminSchools from './pages/admin/AdminSchools';
 import AdminBoards from './pages/admin/AdminBoards';
 import AdminCoaches from './pages/admin/AdminCoaches';
+import AdminOutstandingCoaches from './pages/admin/AdminOutstandingCoaches';
 import AdminFields from './pages/admin/AdminFields';
 import AdminCombatMatches from './pages/admin/AdminCombatMatches';
 import AdminReports from './pages/admin/AdminReports';
@@ -96,6 +97,7 @@ export default function App() {
               <Route path="schools" element={<AdminSchools />} />
               <Route path="boards" element={<AdminBoards />} />
               <Route path="coaches" element={<AdminCoaches />} />
+              <Route path="outstanding-coaches" element={<AdminOutstandingCoaches />} />
               <Route path="fields" element={<AdminFields />} />
               <Route path="combat-matches" element={<AdminCombatMatches />} />
               <Route path="reports" element={<AdminReports />} />

@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
+import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
+import { safeSheetName, buildStyledSheet, downloadWorkbook } from '../../lib/excelReport';
 import './AdminLayout.css';
+
+const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
 
 function MeasurementTable({ teams }) {
   return (
@@ -168,11 +172,13 @@ function CombatBoardTable({ standings, isStars }) {
 }
 
 export default function AdminScoreboard() {
+  const { showAlert } = useNotify();
   const [selectedComp, setSelectedComp] = useState('');
   const [selectedContent, setSelectedContent] = useState('');
   const [selectedBoard, setSelectedBoard] = useState('');
   const [rankings, setRankings] = useState({}); // boardId -> ranking data
   const [rankingsLoading, setRankingsLoading] = useState(false);
+  const [exportingFull, setExportingFull] = useState(false);
 
   const { data: compsData, loading: compsLoading, error: compsError, reload: compsReload } = useApiLoader(
     () => api.getCompetitions(),
@@ -236,6 +242,102 @@ export default function AdminScoreboard() {
 
   const visibleBoards = selectedBoard ? boards.filter((b) => b.id === selectedBoard) : boards;
 
+  // Xuất TOÀN BỘ bảng xếp hạng của cuộc thi đang chọn — mọi nội dung × mọi
+  // bảng đấu, không phụ thuộc nội dung/bảng đang xem trên màn hình — thành 1
+  // file Excel nhiều sheet (1 sheet/nội dung×bảng đấu). Tự đi lấy dữ liệu
+  // riêng cho từng nội dung (không dùng state đang hiển thị, vì state đó chỉ
+  // scope theo đúng 1 nội dung đang chọn).
+  const handleExportFullScoreboard = async () => {
+    if (!selectedComp) { showAlert('Chọn cuộc thi trước.', 'error'); return; }
+    setExportingFull(true);
+    try {
+      const allContents = await api.getContents(selectedComp);
+      const { default: ExcelJS } = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const usedNames = new Set();
+      let sheetCount = 0;
+
+      for (const content of allContents) {
+        const contentBoards = await api.getBoards(content.id).catch(() => []);
+        if (!contentBoards.length) continue;
+        const isCombat = COMBAT_FORMATS.includes(content.content_format);
+        const isStars = content.content_format === 'combat_stars';
+
+        let combatTeams = null, combatMatches = null;
+        if (isCombat) {
+          [combatTeams, combatMatches] = await Promise.all([api.getTeams(content.id), api.getCombatMatches(content.id)]);
+        }
+
+        for (const board of contentBoards) {
+          let header, columnKinds, columnWidths, dataRows;
+
+          if (isCombat) {
+            const boardTeams = combatTeams.filter((t) => t.board_id === board.id);
+            if (!boardTeams.length) continue;
+            const standings = isStars
+              ? computeGroupStandings(boardTeams, combatMatches)
+              : computeDroneStandings(boardTeams, combatMatches);
+            header = isStars
+              ? ['Hạng', 'Đội', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score', 'Meteor', 'Direct Win', 'Retries']
+              : ['Hạng', 'Đội', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score'];
+            columnKinds = isStars
+              ? ['index', 'text', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
+              : ['index', 'text', 'number', 'number', 'number', 'number', 'number', 'number'];
+            columnWidths = isStars ? [8, 26, 10, 10, 10, 10, 14, 14, 12, 12, 10] : [8, 26, 10, 10, 10, 10, 14, 14];
+            dataRows = standings.map((s) => (isStars
+              ? [s.rank, s.teamName, s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
+              : [s.rank, s.teamName, s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
+          } else {
+            const r = await api.getRanking(content.id, board.id).catch(() => null);
+            if (!r) continue;
+            if (r.ranking_format === 'measurement') {
+              if (!r.teams?.length) continue;
+              header = ['Hạng', 'Đội', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
+              columnKinds = ['index', 'text', 'number', 'number', 'number', 'number', 'number'];
+              columnWidths = [8, 28, 12, 12, 12, 14, 10];
+              dataRows = r.teams.map((t, idx) => [
+                idx + 1, t.team_name,
+                t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
+                t.total_score, t.total_time, t.total_retry,
+              ]);
+            } else {
+              // Nhánh đấu loại trực tiếp (ranking_format='combat' cho nội dung
+              // đo lường) — chỉ xuất được khi đã đấu xong hết nhánh.
+              if (!r.bracket_resolved || !r.placements?.length) continue;
+              header = ['Hạng', 'Đội'];
+              columnKinds = ['index', 'text'];
+              columnWidths = [8, 28];
+              dataRows = r.placements.map((p) => {
+                const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
+                  || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || p.team_id;
+                return [p.rank, name];
+              });
+            }
+          }
+
+          buildStyledSheet(workbook, safeSheetName(`${content.name} - ${board.name}`, usedNames), {
+            title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
+            subtitle: `${board.name}${board.age_group ? ` — ${board.age_group}` : ''}`,
+            header, columnKinds, columnWidths, rows: dataRows,
+          });
+          sheetCount++;
+        }
+      }
+
+      if (sheetCount === 0) {
+        showAlert('Chưa có dữ liệu bảng xếp hạng nào để xuất.', 'error');
+        return;
+      }
+      const compName = competitions.find((c) => c.id === selectedComp)?.name || 'bang-xep-hang';
+      const slug = compName.replace(/\s+/g, '-').toLowerCase();
+      await downloadWorkbook(workbook, `bang-xep-hang-${slug}.xlsx`);
+    } catch (e) {
+      showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
+    } finally {
+      setExportingFull(false);
+    }
+  };
+
   const loading = compsLoading;
   const error = compsError || contentsError || boardsError;
   const reload = () => { compsReload(); contentsReload(); boardsReload(); };
@@ -250,6 +352,14 @@ export default function AdminScoreboard() {
           <h1 className="page-title">Bảng xếp hạng</h1>
           <p className="page-subtitle">Chọn cuộc thi và nội dung để xem bảng xếp hạng</p>
         </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleExportFullScoreboard}
+          disabled={!selectedComp || exportingFull}
+        >
+          {exportingFull ? 'Đang xuất...' : 'Xuất Excel toàn bộ BXH'}
+        </button>
       </div>
 
       <div className="card" style={{ marginBottom: 24 }}>

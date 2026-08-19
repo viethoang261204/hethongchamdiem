@@ -509,6 +509,27 @@ export const api = {
   importCoaches: (rows) => withRetry(() => request('/coaches/import', { method: 'POST', body: rows }), 'importCoaches'),
 
   // ============================================================
+  // HLV xuất sắc — bình chọn theo từng cuộc thi
+  // ============================================================
+  getOutstandingCoaches: (competitionId) => withRetry(() => request(
+    `/competitions/${competitionId}/outstanding-coaches`
+  ), 'getOutstandingCoaches'),
+
+  postOutstandingCoach: (competitionId, body) => withRetry(() => request(
+    `/competitions/${competitionId}/outstanding-coaches`,
+    { method: 'POST', body: { coach_id: body.coach_id, award_team_count: body.award_team_count ?? 0, note: body.note ?? null } }
+  ), 'postOutstandingCoach'),
+
+  putOutstandingCoach: (id, body) => {
+    const update = {};
+    if (body.award_team_count !== undefined) update.award_team_count = body.award_team_count;
+    if (body.note !== undefined) update.note = body.note;
+    return withRetry(() => request(`/outstanding-coaches/${id}`, { method: 'PUT', body: update }), 'putOutstandingCoach');
+  },
+
+  deleteOutstandingCoach: (id) => withRetry(() => request(`/outstanding-coaches/${id}`, { method: 'DELETE' }), 'deleteOutstandingCoach'),
+
+  // ============================================================
   // Field (khu vực/trạm thi đấu)
   // ============================================================
   getFields: () => withRetry(() => request('/fields'), 'getFields'),

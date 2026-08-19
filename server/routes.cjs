@@ -1509,6 +1509,46 @@ router.post('/coaches/import', requireAdmin, h(async (req, res) => {
 }));
 
 // ============================================================
+// HLV xuất sắc — do admin bình chọn theo TỪNG cuộc thi, dựa trên số đội của
+// HLV đó đạt giải (award_team_count nhập tay — tiêu chí xét "đạt giải" cụ
+// thể sẽ bổ sung sau, hiện chưa tự tính từ bảng xếp hạng).
+// ============================================================
+router.get('/competitions/:competitionId/outstanding-coaches', requireAdmin, h(async (req, res) => {
+  const { rows } = await query(
+    `select oc.*, c.name as coach_name, c.phone as coach_phone
+     from outstanding_coaches oc
+     join coaches c on c.id = oc.coach_id
+     where oc.competition_id = $1
+     order by oc.award_team_count desc, c.name`,
+    [req.params.competitionId]
+  );
+  res.json(rows);
+}));
+
+router.post('/competitions/:competitionId/outstanding-coaches', requireAdmin, h(async (req, res) => {
+  const b = pick(req.body, ['coach_id', 'award_team_count', 'note']);
+  if (!b.coach_id) return res.status(400).json({ error: 'Thiếu HLV.' });
+  const { rows } = await query(
+    `insert into outstanding_coaches (competition_id, coach_id, award_team_count, note)
+     values ($1, $2, coalesce($3, 0), $4) returning *`,
+    [req.params.competitionId, b.coach_id, b.award_team_count ?? 0, b.note ?? null]
+  );
+  res.json(rows[0]);
+}));
+
+router.put('/outstanding-coaches/:id', requireAdmin, h(async (req, res) => {
+  const q = buildUpdate('outstanding_coaches', req.params.id, pick(req.body, ['award_team_count', 'note']));
+  if (!q) return res.json({});
+  const { rows } = await query(q.text, q.values);
+  res.json(rows[0]);
+}));
+
+router.delete('/outstanding-coaches/:id', requireAdmin, h(async (req, res) => {
+  await query('delete from outstanding_coaches where id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ============================================================
 // Field (khu vực/trạm thi đấu vật lý) — gán theo đội
 // ============================================================
 router.get('/fields', h(async (_req, res) => {
