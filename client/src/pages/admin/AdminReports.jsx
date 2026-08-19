@@ -18,13 +18,10 @@ import {
 import './AdminLayout.css';
 
 // Cột file Excel "Báo cáo điểm" cho nội dung đo lường — 1 dòng/thí sinh theo
-// lượt 1/lượt 2. Bản trước có 2 cột cùng tên "Tên đội thi" (vị trí C và E) vì
-// rập khuôn 1 mẫu cũ có cột ngày sinh thí sinh ở vị trí C — hệ thống không
-// theo dõi ngày sinh nên cột đó luôn trống, nhưng vẫn bị ghi nhầm tiêu đề
-// trùng "Tên đội thi" gây khó hiểu. Đặt lại đúng tên cho khớp dữ liệu thực
-// tế đang ghi vào từng cột (cột B là tên thí sinh, không phải tên trường).
+// lượt 1/lượt 2. Đã bỏ cột "Ngày sinh" — hệ thống không thu thập/lưu ngày
+// sinh thí sinh nên cột đó luôn trống, không cần thiết trong báo cáo.
 const REPORT_EXCEL_HEADER = [
-  'Stt', 'Họ và tên thí sinh', 'Ngày sinh', 'Tổ chức/ Trường', 'Tên đội thi',
+  'Stt', 'Họ và tên thí sinh', 'Tổ chức/ Trường', 'Tên đội thi',
   'Bảng đấu', 'Huấn luyện viên', 'Địa điểm đăng ký dự thi', 'Sa bàn',
   'Điểm lần 1', 'Thời gian lần 1', 'Điểm lần 2', 'Thời gian lần 2',
   'Tổng điểm', 'Tổng thời gian',
@@ -33,7 +30,7 @@ const REPORT_EXCEL_HEADER = [
 // trái, tự xuống dòng); 'number' = số liệu (căn giữa). Dùng để tô đúng kiểu
 // canh lề/định dạng số cho từng cột khi dựng sheet có style.
 const REPORT_COLUMN_KINDS = [
-  'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
+  'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
   'number', 'number', 'number', 'number', 'number', 'number',
 ];
 
@@ -449,7 +446,6 @@ export default function AdminReports() {
               dataRows.push([
                 idx === 0 ? stt : '',
                 mem?.full_name || '',
-                '',
                 team.schools?.name || '',
                 team.name,
                 team.boards?.name || '',
@@ -470,7 +466,7 @@ export default function AdminReports() {
           columnKinds: isCombat ? COMBAT_MATCH_COLUMN_KINDS : REPORT_COLUMN_KINDS,
           columnWidths: isCombat
             ? [6, 22, 22, 20, 14, 20, 12, 16, 12, 12, 14, 14]
-            : [6, 22, 12, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12],
+            : [6, 22, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12],
           rows: dataRows,
         });
       }
