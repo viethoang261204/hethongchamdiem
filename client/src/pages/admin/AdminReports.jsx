@@ -20,30 +20,38 @@ import './AdminLayout.css';
 // Cột file Excel "Báo cáo điểm" cho nội dung đo lường — 1 dòng/thí sinh theo
 // lượt 1/lượt 2. Đã bỏ cột "Ngày sinh" — hệ thống không thu thập/lưu ngày
 // sinh thí sinh nên cột đó luôn trống, không cần thiết trong báo cáo.
+// "Thứ hạng" ở cột cuối = hạng của đội trong BXH của ĐÚNG Bảng đấu (Board/
+// Division tuổi) mà đội đó thi trong nội dung này — không phải hạng gộp toàn
+// nội dung (1 nội dung có thể có nhiều Bảng đấu thi riêng), ghi dạng "Top N".
 const REPORT_EXCEL_HEADER = [
   'Stt', 'Họ và tên thí sinh', 'Tổ chức/ Trường', 'Tên đội thi',
   'Bảng đấu', 'Huấn luyện viên', 'Địa điểm đăng ký dự thi', 'Sa bàn',
   'Điểm lần 1', 'Thời gian lần 1', 'Điểm lần 2', 'Thời gian lần 2',
-  'Tổng điểm', 'Tổng thời gian',
+  'Tổng điểm', 'Tổng thời gian', 'Thứ hạng',
 ];
-// 'index' = số thứ tự (căn giữa, định dạng số nguyên); 'text' = văn bản (căn
-// trái, tự xuống dòng); 'number' = số liệu (căn giữa). Dùng để tô đúng kiểu
-// canh lề/định dạng số cho từng cột khi dựng sheet có style.
+// 'index' = số thứ tự (căn giữa, định dạng số nguyên); 'text' = văn bản dài
+// (căn trái, tự xuống dòng); 'number' = số liệu (căn giữa); 'label' = văn bản
+// ngắn cần căn giữa, không xuống dòng (VD: "Top 1", "Thắng").
 const REPORT_COLUMN_KINDS = [
   'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
-  'number', 'number', 'number', 'number', 'number', 'number',
+  'number', 'number', 'number', 'number', 'number', 'number', 'label',
 ];
 
 // Mẫu Excel cho 2 nội dung đối kháng — MỖI TRẬN 1 DÒNG (không gộp thành 1
 // dòng/đội như trước) — 1 đội đấu vòng tròn với N đối thủ sẽ ra N dòng, mỗi
 // dòng là kết quả của đúng 1 trận, để khớp với cách người dùng đọc phiếu điểm
-// giấy (từng trận riêng) thay vì chỉ xem tổng kết cuối bảng.
+// giấy (từng trận riêng) thay vì chỉ xem tổng kết cuối bảng. "Thắng/Hòa/Thua"
+// là TỔNG cả nội dung (không đổi theo từng dòng/trận) để trọng tài/BTC vẫn
+// thấy được thành tích tổng kết của đội ngay trên cùng 1 sheet chi tiết từng
+// trận, không phải mở thêm báo cáo khác.
 const COMBAT_MATCH_EXCEL_HEADER = [
   'Stt', 'Tên đội thi', 'Đối thủ', 'Trường/Trung tâm', 'Bảng đấu', 'Huấn luyện viên',
   'Sân', 'Bảng vòng tròn', 'Kết quả', 'Điểm đội', 'Điểm đối thủ', 'Match Points',
+  'Thắng', 'Hòa', 'Thua', 'Thứ hạng',
 ];
 const COMBAT_MATCH_COLUMN_KINDS = [
-  'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'number',
+  'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'label',
+  'number', 'number', 'number', 'number', 'number', 'number', 'label',
 ];
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
@@ -63,6 +71,12 @@ function combatMatchOutcome(match, isStars, teamId, mySide) {
   const oppScore = computeScore(sideFromDetails(match.details, oppSide));
   const outcome = match.is_draw ? 'DRAW' : match.winner_id === teamId ? 'WIN' : 'LOSS';
   return { myScore, oppScore, outcome, matchPoints: computeMatchPoints(outcome) };
+}
+
+// "Top N" cho cột Thứ hạng — để trống (không phải "Top null") khi đội chưa
+// có hạng (chưa gán Bảng đấu, hoặc nhánh đấu loại trực tiếp chưa đấu xong).
+function formatRankLabel(rank) {
+  return rank ? `Top ${rank}` : '';
 }
 
 // Tên sheet Excel tối đa 31 ký tự, không chứa \ / * ? : [ ], và không trùng
@@ -148,6 +162,8 @@ function buildStyledSheet(workbook, sheetName, { title, subtitle, header, column
       } else if (kind === 'number') {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         if (typeof val === 'number') cell.numFmt = '0.##';
+      } else if (kind === 'label') {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
       } else {
         cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
       }
@@ -214,27 +230,54 @@ export default function AdminReports() {
     setRowsLoading(true);
     setRowsError(null);
     try {
-      const scopedCombatContents = (selectedContent ? contents.filter((c) => c.id === selectedContent) : contentsForComp)
-        .filter((c) => COMBAT_FORMATS.includes(c.content_format));
-      const [measurement, combatPerContent] = await Promise.all([
+      const scopedContents = selectedContent ? contents.filter((c) => c.id === selectedContent) : contentsForComp;
+      const scopedCombatContents = scopedContents.filter((c) => COMBAT_FORMATS.includes(c.content_format));
+      // Nội dung đo lường không có sẵn rank trong /reports/scores — phải hỏi
+      // riêng route /ranking theo TỪNG Bảng đấu (giống trang Bảng xếp hạng),
+      // rồi build 1 map tra cứu nhanh theo (team_id, content_id) để dùng khi
+      // xuất Excel. Bracket đấu loại (ranking_format='combat' cho nội dung đo
+      // lường) chỉ có hạng khi ĐÃ đấu xong (bracket_resolved) — đội chưa bị
+      // loại/chưa xong nhánh sẽ không có hạng, để trống trong báo cáo.
+      const scopedMeasurementContents = scopedContents.filter((c) => !COMBAT_FORMATS.includes(c.content_format));
+      const [measurement, combatPerContent, measurementRankEntries] = await Promise.all([
         api.getReportScores({ competitionId: selectedComp, contentId: selectedContent || undefined }),
         Promise.all(scopedCombatContents.map(async (c) => {
-          const [teams, matches] = await Promise.all([api.getTeams(c.id), api.getCombatMatches(c.id)]);
+          const [teams, matches, boards] = await Promise.all([api.getTeams(c.id), api.getCombatMatches(c.id), api.getBoards(c.id)]);
           const isStars = c.content_format === 'combat_stars';
           const standings = isStars
             ? computeGroupStandings(teams, matches)
             : computeDroneStandings(teams, matches);
+          // Thứ hạng phải tính RIÊNG theo từng Bảng đấu (Board/Division tuổi) —
+          // standings ở trên gộp CHUNG toàn bộ đội của nội dung nên thứ tự sort
+          // (và do đó rank) không đúng nếu nội dung có nhiều Bảng đấu thi song
+          // song (giống cách AdminScoreboard.jsx tính BXH theo Board riêng).
+          const rankByTeamId = new Map();
+          boards.forEach((b) => {
+            const boardTeams = teams.filter((t) => t.board_id === b.id);
+            if (!boardTeams.length) return;
+            const boardStandings = isStars
+              ? computeGroupStandings(boardTeams, matches)
+              : computeDroneStandings(boardTeams, matches);
+            boardStandings.forEach((s) => rankByTeamId.set(s.teamId, s.rank));
+          });
           const standingsRows = standings.map((s) => ({
             team_id: s.teamId, team_name: s.teamName,
             school: teams.find((t) => t.id === s.teamId)?.schools?.name || 'Chưa có trường',
             content_name: c.name, contest_content_id: c.id, content_format: c.content_format,
             played: s.played, wins: s.wins, draws: s.draws, losses: s.losses,
             match_points: s.matchPoints, total_score: s.totalScore,
+            rank: rankByTeamId.get(s.teamId) ?? null,
           }));
           // Chỉ tính trận ĐÃ chấm điểm — bỏ qua trận còn "scheduled" (chưa vào
           // bàn), cùng điều kiện "đã chấm" mà RefereeCombatMatchScore.jsx dùng
           // để tự điền lại dữ liệu đã lưu khi trọng tài mở lại 1 trận.
           const completedMatches = matches.filter((m) => m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled'));
+          // Tổng Thắng/Hòa/Thua CẢ nội dung của từng đội — lấy từ standings đã
+          // tính ở trên (không đổi theo Board vì mỗi trận chỉ được cộng vào
+          // đúng 1 trong 2 đội tham gia, không phụ thuộc việc so sánh/sort với
+          // ai), để gắn vào MỌI dòng trận của đội đó bên dưới.
+          const statsByTeamId = new Map(standings.map((s) => [s.teamId, s]));
+
           // Mỗi trận đã chấm → 2 dòng (1 dòng/đội, nhìn từ phía đội đó) — 1 đội
           // đấu vòng tròn với N trận sẽ có N dòng riêng trong sheet xuất Excel.
           const matchRows = [];
@@ -244,6 +287,7 @@ export default function AdminReports() {
               const team = teams.find((t) => t.id === teamId);
               const opp = teams.find((t) => t.id === oppId);
               const { myScore, oppScore, outcome, matchPoints } = combatMatchOutcome(m, isStars, teamId, side);
+              const stats = statsByTeamId.get(teamId);
               matchRows.push({
                 team_id: teamId, team_name: team?.name || (side === 'A' ? m.team_a?.name : m.team_b?.name) || '—',
                 opponent_name: opp?.name || (side === 'A' ? m.team_b?.name : m.team_a?.name) || '—',
@@ -253,15 +297,34 @@ export default function AdminReports() {
                 group_label: m.group_label || m.stage || '',
                 content_name: c.name, contest_content_id: c.id, content_format: c.content_format,
                 result_label: RESULT_LABEL_VI[outcome], my_score: myScore, opp_score: oppScore, match_points: matchPoints,
+                total_wins: stats?.wins ?? 0, total_draws: stats?.draws ?? 0, total_losses: stats?.losses ?? 0,
+                rank: rankByTeamId.get(teamId) ?? null,
                 match_id: m.id,
               });
             });
           });
           return { content: c, matches, standingsRows, matchRows };
         })),
+        Promise.all(scopedMeasurementContents.map(async (c) => {
+          const boards = await api.getBoards(c.id).catch(() => []);
+          const perBoard = await Promise.all(boards.map((b) => api.getRanking(c.id, b.id).catch(() => null)));
+          const entries = [];
+          perBoard.forEach((r) => {
+            if (!r) return;
+            if (r.ranking_format === 'measurement') {
+              (r.teams || []).forEach((t, idx) => entries.push({ team_id: t.team_id, contest_content_id: c.id, rank: idx + 1 }));
+            } else if (r.ranking_format === 'combat' && r.bracket_resolved) {
+              (r.placements || []).forEach((p) => entries.push({ team_id: p.team_id, contest_content_id: c.id, rank: p.rank }));
+            }
+          });
+          return entries;
+        })),
       ]);
       setRows({
         measurement,
+        rankByMeasurementKey: Object.fromEntries(
+          measurementRankEntries.flat().map((e) => [`${e.team_id}|${e.contest_content_id}`, e.rank])
+        ),
         combat: combatPerContent.flatMap((c) => c.standingsRows),
         combatMatchRows: combatPerContent.flatMap((c) => c.matchRows),
         combatMatches: combatPerContent.flatMap((c) => c.matches
@@ -418,6 +481,7 @@ export default function AdminReports() {
           dataRows = matchRowsForContent.map((r, idx) => [
             idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
             r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
+            r.total_wins, r.total_draws, r.total_losses, formatRankLabel(r.rank),
           ]);
         } else {
           const scoresByTeam = new Map();
@@ -455,6 +519,7 @@ export default function AdminReports() {
                 r1?.score ?? '', r1?.time ?? '',
                 r2?.score ?? '', r2?.time ?? '',
                 totalScore, totalTime,
+                idx === 0 ? formatRankLabel(rows.rankByMeasurementKey?.[`${team.id}|${content.id}`]) : '',
               ]);
             });
           }
@@ -465,8 +530,8 @@ export default function AdminReports() {
           header: isCombat ? COMBAT_MATCH_EXCEL_HEADER : REPORT_EXCEL_HEADER,
           columnKinds: isCombat ? COMBAT_MATCH_COLUMN_KINDS : REPORT_COLUMN_KINDS,
           columnWidths: isCombat
-            ? [6, 22, 22, 20, 14, 20, 12, 16, 12, 12, 14, 14]
-            : [6, 22, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12],
+            ? [6, 22, 22, 20, 14, 20, 12, 16, 12, 12, 14, 14, 10, 10, 10, 12]
+            : [6, 22, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12, 12],
           rows: dataRows,
         });
       }
