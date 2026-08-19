@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import * as XLSX from 'xlsx';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
@@ -18,16 +17,24 @@ import {
 } from '../../lib/flySmartCupScoring';
 import './AdminLayout.css';
 
-// Cột file Excel "Báo cáo điểm" — khớp đúng tên/thứ tự cột theo file mẫu do
-// người dùng cung cấp (kể cả 2 cột trùng tên "Tên đội thi" ở vị trí 3 và 5 —
-// giữ nguyên tiêu đề gốc của mẫu, không tự "sửa" vì hệ thống nhận file này
-// có thể đang đọc theo đúng VỊ TRÍ cột chứ không theo tên). Cột 3 trong mẫu
-// gốc là ngày sinh thí sinh — hệ thống đã bỏ trường ngày sinh nên để trống.
+// Cột file Excel "Báo cáo điểm" cho nội dung đo lường — 1 dòng/thí sinh theo
+// lượt 1/lượt 2. Bản trước có 2 cột cùng tên "Tên đội thi" (vị trí C và E) vì
+// rập khuôn 1 mẫu cũ có cột ngày sinh thí sinh ở vị trí C — hệ thống không
+// theo dõi ngày sinh nên cột đó luôn trống, nhưng vẫn bị ghi nhầm tiêu đề
+// trùng "Tên đội thi" gây khó hiểu. Đặt lại đúng tên cho khớp dữ liệu thực
+// tế đang ghi vào từng cột (cột B là tên thí sinh, không phải tên trường).
 const REPORT_EXCEL_HEADER = [
-  'Stt', 'Tên trường/ tổ chức', 'Tên đội thi', 'Tổ chức/ Trường', 'Tên đội thi',
+  'Stt', 'Họ và tên thí sinh', 'Ngày sinh', 'Tổ chức/ Trường', 'Tên đội thi',
   'Bảng đấu', 'Huấn luyện viên', 'Địa điểm đăng ký dự thi', 'Sa bàn',
   'Điểm lần 1', 'Thời gian lần 1', 'Điểm lần 2', 'Thời gian lần 2',
   'Tổng điểm', 'Tổng thời gian',
+];
+// 'index' = số thứ tự (căn giữa, định dạng số nguyên); 'text' = văn bản (căn
+// trái, tự xuống dòng); 'number' = số liệu (căn giữa). Dùng để tô đúng kiểu
+// canh lề/định dạng số cho từng cột khi dựng sheet có style.
+const REPORT_COLUMN_KINDS = [
+  'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
+  'number', 'number', 'number', 'number', 'number', 'number',
 ];
 
 // Mẫu Excel cho 2 nội dung đối kháng — MỖI TRẬN 1 DÒNG (không gộp thành 1
@@ -37,6 +44,9 @@ const REPORT_EXCEL_HEADER = [
 const COMBAT_MATCH_EXCEL_HEADER = [
   'Stt', 'Tên đội thi', 'Đối thủ', 'Trường/Trung tâm', 'Bảng đấu', 'Huấn luyện viên',
   'Sân', 'Bảng vòng tròn', 'Kết quả', 'Điểm đội', 'Điểm đối thủ', 'Match Points',
+];
+const COMBAT_MATCH_COLUMN_KINDS = [
+  'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'number',
 ];
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
@@ -71,6 +81,99 @@ function safeSheetName(name, used) {
   }
   used.add(candidate);
   return candidate;
+}
+
+// Bảng màu/kiểu chữ lấy nguyên từ file mẫu báo cáo (bao-cao-mau.xlsx) người
+// dùng cung cấp — thư viện `xlsx` (SheetJS bản miễn phí) không ghi được style
+// khi xuất file nên đổi sang `exceljs` chỉ cho tính năng này để tô đúng màu/
+// font/viền như mẫu (tiêu đề nền xanh navy chữ trắng đậm, dòng phụ đề chữ
+// xanh ngọc nghiêng, dòng tiêu đề cột nền navy chữ trắng đậm, dữ liệu viền
+// xám mảnh, đóng băng 4 dòng đầu, ẩn đường kẻ lưới).
+const REPORT_NAVY = 'FF1F3864';
+const REPORT_TEAL = 'FF0F7A82';
+const REPORT_WHITE = 'FFFFFFFF';
+const REPORT_BORDER_GRAY = 'FFBFBFBF';
+const REPORT_THIN_BORDER = { style: 'thin', color: { argb: REPORT_BORDER_GRAY } };
+const REPORT_CELL_BORDER = { top: REPORT_THIN_BORDER, bottom: REPORT_THIN_BORDER, left: REPORT_THIN_BORDER, right: REPORT_THIN_BORDER };
+
+// Dựng 1 sheet theo đúng bố cục mẫu: dòng 1 tiêu đề lớn (merge hết chiều
+// rộng), dòng 2 phụ đề, dòng 3 để trống, dòng 4 tiêu đề cột, từ dòng 5 là dữ
+// liệu. `columnKinds` quyết định canh lề/định dạng số cho từng cột (song song
+// với `header`); `rows` là mảng dữ liệu THÔ, KHÔNG kèm dòng tiêu đề.
+function buildStyledSheet(workbook, sheetName, { title, subtitle, header, columnKinds, columnWidths, rows }) {
+  const ws = workbook.addWorksheet(sheetName, {
+    views: [{ showGridLines: false, state: 'frozen', ySplit: 4 }],
+    pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+    properties: { tabColor: { argb: REPORT_NAVY } },
+  });
+  const colCount = header.length;
+  ws.columns = columnWidths.map((w) => ({ width: w }));
+
+  ws.mergeCells(1, 1, 1, colCount);
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = title;
+  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: REPORT_WHITE } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REPORT_NAVY } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 31.5;
+
+  ws.mergeCells(2, 1, 2, colCount);
+  const subtitleCell = ws.getCell(2, 1);
+  subtitleCell.value = subtitle;
+  subtitleCell.font = { name: 'Arial', size: 11, italic: true, color: { argb: REPORT_TEAL } };
+  subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(2).height = 19.5;
+
+  ws.getRow(3).height = 6;
+
+  const headerRow = ws.getRow(4);
+  header.forEach((label, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = label;
+    cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: REPORT_WHITE } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REPORT_NAVY } };
+    cell.border = REPORT_CELL_BORDER;
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+  headerRow.height = 30;
+
+  rows.forEach((rowValues, rIdx) => {
+    const row = ws.getRow(5 + rIdx);
+    rowValues.forEach((val, cIdx) => {
+      const cell = row.getCell(cIdx + 1);
+      cell.value = val === '' || val === undefined ? null : val;
+      cell.font = { name: 'Arial', size: 11, color: { argb: 'FF000000' } };
+      cell.border = REPORT_CELL_BORDER;
+      const kind = columnKinds[cIdx];
+      if (kind === 'index') {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.numFmt = '0';
+      } else if (kind === 'number') {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        if (typeof val === 'number') cell.numFmt = '0.##';
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+      }
+    });
+    row.height = 19.5;
+  });
+
+  return ws;
+}
+
+// Tải file .xlsx đã dựng bằng ExcelJS xuống máy — không có API writeFile như
+// SheetJS cho trình duyệt nên tự tạo Blob + link tải rồi bấm hộ.
+async function downloadWorkbook(workbook, filename) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export default function AdminReports() {
@@ -296,22 +399,29 @@ export default function AdminReports() {
       const teamsById = new Map(teamsArrays.flat().map((t) => [t.id, t]));
       const compLocation = competitions.find((c) => c.id === selectedComp)?.location || '';
 
-      const wb = XLSX.utils.book_new();
+      // Nạp exceljs động (dynamic import) — thư viện khá nặng, chỉ cần cho
+      // đúng tính năng xuất Excel này, không nên bắt MỌI người dùng (kể cả
+      // trọng tài dùng iPad) tải thêm ~1MB JS này ngay từ lúc mở app.
+      const { default: ExcelJS } = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
       const usedNames = new Set();
 
       for (const content of orderedContents) {
-        let aoa;
-        if (COMBAT_FORMATS.includes(content.content_format)) {
+        const isCombat = COMBAT_FORMATS.includes(content.content_format);
+        const title = `BÁO CÁO KẾT QUẢ THI ĐẤU – ${(content.name || '').toUpperCase()}`;
+        const subtitle = isCombat
+          ? `${group.name} – Bảng tổng hợp kết quả vòng tròn theo đội`
+          : `${group.name} – Bảng tổng hợp kết quả chấm điểm theo đội`;
+
+        let dataRows;
+        if (isCombat) {
           const matchRowsForContent = combatRows
             .filter((r) => r.contest_content_id === content.id)
             .sort((a, b) => a.team_name.localeCompare(b.team_name) || a.opponent_name.localeCompare(b.opponent_name));
-          aoa = [COMBAT_MATCH_EXCEL_HEADER];
-          matchRowsForContent.forEach((r, idx) => {
-            aoa.push([
-              idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
-              r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
-            ]);
-          });
+          dataRows = matchRowsForContent.map((r, idx) => [
+            idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
+            r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
+          ]);
         } else {
           const scoresByTeam = new Map();
           measurementRows
@@ -325,7 +435,7 @@ export default function AdminReports() {
             .filter(Boolean)
             .sort((a, b) => a.name.localeCompare(b.name));
 
-          aoa = [REPORT_EXCEL_HEADER];
+          dataRows = [];
           let stt = 0;
           for (const team of teamsSorted) {
             stt++;
@@ -336,7 +446,7 @@ export default function AdminReports() {
             const members = (team.student_ids || []).map((id) => students.find((s) => s.id === id)).filter(Boolean);
             const displayMembers = members.length ? members : [null];
             displayMembers.forEach((mem, idx) => {
-              aoa.push([
+              dataRows.push([
                 idx === 0 ? stt : '',
                 mem?.full_name || '',
                 '',
@@ -354,13 +464,19 @@ export default function AdminReports() {
           }
         }
 
-        const ws = XLSX.utils.aoa_to_sheet(aoa);
-        ws['!cols'] = aoa[0].map(() => ({ wch: 20 }));
-        XLSX.utils.book_append_sheet(wb, ws, safeSheetName(content.name, usedNames));
+        buildStyledSheet(workbook, safeSheetName(content.name, usedNames), {
+          title, subtitle,
+          header: isCombat ? COMBAT_MATCH_EXCEL_HEADER : REPORT_EXCEL_HEADER,
+          columnKinds: isCombat ? COMBAT_MATCH_COLUMN_KINDS : REPORT_COLUMN_KINDS,
+          columnWidths: isCombat
+            ? [6, 22, 22, 20, 14, 20, 12, 16, 12, 12, 14, 14]
+            : [6, 22, 12, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12],
+          rows: dataRows,
+        });
       }
 
       const slug = group.name.replace(/\s+/g, '-').toLowerCase();
-      XLSX.writeFile(wb, `bao-cao-diem-${slug}.xlsx`);
+      await downloadWorkbook(workbook, `bao-cao-diem-${slug}.xlsx`);
     } catch (e) {
       showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
     } finally {
