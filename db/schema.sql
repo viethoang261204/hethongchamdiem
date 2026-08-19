@@ -228,6 +228,7 @@ alter table schools add constraint schools_level_check
 alter table schools alter column level drop not null;
 alter table schools drop constraint if exists schools_level_check;
 alter table schools drop constraint if exists schools_name_level_key;
+alter table schools drop constraint if exists schools_name_key;
 alter table schools add constraint schools_name_key unique (name);
 
 alter table tasks add column if not exists image_data bytea;
