@@ -8,8 +8,14 @@ import { exportMultipleToPdf } from '../referee/exportPdf';
 import ScoreSheetTable from '../shared/ScoreSheetTable';
 import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
 import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
-import { computeGroupStandings } from '../../lib/battleScoring';
-import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
+import {
+  computeGroupStandings, computeTaskScore,
+  sideFromDetails as starsSideFromDetails, computeMatchPoints as computeStarsMatchPoints,
+} from '../../lib/battleScoring';
+import {
+  computeGroupStandings as computeDroneStandings, computeSideScore,
+  sideFromDetails as droneSideFromDetails, computeMatchPoints as computeDroneMatchPoints,
+} from '../../lib/flySmartCupScoring';
 import './AdminLayout.css';
 
 // Cột file Excel "Báo cáo điểm" — khớp đúng tên/thứ tự cột theo file mẫu do
@@ -24,21 +30,48 @@ const REPORT_EXCEL_HEADER = [
   'Tổng điểm', 'Tổng thời gian',
 ];
 
-// Mẫu Excel riêng cho 2 nội dung đối kháng — không có sẵn mẫu tham chiếu
-// (khác với REPORT_EXCEL_HEADER là mẫu người dùng cung cấp), tự thiết kế dựa
-// trên đúng dữ liệu bảng xếp hạng đã tính sẵn (computeGroupStandings/
-// computeDroneStandings — Match Points 3/1/0, Total Score) — không thêm cột
-// "Xếp hạng" vì standings ở đây tính theo TOÀN BỘ đội của content (không
-// tách riêng từng bảng vòng tròn), nên xếp hạng theo cách này sẽ sai lệch
-// nếu 1 nội dung có nhiều bảng — giữ đúng những số liệu đã được tin dùng
-// trên màn hình báo cáo (không phát sinh số liệu mới có thể gây hiểu nhầm.
-const COMBAT_EXCEL_HEADER = [
-  'Stt', 'Tên đội thi', 'Trường/Trung tâm', 'Bảng đấu', 'Huấn luyện viên',
-  'Sân', 'Bảng vòng tròn', 'Số trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Tổng điểm',
+// Mẫu Excel cho 2 nội dung đối kháng — MỖI TRẬN 1 DÒNG (không gộp thành 1
+// dòng/đội như trước) — 1 đội đấu vòng tròn với N đối thủ sẽ ra N dòng, mỗi
+// dòng là kết quả của đúng 1 trận, để khớp với cách người dùng đọc phiếu điểm
+// giấy (từng trận riêng) thay vì chỉ xem tổng kết cuối bảng.
+const COMBAT_MATCH_EXCEL_HEADER = [
+  'Stt', 'Tên đội thi', 'Đối thủ', 'Trường/Trung tâm', 'Bảng đấu', 'Huấn luyện viên',
+  'Sân', 'Bảng vòng tròn', 'Kết quả', 'Điểm đội', 'Điểm đối thủ', 'Match Points',
 ];
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
-const COMBAT_FORMAT_LABEL = { combat_stars: 'Battle of Stars', combat_drone: 'Fly Smart Cup' };
+const RESULT_LABEL_VI = { WIN: 'Thắng', DRAW: 'Hòa', LOSS: 'Thua' };
+
+// Kết quả + điểm số của 1 team trong 1 trận đối kháng, nhìn từ phía team đó.
+// Thắng/Hòa/Thua lấy trực tiếp từ match.winner_id/is_draw (đã được tính đúng
+// luật lúc trọng tài lưu — kể cả trận vòng loại trực tiếp quyết định bằng
+// đá luân lưu ở Fly Smart Cup) thay vì tự suy luận lại từ details, để không
+// lặp thiếu logic shootout riêng của combat_drone.
+function combatMatchOutcome(match, isStars, teamId, mySide) {
+  const sideFromDetails = isStars ? starsSideFromDetails : droneSideFromDetails;
+  const computeScore = isStars ? (s) => computeTaskScore(s).taskScore : (s) => computeSideScore(s).total;
+  const computeMatchPoints = isStars ? computeStarsMatchPoints : computeDroneMatchPoints;
+  const oppSide = mySide === 'A' ? 'B' : 'A';
+  const myScore = computeScore(sideFromDetails(match.details, mySide));
+  const oppScore = computeScore(sideFromDetails(match.details, oppSide));
+  const outcome = match.is_draw ? 'DRAW' : match.winner_id === teamId ? 'WIN' : 'LOSS';
+  return { myScore, oppScore, outcome, matchPoints: computeMatchPoints(outcome) };
+}
+
+// Tên sheet Excel tối đa 31 ký tự, không chứa \ / * ? : [ ], và không trùng
+// nhau trong cùng 1 workbook — content.name có thể vi phạm cả 3.
+function safeSheetName(name, used) {
+  const base = (name || 'Sheet').replace(/[\\/*?:[\]]/g, '-').slice(0, 31) || 'Sheet';
+  let candidate = base;
+  let i = 2;
+  while (used.has(candidate)) {
+    const suffix = ` (${i})`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    i++;
+  }
+  used.add(candidate);
+  return candidate;
+}
 
 export default function AdminReports() {
   const { showAlert } = useNotify();
@@ -59,10 +92,8 @@ export default function AdminReports() {
   // Danh sách phiếu điểm chi tiết (đã fetch đủ scores + tasks) đang chờ render
   // ẩn để html2canvas chụp từng phiếu, gộp thành 1 PDF cho cả group.
   const [pendingExport, setPendingExport] = useState(null);
-  // Tên group (trường/HLV) đang xuất Excel riêng — dùng để disable đúng nút đó
+  // Tên group (trường/HLV) đang xuất Excel bảng điểm — dùng để disable đúng nút đó
   const [exportingExcelGroup, setExportingExcelGroup] = useState(null);
-  // key `${group.name}:${content_format}` đang xuất Excel đối kháng riêng
-  const [exportingCombatExcelKey, setExportingCombatExcelKey] = useState(null);
   // Đang xuất PDF toàn bộ phiếu điểm trận đối kháng (mọi trận, mọi đội, mọi
   // nội dung đối kháng đang trong phạm vi báo cáo) + danh sách trận đang chờ
   // render ẩn để html2canvas chụp, gộp thành 1 PDF.
@@ -89,7 +120,8 @@ export default function AdminReports() {
         api.getReportScores({ competitionId: selectedComp, contentId: selectedContent || undefined }),
         Promise.all(scopedCombatContents.map(async (c) => {
           const [teams, matches] = await Promise.all([api.getTeams(c.id), api.getCombatMatches(c.id)]);
-          const standings = c.content_format === 'combat_stars'
+          const isStars = c.content_format === 'combat_stars';
+          const standings = isStars
             ? computeGroupStandings(teams, matches)
             : computeDroneStandings(teams, matches);
           const standingsRows = standings.map((s) => ({
@@ -99,16 +131,39 @@ export default function AdminReports() {
             played: s.played, wins: s.wins, draws: s.draws, losses: s.losses,
             match_points: s.matchPoints, total_score: s.totalScore,
           }));
-          return { content: c, matches, standingsRows };
+          // Chỉ tính trận ĐÃ chấm điểm — bỏ qua trận còn "scheduled" (chưa vào
+          // bàn), cùng điều kiện "đã chấm" mà RefereeCombatMatchScore.jsx dùng
+          // để tự điền lại dữ liệu đã lưu khi trọng tài mở lại 1 trận.
+          const completedMatches = matches.filter((m) => m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled'));
+          // Mỗi trận đã chấm → 2 dòng (1 dòng/đội, nhìn từ phía đội đó) — 1 đội
+          // đấu vòng tròn với N trận sẽ có N dòng riêng trong sheet xuất Excel.
+          const matchRows = [];
+          completedMatches.forEach((m) => {
+            [['A', m.team_a_id, m.team_b_id], ['B', m.team_b_id, m.team_a_id]].forEach(([side, teamId, oppId]) => {
+              if (!teamId) return;
+              const team = teams.find((t) => t.id === teamId);
+              const opp = teams.find((t) => t.id === oppId);
+              const { myScore, oppScore, outcome, matchPoints } = combatMatchOutcome(m, isStars, teamId, side);
+              matchRows.push({
+                team_id: teamId, team_name: team?.name || (side === 'A' ? m.team_a?.name : m.team_b?.name) || '—',
+                opponent_name: opp?.name || (side === 'A' ? m.team_b?.name : m.team_a?.name) || '—',
+                school: team?.schools?.name || 'Chưa có trường',
+                board_name: team?.boards?.name || '', coach_name: team?.coaches?.name || '',
+                field_names: (team?.fields || []).map((f) => f.name).join(', '),
+                group_label: m.group_label || m.stage || '',
+                content_name: c.name, contest_content_id: c.id, content_format: c.content_format,
+                result_label: RESULT_LABEL_VI[outcome], my_score: myScore, opp_score: oppScore, match_points: matchPoints,
+                match_id: m.id,
+              });
+            });
+          });
+          return { content: c, matches, standingsRows, matchRows };
         })),
       ]);
       setRows({
         measurement,
         combat: combatPerContent.flatMap((c) => c.standingsRows),
-        // Chỉ xuất phiếu cho trận ĐÃ chấm điểm — bỏ qua trận còn "scheduled"
-        // (chưa vào bàn) để không in ra phiếu trống toàn 0 điểm. Cùng điều
-        // kiện "đã chấm" mà RefereeCombatMatchScore.jsx dùng để tự điền lại
-        // dữ liệu đã lưu (setEntered) khi trọng tài mở lại một trận.
+        combatMatchRows: combatPerContent.flatMap((c) => c.matchRows),
         combatMatches: combatPerContent.flatMap((c) => c.matches
           .filter((m) => m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled'))
           .map((m) => ({ match: m, content: c.content }))),
@@ -211,121 +266,105 @@ export default function AdminReports() {
     }
   };
 
-  // Xuất Excel RIÊNG cho 1 group (1 trường/trung tâm) — đội thi đo lường (có
-  // lượt 1/lượt 2) của group đó, đúng theo mẫu Excel đã cung cấp (1 dòng/thí
-  // sinh, STT theo từng ĐỘI). Không áp dụng đội đối kháng (không có khái
-  // niệm lượt 1/2 kiểu này) — cùng phạm vi với nút "Xuất phiếu điểm" cạnh nó.
-  const handleExportExcel = async (group) => {
-    const measurementTeams = group.teams.filter((t) => t.format !== 'combat');
-    if (measurementTeams.length === 0) {
-      showAlert('Nhóm này chỉ có đội thi đối kháng — không có lượt 1/lượt 2 để xuất Excel.', 'error');
-      return;
-    }
+  // Xuất TOÀN BỘ bảng điểm của 1 group (1 trường/trung tâm) — mọi đội, mọi
+  // nội dung đội đó đã thi trong phạm vi báo cáo đang xem, thành 1 file Excel
+  // NHIỀU SHEET (1 sheet/nội dung, đúng thứ tự order_index) thay vì phải bấm
+  // từng nút riêng theo từng nội dung như trước. Nội dung đo lường ra 1
+  // dòng/thí sinh theo lượt 1/2 (mẫu REPORT_EXCEL_HEADER); nội dung đối kháng
+  // ra 1 dòng/TRẬN cho mỗi đội (mẫu COMBAT_MATCH_EXCEL_HEADER) — 1 đội đấu
+  // vòng tròn N trận sẽ có N dòng, không gộp thành 1 dòng tổng kết.
+  const handleExportGroupExcel = async (group) => {
     setExportingExcelGroup(group.name);
     try {
-      const contentIds = [...new Set(measurementTeams.map((t) => t.contest_content_id).filter(Boolean))];
-      const teamIdsInGroup = new Set(measurementTeams.map((t) => t.team_id));
+      const measurementRows = (rows.measurement || []).filter((r) => (r.schools?.name || 'Chưa có trường') === group.name);
+      const combatRows = (rows.combatMatchRows || []).filter((r) => r.school === group.name);
+      const contentIdsInScope = new Set([
+        ...measurementRows.map((r) => r.contest_content_id),
+        ...combatRows.map((r) => r.contest_content_id),
+      ]);
+      if (contentIdsInScope.size === 0) {
+        showAlert('Nhóm này chưa có dữ liệu điểm để xuất.', 'error');
+        return;
+      }
+      const orderedContents = contents.filter((c) => contentIdsInScope.has(c.id));
+
+      const measurementContentIds = [...new Set(measurementRows.map((r) => r.contest_content_id))];
       const [students, teamsArrays] = await Promise.all([
-        api.getStudents(),
-        Promise.all(contentIds.map((cid) => api.getTeams(cid))),
+        measurementContentIds.length ? api.getStudents() : Promise.resolve([]),
+        Promise.all(measurementContentIds.map((cid) => api.getTeams(cid))),
       ]);
       const teamsById = new Map(teamsArrays.flat().map((t) => [t.id, t]));
       const compLocation = competitions.find((c) => c.id === selectedComp)?.location || '';
 
-      const scoresByTeam = new Map();
-      for (const r of rows.measurement || []) {
-        if (!teamIdsInGroup.has(r.team_id)) continue;
-        if (!scoresByTeam.has(r.team_id)) scoresByTeam.set(r.team_id, {});
-        scoresByTeam.get(r.team_id)[r.round] = r;
-      }
-
-      const teamsSorted = Array.from(scoresByTeam.keys())
-        .map((id) => teamsById.get(id))
-        .filter(Boolean)
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-      const aoa = [REPORT_EXCEL_HEADER];
-      let stt = 0;
-      for (const team of teamsSorted) {
-        stt++;
-        const rs = scoresByTeam.get(team.id) || {};
-        const r1 = rs[1], r2 = rs[2];
-        const totalScore = (Number(r1?.score) || 0) + (Number(r2?.score) || 0);
-        const totalTime = (Number(r1?.time) || 0) + (Number(r2?.time) || 0);
-        const members = (team.student_ids || []).map((id) => students.find((s) => s.id === id)).filter(Boolean);
-        const displayMembers = members.length ? members : [null];
-        displayMembers.forEach((mem, idx) => {
-          aoa.push([
-            idx === 0 ? stt : '',
-            mem?.full_name || '',
-            '',
-            team.schools?.name || '',
-            team.name,
-            team.boards?.name || '',
-            team.coaches?.name || '',
-            compLocation,
-            (team.fields || []).map((f) => f.name).join(', '),
-            r1?.score ?? '', r1?.time ?? '',
-            r2?.score ?? '', r2?.time ?? '',
-            totalScore, totalTime,
-          ]);
-        });
-      }
-
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = REPORT_EXCEL_HEADER.map(() => ({ wch: 20 }));
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Báo cáo điểm');
+      const usedNames = new Set();
+
+      for (const content of orderedContents) {
+        let aoa;
+        if (COMBAT_FORMATS.includes(content.content_format)) {
+          const matchRowsForContent = combatRows
+            .filter((r) => r.contest_content_id === content.id)
+            .sort((a, b) => a.team_name.localeCompare(b.team_name) || a.opponent_name.localeCompare(b.opponent_name));
+          aoa = [COMBAT_MATCH_EXCEL_HEADER];
+          matchRowsForContent.forEach((r, idx) => {
+            aoa.push([
+              idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
+              r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
+            ]);
+          });
+        } else {
+          const scoresByTeam = new Map();
+          measurementRows
+            .filter((r) => r.contest_content_id === content.id)
+            .forEach((r) => {
+              if (!scoresByTeam.has(r.team_id)) scoresByTeam.set(r.team_id, {});
+              scoresByTeam.get(r.team_id)[r.round] = r;
+            });
+          const teamsSorted = Array.from(scoresByTeam.keys())
+            .map((id) => teamsById.get(id))
+            .filter(Boolean)
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+          aoa = [REPORT_EXCEL_HEADER];
+          let stt = 0;
+          for (const team of teamsSorted) {
+            stt++;
+            const rs = scoresByTeam.get(team.id) || {};
+            const r1 = rs[1], r2 = rs[2];
+            const totalScore = (Number(r1?.score) || 0) + (Number(r2?.score) || 0);
+            const totalTime = (Number(r1?.time) || 0) + (Number(r2?.time) || 0);
+            const members = (team.student_ids || []).map((id) => students.find((s) => s.id === id)).filter(Boolean);
+            const displayMembers = members.length ? members : [null];
+            displayMembers.forEach((mem, idx) => {
+              aoa.push([
+                idx === 0 ? stt : '',
+                mem?.full_name || '',
+                '',
+                team.schools?.name || '',
+                team.name,
+                team.boards?.name || '',
+                team.coaches?.name || '',
+                compLocation,
+                (team.fields || []).map((f) => f.name).join(', '),
+                r1?.score ?? '', r1?.time ?? '',
+                r2?.score ?? '', r2?.time ?? '',
+                totalScore, totalTime,
+              ]);
+            });
+          }
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = aoa[0].map(() => ({ wch: 20 }));
+        XLSX.utils.book_append_sheet(wb, ws, safeSheetName(content.name, usedNames));
+      }
+
       const slug = group.name.replace(/\s+/g, '-').toLowerCase();
       XLSX.writeFile(wb, `bao-cao-diem-${slug}.xlsx`);
     } catch (e) {
       showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
     } finally {
       setExportingExcelGroup(null);
-    }
-  };
-
-  // Xuất Excel RIÊNG cho 1 group (1 trường/trung tâm) × 1 nội dung đối kháng
-  // cụ thể (Battle of Stars HOẶC Fly Smart Cup — 2 luật tính điểm khác nhau
-  // nên KHÔNG gộp chung 1 mẫu như measurement). Dùng đúng số liệu standings
-  // đã tính sẵn ở rows.combat (computeGroupStandings/computeDroneStandings).
-  const handleExportCombatExcel = async (group, contentFormat) => {
-    const teamsForFormat = group.teams.filter((t) => t.format === 'combat' && t.content_format === contentFormat);
-    if (teamsForFormat.length === 0) return;
-    const key = `${group.name}:${contentFormat}`;
-    setExportingCombatExcelKey(key);
-    try {
-      const contentIds = [...new Set(teamsForFormat.map((t) => t.contest_content_id))];
-      const teamsArrays = await Promise.all(contentIds.map((cid) => api.getTeams(cid)));
-      const teamsById = new Map(teamsArrays.flat().map((t) => [t.id, t]));
-
-      const sorted = teamsForFormat.slice().sort((a, b) =>
-        (teamsById.get(a.team_id)?.combat_group || '').localeCompare(teamsById.get(b.team_id)?.combat_group || '') ||
-        a.team_name.localeCompare(b.team_name)
-      );
-
-      const aoa = [COMBAT_EXCEL_HEADER];
-      sorted.forEach((t, idx) => {
-        const team = teamsById.get(t.team_id);
-        aoa.push([
-          idx + 1, t.team_name, t.school, team?.boards?.name || '', team?.coaches?.name || '',
-          (team?.fields || []).map((f) => f.name).join(', '),
-          team?.combat_group || '',
-          t.rounds, t.wins, t.draws, t.losses, t.match_points, t.total_score,
-        ]);
-      });
-
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = COMBAT_EXCEL_HEADER.map(() => ({ wch: 20 }));
-      const wb = XLSX.utils.book_new();
-      const formatLabel = COMBAT_FORMAT_LABEL[contentFormat];
-      XLSX.utils.book_append_sheet(wb, ws, formatLabel);
-      const slug = `${group.name}-${formatLabel}`.replace(/\s+/g, '-').toLowerCase();
-      XLSX.writeFile(wb, `bao-cao-${slug}.xlsx`);
-    } catch (e) {
-      showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
-    } finally {
-      setExportingCombatExcelKey(null);
     }
   };
 
@@ -415,27 +454,14 @@ export default function AdminReports() {
                 <h3 className="card-title">{g.name}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <span className="page-subtitle">{g.teams.length} đội</span>
-                  {g.teams.some((t) => t.format !== 'combat') && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => handleExportExcel(g)}
-                      disabled={exportingExcelGroup === g.name}
-                    >
-                      {exportingExcelGroup === g.name ? 'Đang xuất...' : 'Xuất Excel (đo lường)'}
-                    </button>
-                  )}
-                  {COMBAT_FORMATS.filter((fmt) => g.teams.some((t) => t.content_format === fmt)).map((fmt) => (
-                    <button
-                      key={fmt}
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => handleExportCombatExcel(g, fmt)}
-                      disabled={exportingCombatExcelKey === `${g.name}:${fmt}`}
-                    >
-                      {exportingCombatExcelKey === `${g.name}:${fmt}` ? 'Đang xuất...' : `Xuất Excel (${COMBAT_FORMAT_LABEL[fmt]})`}
-                    </button>
-                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => handleExportGroupExcel(g)}
+                    disabled={exportingExcelGroup === g.name}
+                  >
+                    {exportingExcelGroup === g.name ? 'Đang xuất...' : 'Xuất bảng điểm (Excel)'}
+                  </button>
                   <button
                     type="button"
                     className="btn btn-primary"
