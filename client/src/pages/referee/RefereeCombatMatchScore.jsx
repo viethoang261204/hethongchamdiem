@@ -200,7 +200,9 @@ export default function RefereeCombatMatchScore({ format }) {
 
   const startMatch = () => {
     setStartedAt(new Date().toISOString());
-    setIsTimerRunning(true);
+    // KHÔNG tự bấm giờ ở đây — trọng tài phải tự bấm nút "▶ BẮT ĐẦU" trên
+    // đồng hồ bấm giờ, tách riêng khỏi việc "Bắt đầu trận" (chỉ mở màn hình
+    // chấm điểm), tránh đồng hồ chạy trước khi 2 đội thực sự vào sân.
     setEntered(true);
     // Fly Smart Cup: match lifecycle status (mục 2/13 luật) — Battle of Stars
     // không dùng status nên không đụng tới để không ảnh hưởng module đó.
@@ -591,10 +593,15 @@ export default function RefereeCombatMatchScore({ format }) {
 
           <main>
             <div className="ts-card" style={{ padding: 24 }}>
-              <div className="form-group" style={{ marginBottom: 14, maxWidth: 240 }}>
-                <label className="form-label">Division</label>
-                <input type="text" className="form-input" value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} />
-              </div>
+              {/* Battle of Stars luôn thi đấu vòng tròn (round-robin) — không có
+                  khái niệm Division cần chọn, bỏ ô này để đỡ rối. Fly Smart Cup
+                  vẫn giữ (có vòng bảng lẫn vòng loại trực tiếp). */}
+              {!isStars && (
+                <div className="form-group" style={{ marginBottom: 14, maxWidth: 240 }}>
+                  <label className="form-label">Division</label>
+                  <input type="text" className="form-input" value={form.division} onChange={(e) => setForm({ ...form, division: e.target.value })} />
+                </div>
+              )}
 
               {isStars ? (
                 <div className="table-container">
