@@ -89,7 +89,7 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
         <tr>
           <td colSpan={4}><span className="ss-label">{t(lang, 'Team name:', 'Tên đội:')}</span> {team?.name || ''}</td>
           <td colSpan={3}>
-            <div><span className="ss-label">{t(lang, 'Field:', 'Sân:')}</span> {team?.fields?.name || ''}</div>
+            <div><span className="ss-label">{t(lang, 'Field:', 'Sân:')}</span> {(team?.fields || []).map((f) => f.name).join(', ')}</div>
             <div><span className="ss-label">{t(lang, 'No.:', 'Số:')}</span> {team?.order_index != null ? team.order_index + 1 : ''}</div>
           </td>
         </tr>
