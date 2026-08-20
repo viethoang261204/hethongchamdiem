@@ -64,7 +64,11 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
       round2Tier: cs2.taskTier?.[t.id],
     }));
 
-  const totalMaxScore = tasks.reduce((sum, t) => sum + (Number(t.max_score) || 0), 0);
+  // Điểm thưởng thêm (40 − 10×số lần thử lại) LUÔN cộng vào tổng điểm thật —
+  // điểm tối đa của nó phải nằm trong tổng điểm tối đa, nếu không "Tổng điểm"
+  // cột "Điểm tối đa" sẽ thấp hơn thực tế (thiếu đúng bằng điểm thưởng tối đa).
+  const bonusMax = content?.bonus_config?.base ?? 40;
+  const totalMaxScore = tasks.reduce((sum, t) => sum + (Number(t.max_score) || 0), 0) + bonusMax;
 
   const bonus1 = Number(round1?.bonus_points ?? cs1.extraReward) || 0;
   const bonus2 = Number(round2?.bonus_points ?? cs2.extraReward) || 0;
@@ -131,7 +135,7 @@ export default function ScoreSheetTable({ scores, content, tasks: tasksProp, she
             40 &minus; 10 &times; {t(lang, 'Number of retries (>0)', 'Số lần thử lại (>0)')}
             <div className="ss-small">{t(lang, 'Retries', 'Số lần thử lại')} — {t(lang, 'Round 1', 'Lượt 1')}: <strong>{retry1}</strong> · {t(lang, 'Round 2', 'Lượt 2')}: <strong>{retry2}</strong></div>
           </td>
-          <td></td>
+          <td className="ss-center"><strong>{bonusMax}</strong></td>
           <td className="ss-center"><strong>{bonus1}</strong></td>
           <td className="ss-center"><strong>{bonus2}</strong></td>
         </tr>
