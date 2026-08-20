@@ -352,14 +352,16 @@ export default function AdminScoreboard() {
           <h1 className="page-title">Bảng xếp hạng</h1>
           <p className="page-subtitle">Chọn cuộc thi và nội dung để xem bảng xếp hạng</p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={handleExportFullScoreboard}
-          disabled={!selectedComp || exportingFull}
-        >
-          {exportingFull ? 'Đang xuất...' : 'Xuất Excel toàn bộ BXH'}
-        </button>
+        {selectedComp && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleExportFullScoreboard}
+            disabled={exportingFull}
+          >
+            {exportingFull ? 'Đang xuất...' : 'Xuất Excel toàn bộ BXH'}
+          </button>
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 24 }}>
