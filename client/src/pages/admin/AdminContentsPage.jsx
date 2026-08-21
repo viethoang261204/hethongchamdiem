@@ -60,9 +60,8 @@ export default function AdminContentsPage() {
   // (capi.getAllContents) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
   const refreshContents = async () => {
     clearApiCache('getAllContents');
-    setData(null);
     const updated = await api.getAllContents();
-    setData((prev) => prev ? { ...prev, allContents: updated } : prev);
+    setData((prev) => ({ ...prev, allContents: updated }));
   };
 
   const selectedCompData = competitions.find(c => c.id === selectedComp);

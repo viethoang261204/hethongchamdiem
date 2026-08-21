@@ -202,9 +202,8 @@ export default function AdminTasks() {
       }
       resetImageState();
       setModal(null);
-      setData(null);
       const updated = await api.getAllTasks();
-      setData((prev) => prev ? { ...prev, tasks: updated } : prev);
+      setData((prev) => ({ ...prev, tasks: updated }));
       showAlert('Đã lưu.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi khi lưu nhiệm vụ.', 'error');
@@ -233,9 +232,8 @@ export default function AdminTasks() {
     try {
       await api.deleteTask(deleteConfirm.id);
       setDeleteConfirm(null);
-      setData(null);
       const updated = await api.getAllTasks();
-      setData((prev) => prev ? { ...prev, tasks: updated } : prev);
+      setData((prev) => ({ ...prev, tasks: updated }));
       showAlert('Đã xóa.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
@@ -575,7 +573,7 @@ export default function AdminTasks() {
           templateFilename="mau-nhiem-vu.xlsx"
           notePrereq="Tên nội dung thi phải khớp đúng 1 nội dung đã có sẵn. Kiểu chấm để trống = binary. Không nhập được ảnh minh hoạ qua Excel — thêm ảnh riêng sau khi nhập."
           onImport={(rows) => api.importTasks(rows)}
-          onDone={async () => { setData(null); const updated = await api.getAllTasks(); setData((prev) => prev ? { ...prev, tasks: updated } : prev); }}
+          onDone={async () => { const updated = await api.getAllTasks(); setData((prev) => ({ ...prev, tasks: updated })); }}
           onClose={() => setImportOpen(false)}
         />
       )}
