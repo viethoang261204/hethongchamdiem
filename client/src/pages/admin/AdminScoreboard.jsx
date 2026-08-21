@@ -6,7 +6,7 @@ import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
-import { safeSheetName, buildStyledSheet, downloadWorkbook } from '../../lib/excelReport';
+import { writeStyledBlock, downloadWorkbook } from '../../lib/excelReport';
 import './AdminLayout.css';
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
@@ -243,10 +243,11 @@ export default function AdminScoreboard() {
   const visibleBoards = selectedBoard ? boards.filter((b) => b.id === selectedBoard) : boards;
 
   // Xuất TOÀN BỘ bảng xếp hạng của cuộc thi đang chọn — mọi nội dung × mọi
-  // bảng đấu, không phụ thuộc nội dung/bảng đang xem trên màn hình — thành 1
-  // file Excel nhiều sheet (1 sheet/nội dung×bảng đấu). Tự đi lấy dữ liệu
-  // riêng cho từng nội dung (không dùng state đang hiển thị, vì state đó chỉ
-  // scope theo đúng 1 nội dung đang chọn).
+  // bảng đấu, không phụ thuộc nội dung/bảng đang xem trên màn hình — gộp
+  // chung vào 1 SHEET DUY NHẤT, mỗi bảng cách nhau vài dòng trống, để người
+  // dùng tự cắt/kéo sắp xếp lại thứ tự tùy ý. Tự đi lấy dữ liệu riêng cho
+  // từng nội dung (không dùng state đang hiển thị, vì state đó chỉ scope
+  // theo đúng 1 nội dung đang chọn).
   const handleExportFullScoreboard = async () => {
     if (!selectedComp) { showAlert('Chọn cuộc thi trước.', 'error'); return; }
     setExportingFull(true);
@@ -254,8 +255,19 @@ export default function AdminScoreboard() {
       const allContents = await api.getContents(selectedComp);
       const { default: ExcelJS } = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
-      const usedNames = new Set();
-      let sheetCount = 0;
+      // Gộp TẤT CẢ bảng vào 1 sheet duy nhất (không tách sheet riêng từng
+      // nội dung×bảng đấu như trước) — mỗi bảng cách nhau vài dòng trống để
+      // dễ cắt/kéo sắp xếp lại tay. Độ rộng cột dùng chung cho cả sheet nên
+      // lấy theo bộ cột RỘNG NHẤT (Battle of Stars, 11 cột) — các khối ít cột
+      // hơn chỉ dùng phần đầu của bộ này.
+      const ws = workbook.addWorksheet('Bảng xếp hạng', {
+        views: [{ showGridLines: false }],
+        pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+      });
+      ws.columns = [8, 28, 10, 10, 10, 10, 14, 14, 12, 12, 10].map((w) => ({ width: w }));
+      const BLOCK_GAP_ROWS = 2;
+      let currentRow = 1;
+      let blockCount = 0;
 
       for (const content of allContents) {
         const contentBoards = await api.getBoards(content.id).catch(() => []);
@@ -269,7 +281,7 @@ export default function AdminScoreboard() {
         }
 
         for (const board of contentBoards) {
-          let header, columnKinds, columnWidths, dataRows;
+          let header, columnKinds, dataRows;
 
           if (isCombat) {
             const boardTeams = combatTeams.filter((t) => t.board_id === board.id);
@@ -283,7 +295,6 @@ export default function AdminScoreboard() {
             columnKinds = isStars
               ? ['index', 'text', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
               : ['index', 'text', 'number', 'number', 'number', 'number', 'number', 'number'];
-            columnWidths = isStars ? [8, 26, 10, 10, 10, 10, 14, 14, 12, 12, 10] : [8, 26, 10, 10, 10, 10, 14, 14];
             dataRows = standings.map((s) => (isStars
               ? [s.rank, s.teamName, s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
               : [s.rank, s.teamName, s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
@@ -294,7 +305,6 @@ export default function AdminScoreboard() {
               if (!r.teams?.length) continue;
               header = ['Hạng', 'Đội', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
               columnKinds = ['index', 'text', 'number', 'number', 'number', 'number', 'number'];
-              columnWidths = [8, 28, 12, 12, 12, 14, 10];
               dataRows = r.teams.map((t, idx) => [
                 idx + 1, t.team_name,
                 t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
@@ -306,7 +316,6 @@ export default function AdminScoreboard() {
               if (!r.bracket_resolved || !r.placements?.length) continue;
               header = ['Hạng', 'Đội'];
               columnKinds = ['index', 'text'];
-              columnWidths = [8, 28];
               dataRows = r.placements.map((p) => {
                 const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
                   || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || p.team_id;
@@ -315,16 +324,17 @@ export default function AdminScoreboard() {
             }
           }
 
-          buildStyledSheet(workbook, safeSheetName(`${content.name} - ${board.name}`, usedNames), {
+          const nextRow = writeStyledBlock(ws, currentRow, {
             title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
             subtitle: `${board.name}${board.age_group ? ` — ${board.age_group}` : ''}`,
-            header, columnKinds, columnWidths, rows: dataRows,
+            header, columnKinds, rows: dataRows,
           });
-          sheetCount++;
+          currentRow = nextRow + BLOCK_GAP_ROWS;
+          blockCount++;
         }
       }
 
-      if (sheetCount === 0) {
+      if (blockCount === 0) {
         showAlert('Chưa có dữ liệu bảng xếp hạng nào để xuất.', 'error');
         return;
       }

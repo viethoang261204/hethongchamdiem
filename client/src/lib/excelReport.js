@@ -34,40 +34,38 @@ export function safeSheetName(name, used) {
   return candidate;
 }
 
-// Dựng 1 sheet theo đúng bố cục mẫu: dòng 1 tiêu đề lớn (merge hết chiều
-// rộng), dòng 2 phụ đề, dòng 3 để trống, dòng 4 tiêu đề cột, từ dòng 5 là dữ
-// liệu. `columnKinds` quyết định canh lề/định dạng số cho từng cột (song song
-// với `header`) — 'index' = số thứ tự (căn giữa, số nguyên); 'text' = văn bản
-// dài (căn trái, tự xuống dòng); 'number' = số liệu (căn giữa); 'label' = văn
-// bản ngắn cần căn giữa, không xuống dòng. `rows` là mảng dữ liệu THÔ, KHÔNG
-// kèm dòng tiêu đề.
-export function buildStyledSheet(workbook, sheetName, { title, subtitle, header, columnKinds, columnWidths, rows }) {
-  const ws = workbook.addWorksheet(sheetName, {
-    views: [{ showGridLines: false, state: 'frozen', ySplit: 4 }],
-    pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
-    properties: { tabColor: { argb: REPORT_NAVY } },
-  });
+// Ghi 1 khối bảng (tiêu đề + phụ đề + dòng trống + tiêu đề cột + dữ liệu) bắt
+// đầu tại `startRow` của 1 worksheet CÓ SẴN — dùng để dựng 1 sheet riêng
+// (buildStyledSheet, startRow=1) hoặc gộp NHIỀU khối vào cùng 1 sheet, mỗi
+// khối cách nhau vài dòng trống (xem client/src/pages/admin/AdminScoreboard.jsx,
+// nút "Xuất Excel toàn bộ BXH"). `columnKinds` quyết định canh lề/định dạng số
+// cho từng cột (song song với `header`) — 'index' = số thứ tự (căn giữa, số
+// nguyên); 'text' = văn bản dài (căn trái, tự xuống dòng); 'number' = số liệu
+// (căn giữa); 'label' = văn bản ngắn cần căn giữa, không xuống dòng. `rows` là
+// mảng dữ liệu THÔ, KHÔNG kèm dòng tiêu đề. Trả về số dòng NGAY SAU khối này
+// (chưa cộng khoảng cách) để caller tự tính dòng bắt đầu khối tiếp theo.
+export function writeStyledBlock(ws, startRow, { title, subtitle, header, columnKinds, rows }) {
   const colCount = header.length;
-  ws.columns = columnWidths.map((w) => ({ width: w }));
 
-  ws.mergeCells(1, 1, 1, colCount);
-  const titleCell = ws.getCell(1, 1);
+  ws.mergeCells(startRow, 1, startRow, colCount);
+  const titleCell = ws.getCell(startRow, 1);
   titleCell.value = title;
   titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: REPORT_WHITE } };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: REPORT_NAVY } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  ws.getRow(1).height = 31.5;
+  ws.getRow(startRow).height = 31.5;
 
-  ws.mergeCells(2, 1, 2, colCount);
-  const subtitleCell = ws.getCell(2, 1);
+  ws.mergeCells(startRow + 1, 1, startRow + 1, colCount);
+  const subtitleCell = ws.getCell(startRow + 1, 1);
   subtitleCell.value = subtitle;
   subtitleCell.font = { name: 'Arial', size: 11, italic: true, color: { argb: REPORT_TEAL } };
   subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  ws.getRow(2).height = 19.5;
+  ws.getRow(startRow + 1).height = 19.5;
 
-  ws.getRow(3).height = 6;
+  ws.getRow(startRow + 2).height = 6;
 
-  const headerRow = ws.getRow(4);
+  const headerRowNum = startRow + 3;
+  const headerRow = ws.getRow(headerRowNum);
   header.forEach((label, idx) => {
     const cell = headerRow.getCell(idx + 1);
     cell.value = label;
@@ -79,7 +77,7 @@ export function buildStyledSheet(workbook, sheetName, { title, subtitle, header,
   headerRow.height = 30;
 
   rows.forEach((rowValues, rIdx) => {
-    const row = ws.getRow(5 + rIdx);
+    const row = ws.getRow(headerRowNum + 1 + rIdx);
     rowValues.forEach((val, cIdx) => {
       const cell = row.getCell(cIdx + 1);
       cell.value = val === '' || val === undefined ? null : val;
@@ -101,6 +99,21 @@ export function buildStyledSheet(workbook, sheetName, { title, subtitle, header,
     row.height = 19.5;
   });
 
+  return headerRowNum + 1 + rows.length;
+}
+
+// Dựng 1 sheet RIÊNG chỉ chứa đúng 1 khối bảng theo đúng bố cục mẫu (dòng 1
+// tiêu đề lớn merge hết chiều rộng, dòng 2 phụ đề, dòng 3 để trống, dòng 4
+// tiêu đề cột, từ dòng 5 là dữ liệu) — xem writeStyledBlock() để biết ý nghĩa
+// các tham số.
+export function buildStyledSheet(workbook, sheetName, { title, subtitle, header, columnKinds, columnWidths, rows }) {
+  const ws = workbook.addWorksheet(sheetName, {
+    views: [{ showGridLines: false, state: 'frozen', ySplit: 4 }],
+    pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+    properties: { tabColor: { argb: REPORT_NAVY } },
+  });
+  ws.columns = columnWidths.map((w) => ({ width: w }));
+  writeStyledBlock(ws, 1, { title, subtitle, header, columnKinds, rows });
   return ws;
 }
 
