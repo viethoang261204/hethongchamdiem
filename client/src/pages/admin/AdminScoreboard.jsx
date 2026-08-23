@@ -253,21 +253,21 @@ export default function AdminScoreboard() {
     setExportingFull(true);
     try {
       const allContents = await api.getContents(selectedComp);
+      const allStudents = await api.getStudents().catch(() => []);
+      const studentNameById = new Map(allStudents.map((s) => [s.id, s.full_name]));
       const { default: ExcelJS } = await import('exceljs');
       const workbook = new ExcelJS.Workbook();
-      // Gộp TẤT CẢ bảng vào 1 sheet duy nhất (không tách sheet riêng từng
-      // nội dung×bảng đấu như trước) — mỗi bảng cách nhau vài dòng trống để
-      // dễ cắt/kéo sắp xếp lại tay. Độ rộng cột dùng chung cho cả sheet nên
-      // lấy theo bộ cột RỘNG NHẤT (Battle of Stars, 13 cột kể cả HLV + Trường
-      // - Khu vực) — các khối ít cột hơn chỉ dùng phần đầu của bộ này.
+      // Gộp TẤT CẢ bảng vào 1 sheet duy nhất (không tách sheet riêng từng nội
+      // dung×bảng đấu như trước) — mỗi bảng cách nhau vài dòng trống để dễ
+      // cắt/kéo sắp xếp lại tay. Dựng TOÀN BỘ dữ liệu (mảng `blocks`) trước,
+      // CHƯA ghi vào sheet — để đo được độ dài nội dung dài nhất của từng cột
+      // trên khắp mọi khối rồi mới set độ rộng cột (ws.columns dùng CHUNG cho
+      // cả sheet), tránh chữ bị xuống dòng hoặc bảng quá hẹp mất chữ.
       const ws = workbook.addWorksheet('Bảng xếp hạng', {
         views: [{ showGridLines: false }],
         pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
       });
-      ws.columns = [8, 28, 22, 26, 10, 10, 10, 10, 14, 14, 12, 12, 10].map((w) => ({ width: w }));
-      const BLOCK_GAP_ROWS = 2;
-      let currentRow = 1;
-      let blockCount = 0;
+      const blocks = [];
 
       for (const content of allContents) {
         const contentBoards = await api.getBoards(content.id).catch(() => []);
@@ -279,20 +279,27 @@ export default function AdminScoreboard() {
         if (isCombat) {
           [combatTeams, combatMatches] = await Promise.all([api.getTeams(content.id), api.getCombatMatches(content.id)]);
         }
-        // HLV và Trường/Field không có sẵn trong /ranking (measurement) hay
-        // trong dữ liệu tính BXH combat (chỉ có id/name đội) — lấy riêng từ
-        // /teams (đã kèm sẵn coaches.name, schools.name, fields) rồi tra theo
-        // team_id khi dựng từng dòng.
+        // HLV/Trường/Sân thi đấu/Học sinh không có sẵn trong /ranking
+        // (measurement) hay trong dữ liệu tính BXH combat (chỉ có id/name
+        // đội) — lấy riêng từ /teams (đã kèm sẵn coaches.name, schools.name,
+        // fields, student_ids) rồi tra theo team_id khi dựng từng dòng.
         const allTeamsForLookup = isCombat ? combatTeams : await api.getTeams(content.id).catch(() => []);
         const teamInfoById = new Map((allTeamsForLookup || []).map((t) => [t.id, {
           coach: t.coaches?.name || '',
-          schoolArea: [t.schools?.name, (t.fields || []).map((f) => f.name).join(', ')].filter(Boolean).join(' - '),
+          school: t.schools?.name || '',
+          field: (t.fields || []).map((f) => f.name).join(', '),
+          students: (t.student_ids || []).map((sid) => studentNameById.get(sid)).filter(Boolean).join(', '),
         }]));
-        const coachOf = (id) => teamInfoById.get(id)?.coach || '';
-        const schoolAreaOf = (id) => teamInfoById.get(id)?.schoolArea || '';
+        const infoOf = (id) => teamInfoById.get(id) || { coach: '', school: '', field: '', students: '' };
 
         for (const board of contentBoards) {
           let header, columnKinds, dataRows;
+          const IDENTITY_HEADER = ['Hạng', 'Đội', 'HLV', 'Trường', 'Sân thi đấu', 'Học sinh'];
+          const IDENTITY_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
+          const identityRow = (rank, teamName, id) => {
+            const info = infoOf(id);
+            return [rank, teamName, info.coach, info.school, info.field, info.students];
+          };
 
           if (isCombat) {
             const boardTeams = combatTeams.filter((t) => t.board_id === board.id);
@@ -301,23 +308,23 @@ export default function AdminScoreboard() {
               ? computeGroupStandings(boardTeams, combatMatches)
               : computeDroneStandings(boardTeams, combatMatches);
             header = isStars
-              ? ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score', 'Meteor', 'Direct Win', 'Retries']
-              : ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score'];
+              ? [...IDENTITY_HEADER, 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score', 'Meteor', 'Direct Win', 'Retries']
+              : [...IDENTITY_HEADER, 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score'];
             columnKinds = isStars
-              ? ['index', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
-              : ['index', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'number'];
+              ? [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
+              : [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number', 'number'];
             dataRows = standings.map((s) => (isStars
-              ? [s.rank, s.teamName, coachOf(s.teamId), schoolAreaOf(s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
-              : [s.rank, s.teamName, coachOf(s.teamId), schoolAreaOf(s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
+              ? [...identityRow(s.rank, s.teamName, s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
+              : [...identityRow(s.rank, s.teamName, s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
           } else {
             const r = await api.getRanking(content.id, board.id).catch(() => null);
             if (!r) continue;
             if (r.ranking_format === 'measurement') {
               if (!r.teams?.length) continue;
-              header = ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
-              columnKinds = ['index', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number'];
+              header = [...IDENTITY_HEADER, 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
+              columnKinds = [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number'];
               dataRows = r.teams.map((t, idx) => [
-                idx + 1, t.team_name, coachOf(t.team_id), schoolAreaOf(t.team_id),
+                ...identityRow(idx + 1, t.team_name, t.team_id),
                 t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
                 t.total_score, t.total_time, t.total_retry,
               ]);
@@ -325,30 +332,55 @@ export default function AdminScoreboard() {
               // Nhánh đấu loại trực tiếp (ranking_format='combat' cho nội dung
               // đo lường) — chỉ xuất được khi đã đấu xong hết nhánh.
               if (!r.bracket_resolved || !r.placements?.length) continue;
-              header = ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực'];
-              columnKinds = ['index', 'text', 'text', 'text'];
+              header = IDENTITY_HEADER;
+              columnKinds = IDENTITY_KINDS;
               dataRows = r.placements.map((p) => {
                 const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
                   || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || p.team_id;
-                return [p.rank, name, coachOf(p.team_id), schoolAreaOf(p.team_id)];
+                return identityRow(p.rank, name, p.team_id);
               });
             }
           }
 
-          const nextRow = writeStyledBlock(ws, currentRow, {
+          blocks.push({
             title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
             subtitle: `${board.name}${board.age_group ? ` — ${board.age_group}` : ''}`,
             header, columnKinds, rows: dataRows,
           });
-          currentRow = nextRow + BLOCK_GAP_ROWS;
-          blockCount++;
         }
       }
 
-      if (blockCount === 0) {
+      if (blocks.length === 0) {
         showAlert('Chưa có dữ liệu bảng xếp hạng nào để xuất.', 'error');
         return;
       }
+
+      // Độ rộng mỗi cột = độ dài nội dung DÀI NHẤT xuất hiện ở đúng cột đó
+      // (tiêu đề lẫn dữ liệu) trên khắp mọi khối, cộng thêm chút đệm — không
+      // dùng bề rộng cố định vì tên trường/HLV/học sinh dài ngắn rất khác nhau
+      // giữa các đội, cố định sẽ khiến chữ bị xuống dòng hoặc bảng quá hẹp.
+      const colCount = Math.max(...blocks.map((b) => b.header.length));
+      const colMaxLen = new Array(colCount).fill(0);
+      const colKindAt = new Array(colCount).fill(null);
+      for (const b of blocks) {
+        b.header.forEach((h, i) => { colMaxLen[i] = Math.max(colMaxLen[i], String(h).length); });
+        b.rows.forEach((row) => {
+          row.forEach((v, i) => { colMaxLen[i] = Math.max(colMaxLen[i], String(v ?? '').length); });
+        });
+        b.columnKinds.forEach((k, i) => { if (!colKindAt[i]) colKindAt[i] = k; });
+      }
+      ws.columns = colMaxLen.map((len, i) => {
+        const minWidth = colKindAt[i] === 'index' ? 8 : colKindAt[i] === 'number' ? 10 : 10;
+        return { width: Math.max(minWidth, len + 2) };
+      });
+
+      const BLOCK_GAP_ROWS = 2;
+      let currentRow = 1;
+      for (const b of blocks) {
+        const nextRow = writeStyledBlock(ws, currentRow, b);
+        currentRow = nextRow + BLOCK_GAP_ROWS;
+      }
+
       const compName = competitions.find((c) => c.id === selectedComp)?.name || 'bang-xep-hang';
       const slug = compName.replace(/\s+/g, '-').toLowerCase();
       await downloadWorkbook(workbook, `bang-xep-hang-${slug}.xlsx`);

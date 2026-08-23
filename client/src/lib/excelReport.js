@@ -40,8 +40,10 @@ export function safeSheetName(name, used) {
 // khối cách nhau vài dòng trống (xem client/src/pages/admin/AdminScoreboard.jsx,
 // nút "Xuất Excel toàn bộ BXH"). `columnKinds` quyết định canh lề/định dạng số
 // cho từng cột (song song với `header`) — 'index' = số thứ tự (căn giữa, số
-// nguyên); 'text' = văn bản dài (căn trái, tự xuống dòng); 'number' = số liệu
-// (căn giữa); 'label' = văn bản ngắn cần căn giữa, không xuống dòng. `rows` là
+// nguyên); 'text' = văn bản dài (căn trái, tự xuống dòng); 'text-nowrap' =
+// văn bản căn trái nhưng KHÔNG xuống dòng (dùng khi cột đã đủ rộng chứa hết
+// nội dung dài nhất); 'number' = số liệu (căn giữa); 'label' = văn bản ngắn
+// cần căn giữa, không xuống dòng. `rows` là
 // mảng dữ liệu THÔ, KHÔNG kèm dòng tiêu đề. Trả về số dòng NGAY SAU khối này
 // (chưa cộng khoảng cách) để caller tự tính dòng bắt đầu khối tiếp theo.
 export function writeStyledBlock(ws, startRow, { title, subtitle, header, columnKinds, rows }) {
@@ -92,6 +94,8 @@ export function writeStyledBlock(ws, startRow, { title, subtitle, header, column
         if (typeof val === 'number') cell.numFmt = '0.##';
       } else if (kind === 'label') {
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      } else if (kind === 'text-nowrap') {
+        cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: false };
       } else {
         cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
       }
