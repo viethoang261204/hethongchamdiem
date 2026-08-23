@@ -258,13 +258,13 @@ export default function AdminScoreboard() {
       // Gộp TẤT CẢ bảng vào 1 sheet duy nhất (không tách sheet riêng từng
       // nội dung×bảng đấu như trước) — mỗi bảng cách nhau vài dòng trống để
       // dễ cắt/kéo sắp xếp lại tay. Độ rộng cột dùng chung cho cả sheet nên
-      // lấy theo bộ cột RỘNG NHẤT (Battle of Stars, 12 cột kể cả HLV) — các
-      // khối ít cột hơn chỉ dùng phần đầu của bộ này.
+      // lấy theo bộ cột RỘNG NHẤT (Battle of Stars, 13 cột kể cả HLV + Trường
+      // - Khu vực) — các khối ít cột hơn chỉ dùng phần đầu của bộ này.
       const ws = workbook.addWorksheet('Bảng xếp hạng', {
         views: [{ showGridLines: false }],
         pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
       });
-      ws.columns = [8, 28, 22, 10, 10, 10, 10, 14, 14, 12, 12, 10].map((w) => ({ width: w }));
+      ws.columns = [8, 28, 22, 26, 10, 10, 10, 10, 14, 14, 12, 12, 10].map((w) => ({ width: w }));
       const BLOCK_GAP_ROWS = 2;
       let currentRow = 1;
       let blockCount = 0;
@@ -279,11 +279,17 @@ export default function AdminScoreboard() {
         if (isCombat) {
           [combatTeams, combatMatches] = await Promise.all([api.getTeams(content.id), api.getCombatMatches(content.id)]);
         }
-        // Tên HLV không có sẵn trong /ranking (measurement) hay trong dữ liệu
-        // tính BXH combat (chỉ có id/name đội) — lấy riêng từ /teams (đã kèm
-        // sẵn coaches.name) rồi tra theo team_id khi dựng từng dòng.
-        const allTeamsForCoach = isCombat ? combatTeams : await api.getTeams(content.id).catch(() => []);
-        const coachByTeamId = new Map((allTeamsForCoach || []).map((t) => [t.id, t.coaches?.name || '']));
+        // HLV và Trường/Field không có sẵn trong /ranking (measurement) hay
+        // trong dữ liệu tính BXH combat (chỉ có id/name đội) — lấy riêng từ
+        // /teams (đã kèm sẵn coaches.name, schools.name, fields) rồi tra theo
+        // team_id khi dựng từng dòng.
+        const allTeamsForLookup = isCombat ? combatTeams : await api.getTeams(content.id).catch(() => []);
+        const teamInfoById = new Map((allTeamsForLookup || []).map((t) => [t.id, {
+          coach: t.coaches?.name || '',
+          schoolArea: [t.schools?.name, (t.fields || []).map((f) => f.name).join(', ')].filter(Boolean).join(' - '),
+        }]));
+        const coachOf = (id) => teamInfoById.get(id)?.coach || '';
+        const schoolAreaOf = (id) => teamInfoById.get(id)?.schoolArea || '';
 
         for (const board of contentBoards) {
           let header, columnKinds, dataRows;
@@ -295,23 +301,23 @@ export default function AdminScoreboard() {
               ? computeGroupStandings(boardTeams, combatMatches)
               : computeDroneStandings(boardTeams, combatMatches);
             header = isStars
-              ? ['Hạng', 'Đội', 'HLV', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score', 'Meteor', 'Direct Win', 'Retries']
-              : ['Hạng', 'Đội', 'HLV', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score'];
+              ? ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score', 'Meteor', 'Direct Win', 'Retries']
+              : ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score'];
             columnKinds = isStars
-              ? ['index', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
-              : ['index', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'number'];
+              ? ['index', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
+              : ['index', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'number'];
             dataRows = standings.map((s) => (isStars
-              ? [s.rank, s.teamName, coachByTeamId.get(s.teamId) || '', s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
-              : [s.rank, s.teamName, coachByTeamId.get(s.teamId) || '', s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
+              ? [s.rank, s.teamName, coachOf(s.teamId), schoolAreaOf(s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
+              : [s.rank, s.teamName, coachOf(s.teamId), schoolAreaOf(s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
           } else {
             const r = await api.getRanking(content.id, board.id).catch(() => null);
             if (!r) continue;
             if (r.ranking_format === 'measurement') {
               if (!r.teams?.length) continue;
-              header = ['Hạng', 'Đội', 'HLV', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
-              columnKinds = ['index', 'text', 'text', 'number', 'number', 'number', 'number', 'number'];
+              header = ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
+              columnKinds = ['index', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number'];
               dataRows = r.teams.map((t, idx) => [
-                idx + 1, t.team_name, coachByTeamId.get(t.team_id) || '',
+                idx + 1, t.team_name, coachOf(t.team_id), schoolAreaOf(t.team_id),
                 t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
                 t.total_score, t.total_time, t.total_retry,
               ]);
@@ -319,12 +325,12 @@ export default function AdminScoreboard() {
               // Nhánh đấu loại trực tiếp (ranking_format='combat' cho nội dung
               // đo lường) — chỉ xuất được khi đã đấu xong hết nhánh.
               if (!r.bracket_resolved || !r.placements?.length) continue;
-              header = ['Hạng', 'Đội', 'HLV'];
-              columnKinds = ['index', 'text', 'text'];
+              header = ['Hạng', 'Đội', 'HLV', 'Trường - Khu vực'];
+              columnKinds = ['index', 'text', 'text', 'text'];
               dataRows = r.placements.map((p) => {
                 const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
                   || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || p.team_id;
-                return [p.rank, name, coachByTeamId.get(p.team_id) || ''];
+                return [p.rank, name, coachOf(p.team_id), schoolAreaOf(p.team_id)];
               });
             }
           }
