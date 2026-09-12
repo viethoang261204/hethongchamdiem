@@ -119,25 +119,31 @@ export default function AdminScores() {
     setErrors({});
   };
 
-  const openEdit = (s) => {
+  const openEdit = async (s) => {
     setModal({ id: s.id });
+    setErrors({});
+    // Danh sách không mang theo ảnh chữ ký (để tải nhanh) — lấy lại phiếu đầy đủ
+    // trước khi cho sửa, tránh việc lưu đè mất ảnh chữ ký đã có.
+    let full = s;
+    try {
+      full = await api.getScore(s.id);
+    } catch (_) { /* fallback dùng dữ liệu từ danh sách */ }
     setForm({
-      team_id: s.team_id,
-      contest_content_id: s.contest_content_id,
-      board_id: s.boards?.id || '',
-      referee_id: s.referee_id || null,
-      round: s.round || 1,
-      score: s.score ?? 0,
-      time: s.time || '',
-      notes: s.notes || '',
-      criteria_scores: s.criteria_scores || {},
-      arena_entry_time: s.arena_entry_time || '',
-      head_referee_name: s.head_referee_name || '',
-      scorekeeper_name: s.scorekeeper_name || '',
-      objection: s.objection || '',
+      team_id: full.team_id,
+      contest_content_id: full.contest_content_id,
+      board_id: full.boards?.id || '',
+      referee_id: full.referee_id || null,
+      round: full.round || 1,
+      score: full.score ?? 0,
+      time: full.time || '',
+      notes: full.notes || '',
+      criteria_scores: full.criteria_scores || {},
+      arena_entry_time: full.arena_entry_time || '',
+      head_referee_name: full.head_referee_name || '',
+      scorekeeper_name: full.scorekeeper_name || '',
+      objection: full.objection || '',
       reviewerSignature: '',
     });
-    setErrors({});
   };
 
   const validate = () => {
