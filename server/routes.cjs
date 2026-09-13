@@ -766,8 +766,9 @@ router.get('/students/:studentId/scores', requireAuth, h(async (req, res) => {
 // Chữ ký (refereeSignatureImage/studentSignatureImage) trong criteria_scores
 // là ảnh base64 PNG, có thể nặng 100-200KB/phiếu — với vài trăm phiếu, response
 // danh sách phình lên hàng chục MB khiến trang "Quản lý phiếu điểm" tải rất
-// chậm/treo. Danh sách không hiển thị ảnh chữ ký nên lược bỏ 2 field này,
-// chỉ trả đầy đủ khi xem/sửa 1 phiếu qua GET /scores/:id.
+// chậm/treo. Chỉ lược bỏ 2 field này khi trả về DANH SÁCH LỚN (không lọc
+// theo teamId) — trang chi tiết/Score Sheet gộp 2 lượt lọc theo teamId chỉ
+// trả 1-2 dòng nên giữ nguyên ảnh, tránh mất chữ ký khi xem/xuất PDF.
 function stripSignatureImages(row) {
   const cs = row.criteria_scores;
   if (!cs || (!cs.refereeSignatureImage && !cs.studentSignatureImage)) return row;
@@ -784,7 +785,7 @@ router.get('/scores', h(async (req, res) => {
   if (req.query.teamId) add('s.team_id = ?', req.query.teamId);
   const where = cond.length ? `where ${cond.join(' and ')}` : '';
   const { rows } = await query(`${SCORE_NESTED} ${where} order by s.submitted_at desc`, vals);
-  res.json(rows.map(stripSignatureImages));
+  res.json(req.query.teamId ? rows : rows.map(stripSignatureImages));
 }));
 
 router.get('/scores/:id', h(async (req, res) => {
