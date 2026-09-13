@@ -532,23 +532,24 @@ export const api = {
   // ============================================================
   // Field (khu vực/trạm thi đấu)
   // ============================================================
-  getFields: () => withRetry(() => request('/fields'), 'getFields'),
+  getFields: (competitionId) => withRetry(() => request(`/fields${competitionId ? `?competitionId=${encodeURIComponent(competitionId)}` : ''}`), 'getFields'),
 
   postField: (body) => withRetry(() => request('/fields', {
     method: 'POST',
-    body: { name: body.name, notes: body.notes ?? null },
+    body: { name: body.name, notes: body.notes ?? null, competition_id: body.competition_id ?? body.competitionId },
   }), 'postField'),
 
   putField: (id, body) => {
     const update = {};
     if (body.name !== undefined) update.name = body.name;
     if (body.notes !== undefined) update.notes = body.notes;
+    if (body.competition_id !== undefined || body.competitionId !== undefined) update.competition_id = body.competition_id ?? body.competitionId;
     return withRetry(() => request(`/fields/${id}`, { method: 'PUT', body: update }), 'putField');
   },
 
   deleteField: (id) => withRetry(() => request(`/fields/${id}`, { method: 'DELETE' }), 'deleteField'),
 
-  importFields: (rows) => withRetry(() => request('/fields/import', { method: 'POST', body: rows }), 'importFields'),
+  importFields: (rows, competitionId) => withRetry(() => request('/fields/import', { method: 'POST', body: { rows, competitionId } }), 'importFields'),
 
   // ============================================================
   // Báo cáo

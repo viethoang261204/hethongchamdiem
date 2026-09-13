@@ -183,6 +183,13 @@ export default function AdminTeams() {
     return schoolFiltered.filter(t => t.fields?.some(f => f.id === filterField));
   }, [schoolFiltered, filterField]);
 
+  // Field gắn theo cuộc thi — form thêm/sửa đội chỉ hiện field của đúng
+  // cuộc thi đang chọn, tránh gán nhầm field của cuộc thi khác.
+  const fieldsForForm = useMemo(
+    () => fields.filter(f => !form.competitionId || f.competition_id === form.competitionId),
+    [fields, form.competitionId]
+  );
+
   const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
 
   const studentsFiltered = useMemo(() => {
@@ -564,11 +571,11 @@ export default function AdminTeams() {
               </div>
               <div className="form-group">
                 <label className="form-label">Field <span style={{ fontWeight: 400, color: '#94a3b8' }}>(chọn nhiều nếu đội thi ở nhiều field)</span></label>
-                {fields.length === 0 ? (
-                  <p style={{ color: '#888', fontSize: 13 }}>Chưa có field nào — tạo ở mục "Field".</p>
+                {fieldsForForm.length === 0 ? (
+                  <p style={{ color: '#888', fontSize: 13 }}>Chưa có field nào cho cuộc thi này — tạo ở mục "Field".</p>
                 ) : (
                   <div className="checkbox-list">
-                    {fields.map(f => (
+                    {fieldsForForm.map(f => (
                       <label key={f.id}>
                         <input
                           type="checkbox"

@@ -419,6 +419,16 @@ insert into team_fields (team_id, field_id)
 select id, field_id from teams where field_id is not null
 on conflict do nothing;
 
+-- Field gắn theo từng cuộc thi — trước đây là danh mục dùng chung toàn hệ
+-- thống, gây lẫn field giữa các cuộc thi khác nhau khi có ≥ 2 cuộc thi cùng
+-- lúc. Backfill: field cũ (chưa gắn cuộc thi) gán về cuộc thi duy nhất đang
+-- có dữ liệu tại thời điểm thêm cột này.
+alter table fields add column if not exists competition_id uuid references competitions(id) on delete cascade;
+update fields set competition_id = (select id from competitions order by created_at limit 1)
+  where competition_id is null;
+alter table fields alter column competition_id set not null;
+create index if not exists idx_fields_competition on fields(competition_id);
+
 -- Phân loại phương thức chấm ở cấp NỘI DUNG (khác content_boards.ranking_format
 -- vốn ở cấp content×board, dùng cho nhánh loại trực tiếp generic) —
 -- 'scoring' = chấm điểm bình thường (mặc định) · 'combat_drone' = Fly Smart Cup

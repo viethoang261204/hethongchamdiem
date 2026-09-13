@@ -18,6 +18,8 @@ export default function AdminRefereeAccounts() {
   const { showConfirm, showAlert } = useNotify();
   const { user } = useAuth();
   const { data, loading, error, reload, setData } = useApiLoader(() => api.getUsers('referee'), []);
+  const { data: competitionsData } = useApiLoader(() => api.getCompetitions(), []);
+  const competitions = competitionsData || [];
   const { data: contentsData } = useApiLoader(() => api.getAllContents(), []);
   const allContents = contentsData || [];
   const { data: fieldsData } = useApiLoader(() => api.getFields(), []);
@@ -48,8 +50,14 @@ export default function AdminRefereeAccounts() {
   // tick đã chọn mà không hề có cảnh báo (dễ khiến admin tưởng đã lưu).
   const snapshotOf = (set) => [...set].sort().join(',');
 
+  // Ma trận Nội dung × Field gộp TẤT CẢ cuộc thi vào 1 bảng sẽ rất rối khi hệ
+  // thống có ≥ 2 cuộc thi cùng lúc — cho chọn 1 cuộc thi để thu hẹp trước khi
+  // tick. Mặc định chọn cuộc thi duy nhất/đầu tiên nếu chỉ có 1.
+  const [permCompFilter, setPermCompFilter] = useState('');
+
   const openPerms = async (u) => {
     setPermModal({ user: u, selected: new Set(), saved: '', loading: true, saving: false });
+    setPermCompFilter((prev) => prev || competitions[0]?.id || '');
     try {
       const items = await api.getUserPermissions(u.id);
       const selected = new Set(items.map((it) => permKey(it.contest_content_id, it.field_id)));
@@ -59,6 +67,15 @@ export default function AdminRefereeAccounts() {
       setPermModal(null);
     }
   };
+
+  const contentsForPermModal = useMemo(
+    () => allContents.filter((c) => !permCompFilter || c.competition_id === permCompFilter),
+    [allContents, permCompFilter]
+  );
+  const fieldsForPermModal = useMemo(
+    () => allFields.filter((f) => !permCompFilter || f.competition_id === permCompFilter),
+    [allFields, permCompFilter]
+  );
 
   const closePermModal = async () => {
     if (permModal.saving) return;
@@ -84,7 +101,7 @@ export default function AdminRefereeAccounts() {
   const toggleAllFieldsForContent = (contentId, allChecked) => {
     setPermModal((m) => {
       const selected = new Set(m.selected);
-      for (const f of allFields) {
+      for (const f of fieldsForPermModal) {
         const key = permKey(contentId, f.id);
         if (allChecked) selected.delete(key); else selected.add(key);
       }
@@ -426,22 +443,33 @@ export default function AdminRefereeAccounts() {
               <p style={{ marginBottom: 16, color: '#374151' }}>
                 Đánh dấu ô (Nội dung, Field) mà trọng tài này được phép chấm điểm/ghi kết quả. Nếu 1 Nội dung không có ô nào được đánh dấu, trọng tài sẽ thấy và chấm được <strong>tất cả</strong> Field của nội dung đó (chưa giới hạn).
               </p>
+              <div className="form-group">
+                <label className="form-label">Cuộc thi</label>
+                <select
+                  className="form-input form-select"
+                  value={permCompFilter}
+                  onChange={(e) => setPermCompFilter(e.target.value)}
+                >
+                  <option value="">-- Tất cả cuộc thi --</option>
+                  {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
               {permModal.loading ? (
                 <p style={{ textAlign: 'center', padding: 24 }}>Đang tải...</p>
-              ) : allContents.length === 0 || allFields.length === 0 ? (
-                <p style={{ color: '#888' }}>Cần có ít nhất 1 Nội dung thi và 1 Field trong hệ thống trước.</p>
+              ) : contentsForPermModal.length === 0 || fieldsForPermModal.length === 0 ? (
+                <p style={{ color: '#888' }}>Cuộc thi này chưa có Nội dung thi và Field nào.</p>
               ) : (
                 <div className="table-container" style={{ maxHeight: 420, overflowY: 'auto' }}>
                   <table>
                     <thead>
                       <tr>
                         <th>Nội dung</th>
-                        {allFields.map((f) => <th key={f.id} style={{ textAlign: 'center' }}>{f.name}</th>)}
+                        {fieldsForPermModal.map((f) => <th key={f.id} style={{ textAlign: 'center' }}>{f.name}</th>)}
                       </tr>
                     </thead>
                     <tbody>
-                      {allContents.map((c) => {
-                        const allChecked = allFields.every((f) => permModal.selected.has(permKey(c.id, f.id)));
+                      {contentsForPermModal.map((c) => {
+                        const allChecked = fieldsForPermModal.every((f) => permModal.selected.has(permKey(c.id, f.id)));
                         return (
                           <tr key={c.id}>
                             <td>
@@ -450,7 +478,7 @@ export default function AdminRefereeAccounts() {
                                 {c.name}
                               </label>
                             </td>
-                            {allFields.map((f) => (
+                            {fieldsForPermModal.map((f) => (
                               <td key={f.id} style={{ textAlign: 'center' }}>
                                 <input
                                   type="checkbox"

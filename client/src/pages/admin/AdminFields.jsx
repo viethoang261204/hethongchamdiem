@@ -15,8 +15,17 @@ const IMPORT_COLUMNS = [
 
 export default function AdminFields() {
   const { showConfirm, showAlert } = useNotify();
-  const { data, loading, error, reload, setData } = useApiLoader(() => api.getFields(), []);
-  const list = data || [];
+  const { data, loading, error, reload } = useApiLoader(() => api.getCompetitions(), []);
+  const competitions = data || [];
+  const [filterComp, setFilterComp] = useState('');
+
+  // Field gắn theo cuộc thi — chỉ tải/hiện field của cuộc thi đang chọn.
+  const { data: fieldsData, loading: fieldsLoading, error: fieldsError, reload: reloadFields } = useApiLoader(
+    () => (filterComp ? api.getFields(filterComp) : Promise.resolve([])),
+    [filterComp]
+  );
+  const list = fieldsData || [];
+
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -53,9 +62,7 @@ export default function AdminFields() {
   };
 
   const reloadList = async () => {
-    setData(null);
-    const updated = await api.getFields();
-    setData(updated);
+    await reloadFields();
     clearApiCache('getFields');
   };
 
@@ -65,7 +72,7 @@ export default function AdminFields() {
       return;
     }
     try {
-      const body = { name: form.name.trim(), notes: form.notes.trim() || null };
+      const body = { name: form.name.trim(), notes: form.notes.trim() || null, competition_id: filterComp };
       if (modal === 'add') await api.postField(body);
       else await api.putField(modal.id, body);
       setModal(null);
@@ -103,48 +110,59 @@ export default function AdminFields() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Field (Khu vực thi đấu)</h1>
-          <p className="page-subtitle">Tổng số: {filtered.length} Field</p>
+          <p className="page-subtitle">{filterComp ? `Tổng số: ${filtered.length} Field` : 'Chọn cuộc thi để xem/quản lý Field'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
-          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm Field</button>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)} disabled={!filterComp}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd} disabled={!filterComp}>Thêm Field</button>
         </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
+      {fieldsError && <ErrorBox error={fieldsError} onRetry={reloadFields} />}
       <div className="filters-bar">
+        <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
+          <option value="">-- Chọn cuộc thi --</option>
+          {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <div className="search-box">
-          <input type="text" placeholder="Tìm theo tên Field..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input type="text" placeholder="Tìm theo tên Field..." value={search} onChange={(e) => setSearch(e.target.value)} disabled={!filterComp} />
         </div>
       </div>
       <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Tên Field</th>
-                <th>Ghi chú</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có Field nào.</td></tr>
-              ) : pageItems.map((f) => (
-                <tr key={f.id}>
-                  <td style={{ fontWeight: 600 }}>{f.name}</td>
-                  <td style={{ fontSize: 13, color: '#64748b' }}>{f.notes || '-'}</td>
-                  <td>
-                    <button type="button" className="btn btn-secondary" onClick={() => openEdit(f)}>Sửa</button>
-                    <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(f.id)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+        {!filterComp ? (
+          <p style={{ padding: 24, textAlign: 'center', color: '#888' }}>Chọn cuộc thi ở trên để xem danh sách Field.</p>
+        ) : (
+          <>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tên Field</th>
+                    <th>Ghi chú</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fieldsLoading ? (
+                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                  ) : filtered.length === 0 ? (
+                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có Field nào.</td></tr>
+                  ) : pageItems.map((f) => (
+                    <tr key={f.id}>
+                      <td style={{ fontWeight: 600 }}>{f.name}</td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{f.notes || '-'}</td>
+                      <td>
+                        <button type="button" className="btn btn-secondary" onClick={() => openEdit(f)}>Sửa</button>
+                        <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(f.id)}>Xóa</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+          </>
+        )}
       </div>
 
       {modal && (
@@ -212,7 +230,7 @@ export default function AdminFields() {
           title="Nhập Field từ Excel"
           columns={IMPORT_COLUMNS}
           templateFilename="mau-field.xlsx"
-          onImport={(rows) => api.importFields(rows)}
+          onImport={(rows) => api.importFields(rows, filterComp)}
           onDone={reloadList}
           onClose={() => setImportOpen(false)}
         />

@@ -641,6 +641,23 @@ async function resolveOrCreateByName(table, name) {
   return created[0].id;
 }
 
+// Field giờ gắn theo cuộc thi (competition_id not null) — resolve/tạo mới
+// phải scope theo cuộc thi, khác resolveOrCreateByName dùng cho HLV (vẫn
+// dùng chung toàn hệ thống).
+async function resolveOrCreateFieldByName(name, competitionId) {
+  if (!name) return null;
+  const { rows: existing } = await query(
+    'select id from fields where lower(name) = lower($1) and competition_id = $2 limit 1',
+    [name, competitionId]
+  );
+  if (existing[0]) return existing[0].id;
+  const { rows: created } = await query(
+    'insert into fields (name, competition_id) values ($1, $2) returning id',
+    [name, competitionId]
+  );
+  return created[0].id;
+}
+
 // Nhập đội thi hàng loạt từ Excel — "Tên nội dung thi" phải khớp nội dung đã
 // có (không tự tạo); "Bảng đấu" phải khớp 1 trong 5 bảng cố định A-E (không
 // tự tạo); Trường/HLV/Field tự tạo nếu gõ tên chưa có. KHÔNG gán học sinh
@@ -654,6 +671,8 @@ router.post('/teams/import', requireAdmin, h(async (req, res) => {
       throw new Error('Khu vực phải là bac, trung hoặc nam.');
     }
     const contentId = await resolveContentByName(row.content_name);
+    const { rows: contentRow } = await query('select competition_id from contest_contents where id = $1', [contentId]);
+    const competitionId = contentRow[0].competition_id;
 
     let boardId = null;
     if (row.board_name) {
@@ -674,7 +693,7 @@ router.post('/teams/import', requireAdmin, h(async (req, res) => {
     // chưa có, giống resolveOrCreateByName đang dùng cho HLV.
     const fieldNames = String(row.field_names || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean);
     const fieldIds = [];
-    for (const fname of fieldNames) fieldIds.push(await resolveOrCreateByName('fields', fname));
+    for (const fname of fieldNames) fieldIds.push(await resolveOrCreateFieldByName(fname, competitionId));
 
     const { rows: created } = await query(
       `insert into teams (contest_content_id, name, school_id, board_id, coach_id, region)
@@ -1563,22 +1582,27 @@ router.delete('/outstanding-coaches/:id', requireAdmin, h(async (req, res) => {
 // ============================================================
 // Field (khu vực/trạm thi đấu vật lý) — gán theo đội
 // ============================================================
-router.get('/fields', h(async (_req, res) => {
-  const { rows } = await query('select * from fields order by name');
+router.get('/fields', h(async (req, res) => {
+  const cond = [];
+  const vals = [];
+  if (req.query.competitionId) { vals.push(req.query.competitionId); cond.push(`competition_id = $${vals.length}`); }
+  const where = cond.length ? `where ${cond.join(' and ')}` : '';
+  const { rows } = await query(`select * from fields ${where} order by name`, vals);
   res.json(rows);
 }));
 
 router.post('/fields', requireAdmin, h(async (req, res) => {
-  const b = pick(req.body, ['name', 'notes']);
+  const b = pick(req.body, ['name', 'notes', 'competition_id']);
+  if (!b.competition_id) return res.status(400).json({ error: 'Thiếu cuộc thi.' });
   const { rows } = await query(
-    'insert into fields (name, notes) values ($1, $2) returning *',
-    [b.name, b.notes ?? null]
+    'insert into fields (name, notes, competition_id) values ($1, $2, $3) returning *',
+    [b.name, b.notes ?? null, b.competition_id]
   );
   res.json(rows[0]);
 }));
 
 router.put('/fields/:id', requireAdmin, h(async (req, res) => {
-  const data = pick(req.body, ['name', 'notes']);
+  const data = pick(req.body, ['name', 'notes', 'competition_id']);
   const q = buildUpdate('fields', req.params.id, data);
   if (!q) return res.json({});
   const { rows } = await query(q.text, q.values);
@@ -1590,14 +1614,20 @@ router.delete('/fields/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Nhập hàng loạt từ Excel — bỏ qua trùng tên
+// Nhập hàng loạt từ Excel — bỏ qua trùng tên trong CÙNG 1 cuộc thi (khác
+// cuộc thi được phép trùng tên field, vd cả 2 giải đều có "S01")
 router.post('/fields/import', requireAdmin, h(async (req, res) => {
   const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const competitionId = req.body.competitionId || req.query.competitionId;
+  if (!competitionId) return res.status(400).json({ error: 'Thiếu cuộc thi.' });
   const result = await bulkImport(rows, async (row) => {
     if (!row.name) throw new Error('Thiếu Tên Field.');
-    const { rows: dup } = await query('select 1 from fields where lower(name) = lower($1) limit 1', [row.name]);
+    const { rows: dup } = await query(
+      'select 1 from fields where lower(name) = lower($1) and competition_id = $2 limit 1',
+      [row.name, competitionId]
+    );
     if (dup[0]) return { skipped: true };
-    await query('insert into fields (name, notes) values ($1, $2)', [row.name, row.notes || null]);
+    await query('insert into fields (name, notes, competition_id) values ($1, $2, $3)', [row.name, row.notes || null, competitionId]);
     return {};
   });
   res.json(result);

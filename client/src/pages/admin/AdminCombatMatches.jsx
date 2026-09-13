@@ -107,6 +107,12 @@ export default function AdminCombatMatches() {
     () => combatContents.filter((c) => !selectedComp || c.competition_id === selectedComp),
     [combatContents, selectedComp]
   );
+  // Field giờ gắn theo cuộc thi — chỉ cho chọn/tự động xếp sân trong phạm vi
+  // cuộc thi đang chọn, tránh lẫn sân giữa các cuộc thi khác nhau.
+  const fieldsForComp = useMemo(
+    () => allFields.filter((f) => !selectedComp || f.competition_id === selectedComp),
+    [allFields, selectedComp]
+  );
 
   const { data: cdata, loading: cLoading, error: cError, reload: cReload, setData: setCData } = useApiLoader(async () => {
     if (!selectedContentId) return null;
@@ -613,9 +619,9 @@ export default function AdminCombatMatches() {
       bumpTeamField(m.team_b_id, m.field_id);
     }
     const pickField = (teamA, teamB) => {
-      if (!allFields.length) return null;
+      if (!fieldsForComp.length) return null;
       const candidateIds = new Set([...(teamA?.fields || []), ...(teamB?.fields || [])].map((f) => f.id));
-      const candidates = candidateIds.size ? allFields.filter((f) => candidateIds.has(f.id)) : allFields;
+      const candidates = candidateIds.size ? fieldsForComp.filter((f) => candidateIds.has(f.id)) : fieldsForComp;
       let best = candidates[0], bestScore = Infinity;
       for (const f of candidates) {
         const teamScore = (teamFieldUsage.get(`${teamA?.id}:${f.id}`) || 0) + (teamFieldUsage.get(`${teamB?.id}:${f.id}`) || 0);
@@ -677,9 +683,9 @@ export default function AdminCombatMatches() {
       bumpTeamField(m.team_b_id, m.field_id);
     }
     const pickField = (teamA, teamB) => {
-      if (!allFields.length) return null;
+      if (!fieldsForComp.length) return null;
       const candidateIds = new Set([...(teamA?.fields || []), ...(teamB?.fields || [])].map((f) => f.id));
-      const candidates = candidateIds.size ? allFields.filter((f) => candidateIds.has(f.id)) : allFields;
+      const candidates = candidateIds.size ? fieldsForComp.filter((f) => candidateIds.has(f.id)) : fieldsForComp;
       let best = candidates[0], bestScore = Infinity;
       for (const f of candidates) {
         const teamScore = (teamFieldUsage.get(`${teamA?.id}:${f.id}`) || 0) + (teamFieldUsage.get(`${teamB?.id}:${f.id}`) || 0);
@@ -1323,7 +1329,7 @@ export default function AdminCombatMatches() {
                 <label className="form-label">Sân thi đấu (Field)</label>
                 <select className="form-input form-select" value={form.field_id} onChange={(e) => setForm({ ...form, field_id: e.target.value })}>
                   <option value="">-- Chưa chọn --</option>
-                  {allFields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  {fieldsForComp.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
               <div className="form-row">
