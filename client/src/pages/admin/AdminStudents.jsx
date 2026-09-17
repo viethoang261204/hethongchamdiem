@@ -53,29 +53,15 @@ export default function AdminStudents() {
     }
     return ids;
   }, [teams, allContents, filterComp]);
-  // Map cuộc thi -> tập id trường có đội thi ở cuộc thi đó (dùng để lọc dropdown
-  // trường khi thêm học sinh, tránh hiện tất cả trường của mọi cuộc thi)
-  const schoolIdsByComp = useMemo(() => {
-    const contentToComp = new Map(allContents.map(c => [c.id, c.competition_id]));
-    const map = new Map();
-    for (const t of teams) {
-      if (!t.school_id) continue;
-      const compId = contentToComp.get(t.contest_content_id);
-      if (!compId) continue;
-      if (!map.has(compId)) map.set(compId, new Set());
-      map.get(compId).add(t.school_id);
-    }
-    return map;
-  }, [teams, allContents]);
-
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '', competitionId: '' });
 
+  // Trường giờ gắn theo cuộc thi (schools.competition_id) — dropdown Trường
+  // khi thêm học sinh chỉ hiện trường của đúng cuộc thi đang chọn.
   const schoolOptionsForForm = useMemo(() => {
     if (!form.competitionId) return schools;
-    const ids = schoolIdsByComp.get(form.competitionId);
-    return schools.filter(s => ids?.has(s.id));
-  }, [schools, form.competitionId, schoolIdsByComp]);
+    return schools.filter(s => s.competition_id === form.competitionId);
+  }, [schools, form.competitionId]);
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [importOpen, setImportOpen] = useState(false);

@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
-import { createCachedApi, clearApiCache } from '../../apiCache';
+import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
-
-const capi = createCachedApi(api);
 
 const IMPORT_COLUMNS = [
   { key: 'name', label: 'Tên trường/trung tâm', required: true, example: 'THPT Chuyên Lê Hồng Phong' },
@@ -18,22 +16,19 @@ const IMPORT_COLUMNS = [
 
 export default function AdminSchools() {
   const { showConfirm, showAlert } = useNotify();
-  const { data, loading, error, reload, setData } = useApiLoader(async () => {
-    const [schools, comps, allContents, teams] = await Promise.all([
-      api.getSchools(),
-      capi.getCompetitions(),
-      capi.getAllContents(),
-      capi.getAllTeams(),
-    ]);
-    return { schools, competitions: comps, allContents, teams };
-  }, []);
-  const list = data?.schools || [];
-  const competitions = data?.competitions || [];
-  const allContents = data?.allContents || [];
-  const teams = data?.teams || [];
+  const { data, loading, error, reload } = useApiLoader(() => api.getCompetitions(), []);
+  const competitions = data || [];
+  const [filterComp, setFilterComp] = useState('');
+
+  // Trường gắn theo cuộc thi — chỉ tải/hiện trường của cuộc thi đang chọn.
+  const { data: schoolsData, loading: schoolsLoading, error: schoolsError, reload: reloadSchools } = useApiLoader(
+    () => (filterComp ? api.getSchools({ competitionId: filterComp }) : Promise.resolve([])),
+    [filterComp]
+  );
+  const list = schoolsData || [];
+
   const [search, setSearch] = useState('');
   const [filterProvince, setFilterProvince] = useState('');
-  const [filterComp, setFilterComp] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', province: '', district: '' });
@@ -41,16 +36,8 @@ export default function AdminSchools() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const SECURITY_CODE = '26122004';
 
-  // Trường/trung tâm có đội thi đấu trong cuộc thi đang chọn (qua contest_content_id)
-  const schoolIdsInComp = useMemo(() => {
-    if (!filterComp) return null;
-    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
-    return new Set(teams.filter(t => contentIds.has(t.contest_content_id) && t.school_id).map(t => t.school_id));
-  }, [teams, allContents, filterComp]);
-
   const filtered = useMemo(() => {
     let l = list;
-    if (schoolIdsInComp) l = l.filter(x => schoolIdsInComp.has(x.id));
     if (search.trim()) {
       const s = search.toLowerCase().trim();
       l = l.filter(x =>
@@ -61,7 +48,7 @@ export default function AdminSchools() {
     }
     if (filterProvince) l = l.filter(x => (x.province || '') === filterProvince);
     return l;
-  }, [list, search, filterProvince, schoolIdsInComp]);
+  }, [list, search, filterProvince]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
@@ -73,9 +60,8 @@ export default function AdminSchools() {
   // Trang khác (Học sinh, Đội thi...) đọc danh sách trường qua cache
   // (capi.getSchools) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
   const refreshSchools = async () => {
+    await reloadSchools();
     clearApiCache('getSchools');
-    const updated = await api.getSchools();
-    setData((prev) => (prev ? { ...prev, schools: updated } : prev));
   };
 
   const openAdd = () => {
@@ -112,6 +98,7 @@ export default function AdminSchools() {
           name: form.name.trim(),
           province: form.province.trim(),
           district: form.district.trim(),
+          competition_id: filterComp,
         });
       } else {
         await api.putSchool(modal.id, {
@@ -155,58 +142,65 @@ export default function AdminSchools() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Quản lý các trường - trung tâm</h1>
-          <p className="page-subtitle">Tổng số: {filtered.length} trường</p>
+          <p className="page-subtitle">{filterComp ? `Tổng số: ${filtered.length} trường` : 'Chọn cuộc thi để xem/quản lý trường'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
-          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trường/trung tâm</button>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)} disabled={!filterComp}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd} disabled={!filterComp}>Thêm trường/trung tâm</button>
         </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
+      {schoolsError && <ErrorBox error={schoolsError} onRetry={reloadSchools} />}
       <div className="filters-bar">
-        <div className="search-box">
-          <input type="text" placeholder="Tìm theo tên, tỉnh, quận..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
         <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
-          <option value="">Tất cả cuộc thi</option>
+          <option value="">-- Chọn cuộc thi --</option>
           {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select className="filter-select" value={filterProvince} onChange={(e) => setFilterProvince(e.target.value)}>
+        <div className="search-box">
+          <input type="text" placeholder="Tìm theo tên, tỉnh, quận..." value={search} onChange={(e) => setSearch(e.target.value)} disabled={!filterComp} />
+        </div>
+        <select className="filter-select" value={filterProvince} onChange={(e) => setFilterProvince(e.target.value)} disabled={!filterComp}>
           <option value="">Tất cả tỉnh/TP</option>
           {provinces.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
       <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Tên trường/trung tâm</th>
-                <th>Tỉnh/TP</th>
-                <th>Quận/Huyện</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
-              ) : pageItems.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.name}</td>
-                  <td>{s.province || '-'}</td>
-                  <td>{s.district || '-'}</td>
-                  <td>
-                    <button type="button" className="btn btn-secondary" onClick={() => openEdit(s)}>Sửa</button>
-                    <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(s.id)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+        {!filterComp ? (
+          <p style={{ padding: 24, textAlign: 'center', color: '#888' }}>Chọn cuộc thi ở trên để xem danh sách trường/trung tâm.</p>
+        ) : (
+          <>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tên trường/trung tâm</th>
+                    <th>Tỉnh/TP</th>
+                    <th>Quận/Huyện</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schoolsLoading ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                  ) : filtered.length === 0 ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td></tr>
+                  ) : pageItems.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.name}</td>
+                      <td>{s.province || '-'}</td>
+                      <td>{s.district || '-'}</td>
+                      <td>
+                        <button type="button" className="btn btn-secondary" onClick={() => openEdit(s)}>Sửa</button>
+                        <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(s.id)}>Xóa</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+          </>
+        )}
       </div>
 
       {modal && (
@@ -290,7 +284,7 @@ export default function AdminSchools() {
           title="Nhập trường/trung tâm từ Excel"
           columns={IMPORT_COLUMNS}
           templateFilename="mau-truong-hoc.xlsx"
-          onImport={(rows) => api.importSchools(rows)}
+          onImport={(rows) => api.importSchools(rows, filterComp)}
           onDone={refreshSchools}
           onClose={() => setImportOpen(false)}
         />

@@ -190,6 +190,12 @@ export default function AdminTeams() {
     [fields, form.competitionId]
   );
 
+  // Trường gắn theo cuộc thi — cùng lý do với Field ở trên.
+  const schoolsForForm = useMemo(
+    () => schools.filter(s => !form.competitionId || s.competition_id === form.competitionId),
+    [schools, form.competitionId]
+  );
+
   const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
 
   const studentsFiltered = useMemo(() => {
@@ -260,11 +266,11 @@ export default function AdminTeams() {
       let schoolId = null;
       const schoolName = studentForm.school.trim();
       if (schoolName) {
-        const existing = schools.find(s => s.name === schoolName);
+        const existing = schoolsForForm.find(s => s.name === schoolName);
         if (existing) {
           schoolId = existing.id;
         } else {
-          const created = await api.postSchool({ name: schoolName });
+          const created = await api.postSchool({ name: schoolName, competition_id: form.competitionId });
           schoolId = created.id;
           setSchools((prev) => [created, ...prev]);
           clearApiCache();
@@ -309,6 +315,7 @@ export default function AdminTeams() {
         name: schoolForm.name.trim(),
         province: schoolForm.province.trim(),
         district: schoolForm.district.trim(),
+        competition_id: form.competitionId,
       });
       setSchools((prev) => [created, ...prev]);
       setForm((prev) => ({ ...prev, schoolId: created.id }));
@@ -605,11 +612,12 @@ export default function AdminTeams() {
                     className={`form-input form-select ${errors.schoolId ? 'form-input-error' : ''}`}
                     value={form.schoolId}
                     onChange={(e) => { setForm({ ...form, schoolId: e.target.value }); setErrors({ ...errors, schoolId: '' }); }}
+                    disabled={!form.competitionId}
                   >
                     <option value="">-- Chọn trường/trung tâm --</option>
-                    {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {schoolsForForm.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
-                  <button type="button" className="btn btn-secondary" onClick={openAddSchool} title="Thêm trường/trung tâm">+</button>
+                  <button type="button" className="btn btn-secondary" onClick={openAddSchool} disabled={!form.competitionId} title={!form.competitionId ? 'Chọn cuộc thi trước' : 'Thêm trường/trung tâm'}>+</button>
                 </div>
                 {errors.schoolId && <div className="form-error-text">{errors.schoolId}</div>}
                 <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>

@@ -87,6 +87,7 @@ router.get('/schools', h(async (req, res) => {
   const cond = [];
   const vals = [];
   const add = (sql, v) => { vals.push(v); cond.push(sql.replace('?', `$${vals.length}`)); };
+  if (req.query.competitionId) add('competition_id = ?', req.query.competitionId);
   if (req.query.query) add('name ilike ?', `%${req.query.query}%`);
   if (req.query.level) add('level = ?', req.query.level);
   if (req.query.province) add('province ilike ?', `%${req.query.province}%`);
@@ -97,11 +98,12 @@ router.get('/schools', h(async (req, res) => {
 }));
 
 router.post('/schools', requireAdmin, h(async (req, res) => {
-  const data = pick(req.body, ['name', 'province', 'district', 'source']);
+  const data = pick(req.body, ['name', 'province', 'district', 'source', 'competition_id']);
+  if (!data.competition_id) return res.status(400).json({ error: 'Thiếu cuộc thi.' });
   const { rows } = await query(
-    `insert into schools (name, province, district, source)
-     values ($1, $2, $3, coalesce($4, 'manual')) returning *`,
-    [data.name, data.province ?? null, data.district ?? null, data.source ?? null]
+    `insert into schools (name, province, district, source, competition_id)
+     values ($1, $2, $3, coalesce($4, 'manual'), $5) returning *`,
+    [data.name, data.province ?? null, data.district ?? null, data.source ?? null, data.competition_id]
   );
   res.json(rows[0]);
 }));
@@ -119,16 +121,19 @@ router.delete('/schools/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Nhập hàng loạt từ Excel — bỏ qua trùng tên nhờ unique constraint sẵn có
+// Nhập hàng loạt từ Excel — bỏ qua trùng tên (trong cùng cuộc thi) nhờ
+// unique constraint (name, competition_id) sẵn có
 router.post('/schools/import', requireAdmin, h(async (req, res) => {
   const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const competitionId = req.body.competitionId || req.query.competitionId;
+  if (!competitionId) return res.status(400).json({ error: 'Thiếu cuộc thi.' });
   const result = await bulkImport(rows, async (row) => {
     if (!row.name) throw new Error('Thiếu Tên trường.');
     const { rowCount } = await query(
-      `insert into schools (name, province, district, source)
-       values ($1, $2, $3, 'import')
-       on conflict (name) do nothing`,
-      [row.name, row.province || null, row.district || null]
+      `insert into schools (name, province, district, source, competition_id)
+       values ($1, $2, $3, 'import', $4)
+       on conflict (name, competition_id) do nothing`,
+      [row.name, row.province || null, row.district || null, competitionId]
     );
     return rowCount === 0 ? { skipped: true } : {};
   });

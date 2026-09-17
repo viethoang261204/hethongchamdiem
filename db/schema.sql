@@ -538,6 +538,21 @@ create table if not exists referee_content_fields (
 create index if not exists idx_referee_content_fields_content on referee_content_fields(contest_content_id);
 create index if not exists idx_referee_content_fields_field on referee_content_fields(field_id);
 
+-- Trường/trung tâm gắn theo từng cuộc thi — cùng lý do với Field ở trên:
+-- trước đây là danh mục dùng chung toàn hệ thống, gây lẫn trường giữa các
+-- cuộc thi khác nhau khi có ≥ 2 cuộc thi cùng lúc. Backfill: trường cũ
+-- (chưa gắn cuộc thi) gán về cuộc thi cũ nhất đang có dữ liệu tại thời
+-- điểm thêm cột này. Đổi unique constraint từ (name) sang (name,
+-- competition_id) — 2 cuộc thi có thể trùng tên trường.
+alter table schools add column if not exists competition_id uuid references competitions(id) on delete cascade;
+update schools set competition_id = (select id from competitions order by created_at limit 1)
+  where competition_id is null;
+alter table schools alter column competition_id set not null;
+alter table schools drop constraint if exists schools_name_key;
+alter table schools drop constraint if exists schools_name_competition_key;
+alter table schools add constraint schools_name_competition_key unique (name, competition_id);
+create index if not exists idx_schools_competition on schools(competition_id);
+
 -- ============================================================
 -- 2. INDEXES
 -- ============================================================

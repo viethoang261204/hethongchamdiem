@@ -60,6 +60,7 @@ export const api = {
   // ============================================================
   getSchools: async (params = {}) => {
     const qs = new URLSearchParams();
+    if (params.competitionId) qs.set('competitionId', params.competitionId);
     if (params.query) qs.set('query', params.query);
     if (params.level) qs.set('level', params.level);
     if (params.province) qs.set('province', params.province);
@@ -81,7 +82,7 @@ export const api = {
 
   deleteSchool: (id) => withRetry(() => request(`/schools/${id}`, { method: 'DELETE' }), 'deleteSchool'),
 
-  importSchools: (rows) => withRetry(() => request('/schools/import', { method: 'POST', body: rows }), 'importSchools'),
+  importSchools: (rows, competitionId) => withRetry(() => request('/schools/import', { method: 'POST', body: { rows, competitionId } }), 'importSchools'),
 
   // ============================================================
   // Competitions
