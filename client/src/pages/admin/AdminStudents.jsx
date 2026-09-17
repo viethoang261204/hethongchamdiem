@@ -53,8 +53,29 @@ export default function AdminStudents() {
     }
     return ids;
   }, [teams, allContents, filterComp]);
+  // Map cuộc thi -> tập id trường có đội thi ở cuộc thi đó (dùng để lọc dropdown
+  // trường khi thêm học sinh, tránh hiện tất cả trường của mọi cuộc thi)
+  const schoolIdsByComp = useMemo(() => {
+    const contentToComp = new Map(allContents.map(c => [c.id, c.competition_id]));
+    const map = new Map();
+    for (const t of teams) {
+      if (!t.school_id) continue;
+      const compId = contentToComp.get(t.contest_content_id);
+      if (!compId) continue;
+      if (!map.has(compId)) map.set(compId, new Set());
+      map.get(compId).add(t.school_id);
+    }
+    return map;
+  }, [teams, allContents]);
+
   const [modal, setModal] = useState(null);
-  const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '' });
+  const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '', competitionId: '' });
+
+  const schoolOptionsForForm = useMemo(() => {
+    if (!form.competitionId) return schools;
+    const ids = schoolIdsByComp.get(form.competitionId);
+    return schools.filter(s => ids?.has(s.id));
+  }, [schools, form.competitionId, schoolIdsByComp]);
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -85,7 +106,7 @@ export default function AdminStudents() {
 
   const openAdd = () => {
     setModal('add');
-    setForm({ fullName: '', grade: '', schoolId: '' });
+    setForm({ fullName: '', grade: '', schoolId: '', competitionId: filterComp || '' });
     setErrors({});
   };
 
@@ -95,6 +116,7 @@ export default function AdminStudents() {
       fullName: s.full_name || '',
       grade: s.grade || '',
       schoolId: s.school_id || '',
+      competitionId: '',
     });
     setErrors({});
   };
@@ -229,6 +251,20 @@ export default function AdminStudents() {
                 {GRADE_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
+            {modal === 'add' && (
+              <div className="form-group">
+                <label className="form-label">Cuộc thi</label>
+                <select
+                  className="form-input form-select"
+                  value={form.competitionId}
+                  onChange={(e) => setForm({ ...form, competitionId: e.target.value, schoolId: '' })}
+                >
+                  <option value="">-- Tất cả trường (không lọc theo cuộc thi) --</option>
+                  {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, marginBottom: 0 }}>Chọn cuộc thi để dropdown Trường bên dưới chỉ hiện trường đang thi đấu ở cuộc thi đó.</p>
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label">Trường</label>
               <select
@@ -237,8 +273,11 @@ export default function AdminStudents() {
                 onChange={(e) => setForm({ ...form, schoolId: e.target.value })}
               >
                 <option value="">-- Chọn trường --</option>
-                {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {schoolOptionsForForm.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
+              {form.competitionId && schoolOptionsForForm.length === 0 && (
+                <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6, marginBottom: 0 }}>Cuộc thi này chưa có trường/đội thi nào — tạo đội thi trước ở mục "Quản lý đội thi".</p>
+              )}
               <p style={{ fontSize: 12, color: '#94a3b8', marginTop: 6, marginBottom: 0 }}>Quản lý trường tại trang Học sinh → Thêm trường.</p>
             </div>
             </div>
