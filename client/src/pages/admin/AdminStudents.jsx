@@ -42,17 +42,26 @@ export default function AdminStudents() {
   const [filterGrade, setFilterGrade] = useState('');
   const [filterComp, setFilterComp] = useState('');
 
-  // Học sinh có mặt trong 1 đội thi đấu ở cuộc thi đang chọn (qua team.student_ids)
+  // Học sinh thuộc cuộc thi đang chọn — trường giờ gắn theo cuộc thi
+  // (schools.competition_id) nên lọc trực tiếp qua đó, không cần đợi học
+  // sinh được xếp vào đội thi mới hiện ra (trước đây lọc qua team.student_ids
+  // nên học sinh mới thêm — chưa có đội — không hiện được).
   const studentIdsInComp = useMemo(() => {
     if (!filterComp) return null;
-    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
+    const schoolIds = new Set(schools.filter(s => s.competition_id === filterComp).map(s => s.id));
     const ids = new Set();
+    for (const s of list) {
+      if (s.school_id && schoolIds.has(s.school_id)) ids.add(s.id);
+    }
+    // Vẫn gộp thêm học sinh đã vào đội của cuộc thi này dù trường của họ
+    // (nếu có) thuộc cuộc thi khác — trường hợp hiếm nhưng để không mất sót.
+    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
     for (const t of teams) {
       if (!contentIds.has(t.contest_content_id)) continue;
       for (const sid of t.student_ids || []) ids.add(sid);
     }
     return ids;
-  }, [teams, allContents, filterComp]);
+  }, [teams, allContents, filterComp, schools, list]);
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '', competitionId: '' });
 
