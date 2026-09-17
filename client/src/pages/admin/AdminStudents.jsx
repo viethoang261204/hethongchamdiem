@@ -22,15 +22,37 @@ export default function AdminStudents() {
   const { showConfirm, showAlert } = useNotify();
   const { data: loaded, loading, error, reload, setData } = useApiLoader(
     async () => {
-      const [data, sch] = await Promise.all([capi.getStudents(), capi.getSchools()]);
-      return { list: data, schools: sch };
+      const [data, sch, comps, allContents, teams] = await Promise.all([
+        capi.getStudents(),
+        capi.getSchools(),
+        capi.getCompetitions(),
+        capi.getAllContents(),
+        capi.getAllTeams(),
+      ]);
+      return { list: data, schools: sch, competitions: comps, allContents, teams };
     },
     []
   );
   const list = loaded?.list ?? [];
   const schools = loaded?.schools ?? [];
+  const competitions = loaded?.competitions ?? [];
+  const allContents = loaded?.allContents ?? [];
+  const teams = loaded?.teams ?? [];
   const [search, setSearch] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
+  const [filterComp, setFilterComp] = useState('');
+
+  // Học sinh có mặt trong 1 đội thi đấu ở cuộc thi đang chọn (qua team.student_ids)
+  const studentIdsInComp = useMemo(() => {
+    if (!filterComp) return null;
+    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
+    const ids = new Set();
+    for (const t of teams) {
+      if (!contentIds.has(t.contest_content_id)) continue;
+      for (const sid of t.student_ids || []) ids.add(sid);
+    }
+    return ids;
+  }, [teams, allContents, filterComp]);
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({ fullName: '', grade: '', schoolId: '' });
   const [errors, setErrors] = useState({});
@@ -44,6 +66,7 @@ export default function AdminStudents() {
 
   const filtered = useMemo(() => {
     let l = list;
+    if (studentIdsInComp) l = l.filter(x => studentIdsInComp.has(x.id));
     if (search.trim()) {
       const s = search.toLowerCase().trim();
       l = l.filter(x =>
@@ -54,7 +77,7 @@ export default function AdminStudents() {
     }
     if (filterGrade) l = l.filter(x => (x.grade || '') === filterGrade);
     return l;
-  }, [list, search, filterGrade]);
+  }, [list, search, filterGrade, studentIdsInComp]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
@@ -142,6 +165,10 @@ export default function AdminStudents() {
         <div className="search-box">
           <input type="text" placeholder="Tìm theo tên, lớp, trường..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
+          <option value="">Tất cả cuộc thi</option>
+          {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <select className="filter-select" value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)}>
           <option value="">Tất cả khối</option>
           {grades.map(g => <option key={g} value={g}>{g}</option>)}

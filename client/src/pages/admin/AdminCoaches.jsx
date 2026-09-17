@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
-import { clearApiCache } from '../../apiCache';
+import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const capi = createCachedApi(api);
 
 const IMPORT_COLUMNS = [
   { key: 'name', label: 'Tên HLV', required: true, example: 'Nguyễn Văn A' },
@@ -17,9 +19,21 @@ const IMPORT_COLUMNS = [
 
 export default function AdminCoaches() {
   const { showConfirm, showAlert } = useNotify();
-  const { data, loading, error, reload, setData } = useApiLoader(() => api.getCoaches(), []);
-  const list = data || [];
+  const { data, loading, error, reload, setData } = useApiLoader(async () => {
+    const [coaches, comps, allContents, teams] = await Promise.all([
+      api.getCoaches(),
+      capi.getCompetitions(),
+      capi.getAllContents(),
+      capi.getAllTeams(),
+    ]);
+    return { coaches, competitions: comps, allContents, teams };
+  }, []);
+  const list = data?.coaches || [];
+  const competitions = data?.competitions || [];
+  const allContents = data?.allContents || [];
+  const teams = data?.teams || [];
   const [search, setSearch] = useState('');
+  const [filterComp, setFilterComp] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', notes: '' });
@@ -27,15 +41,26 @@ export default function AdminCoaches() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const SECURITY_CODE = '26122004';
 
+  // HLV có đội thi đấu trong cuộc thi đang chọn (qua contest_content_id)
+  const coachIdsInComp = useMemo(() => {
+    if (!filterComp) return null;
+    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
+    return new Set(teams.filter(t => contentIds.has(t.contest_content_id) && t.coach_id).map(t => t.coach_id));
+  }, [teams, allContents, filterComp]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return list;
-    const s = search.toLowerCase().trim();
-    return list.filter(x =>
-      (x.name || '').toLowerCase().includes(s) ||
-      (x.phone || '').toLowerCase().includes(s) ||
-      (x.email || '').toLowerCase().includes(s)
-    );
-  }, [list, search]);
+    let l = list;
+    if (coachIdsInComp) l = l.filter(x => coachIdsInComp.has(x.id));
+    if (search.trim()) {
+      const s = search.toLowerCase().trim();
+      l = l.filter(x =>
+        (x.name || '').toLowerCase().includes(s) ||
+        (x.phone || '').toLowerCase().includes(s) ||
+        (x.email || '').toLowerCase().includes(s)
+      );
+    }
+    return l;
+  }, [list, search, coachIdsInComp]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
@@ -59,10 +84,9 @@ export default function AdminCoaches() {
   };
 
   const reloadList = async () => {
-    setData(null);
-    const updated = await api.getCoaches();
-    setData(updated);
     clearApiCache('getCoaches');
+    const updated = await api.getCoaches();
+    setData((prev) => (prev ? { ...prev, coaches: updated } : prev));
   };
 
   const save = async () => {
@@ -126,6 +150,10 @@ export default function AdminCoaches() {
         <div className="search-box">
           <input type="text" placeholder="Tìm theo tên, SĐT, email..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
+          <option value="">Tất cả cuộc thi</option>
+          {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
       </div>
       <div className="card">
         <div className="table-container">

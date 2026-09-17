@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
-import { clearApiCache } from '../../apiCache';
+import { createCachedApi, clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
+
+const capi = createCachedApi(api);
 
 const IMPORT_COLUMNS = [
   { key: 'name', label: 'Tên trường/trung tâm', required: true, example: 'THPT Chuyên Lê Hồng Phong' },
@@ -16,10 +18,22 @@ const IMPORT_COLUMNS = [
 
 export default function AdminSchools() {
   const { showConfirm, showAlert } = useNotify();
-  const { data, loading, error, reload, setData } = useApiLoader(() => api.getSchools(), []);
-  const list = data || [];
+  const { data, loading, error, reload, setData } = useApiLoader(async () => {
+    const [schools, comps, allContents, teams] = await Promise.all([
+      api.getSchools(),
+      capi.getCompetitions(),
+      capi.getAllContents(),
+      capi.getAllTeams(),
+    ]);
+    return { schools, competitions: comps, allContents, teams };
+  }, []);
+  const list = data?.schools || [];
+  const competitions = data?.competitions || [];
+  const allContents = data?.allContents || [];
+  const teams = data?.teams || [];
   const [search, setSearch] = useState('');
   const [filterProvince, setFilterProvince] = useState('');
+  const [filterComp, setFilterComp] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', province: '', district: '' });
@@ -27,8 +41,16 @@ export default function AdminSchools() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const SECURITY_CODE = '26122004';
 
+  // Trường/trung tâm có đội thi đấu trong cuộc thi đang chọn (qua contest_content_id)
+  const schoolIdsInComp = useMemo(() => {
+    if (!filterComp) return null;
+    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
+    return new Set(teams.filter(t => contentIds.has(t.contest_content_id) && t.school_id).map(t => t.school_id));
+  }, [teams, allContents, filterComp]);
+
   const filtered = useMemo(() => {
     let l = list;
+    if (schoolIdsInComp) l = l.filter(x => schoolIdsInComp.has(x.id));
     if (search.trim()) {
       const s = search.toLowerCase().trim();
       l = l.filter(x =>
@@ -39,7 +61,7 @@ export default function AdminSchools() {
     }
     if (filterProvince) l = l.filter(x => (x.province || '') === filterProvince);
     return l;
-  }, [list, search, filterProvince]);
+  }, [list, search, filterProvince, schoolIdsInComp]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
@@ -52,9 +74,8 @@ export default function AdminSchools() {
   // (capi.getSchools) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
   const refreshSchools = async () => {
     clearApiCache('getSchools');
-    setData(null);
     const updated = await api.getSchools();
-    setData(updated);
+    setData((prev) => (prev ? { ...prev, schools: updated } : prev));
   };
 
   const openAdd = () => {
@@ -146,6 +167,10 @@ export default function AdminSchools() {
         <div className="search-box">
           <input type="text" placeholder="Tìm theo tên, tỉnh, quận..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
+          <option value="">Tất cả cuộc thi</option>
+          {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <select className="filter-select" value={filterProvince} onChange={(e) => setFilterProvince(e.target.value)}>
           <option value="">Tất cả tỉnh/TP</option>
           {provinces.map(p => <option key={p} value={p}>{p}</option>)}

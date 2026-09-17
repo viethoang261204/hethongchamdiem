@@ -1373,6 +1373,7 @@ const COMPLAINT_NESTED = `
     case when ru.id is null then null else json_build_object('id', ru.id, 'full_name', ru.full_name, 'username', ru.username) end as resolver,
     coalesce(st.name, nullif(trim(both from concat(cmt_a.name, ' vs ', cmt_b.name)), '')) as team_name,
     coalesce(scc.name, ccc.name) as content_name,
+    coalesce(scc.competition_id, ccc.competition_id) as competition_id,
     s.round as score_round,
     case when s.id is null then null else json_build_object(
       'id', s.id, 'score', s.score, 'time', s.time, 'notes', s.notes,

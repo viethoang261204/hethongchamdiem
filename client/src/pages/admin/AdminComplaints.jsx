@@ -20,16 +20,23 @@ function formatDate(iso) {
 
 export default function AdminComplaints() {
   const { showAlert } = useNotify();
-  const { data, loading, error, reload, setData } = useApiLoader(() => api.getComplaints(), []);
-  const list = data || [];
+  const { data, loading, error, reload, setData } = useApiLoader(async () => {
+    const [complaints, comps] = await Promise.all([api.getComplaints(), api.getCompetitions()]);
+    return { complaints, competitions: comps };
+  }, []);
+  const list = data?.complaints || [];
+  const competitions = data?.competitions || [];
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterComp, setFilterComp] = useState('');
   const [resolveModal, setResolveModal] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const filtered = useMemo(
-    () => (filterStatus ? list.filter((c) => c.status === filterStatus) : list),
-    [list, filterStatus]
-  );
+  const filtered = useMemo(() => {
+    let l = list;
+    if (filterStatus) l = l.filter((c) => c.status === filterStatus);
+    if (filterComp) l = l.filter((c) => c.competition_id === filterComp);
+    return l;
+  }, [list, filterStatus, filterComp]);
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
 
   const openResolve = (c, status) => {
@@ -72,9 +79,8 @@ export default function AdminComplaints() {
       }
       await api.putComplaint(resolveModal.id, body);
       setResolveModal(null);
-      setData(null);
       const updated = await api.getComplaints();
-      setData(updated);
+      setData((prev) => (prev ? { ...prev, complaints: updated } : prev));
       showAlert('Đã cập nhật.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
@@ -99,6 +105,10 @@ export default function AdminComplaints() {
       {error && <ErrorBox error={error} onRetry={reload} />}
 
       <div className="filters-bar">
+        <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
+          <option value="">Tất cả cuộc thi</option>
+          {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <select className="filter-select" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
           <option value="">Tất cả trạng thái</option>
           <option value="pending">Đang chờ</option>
