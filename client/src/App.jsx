@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { NotifyProvider } from './context/NotifyContext';
 import { getMe, signOut } from './lib/http';
+import { clearApiCache } from './apiCache';
 import HomePage from './pages/HomePage';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminLayout from './pages/admin/AdminLayout';
@@ -57,6 +58,11 @@ export default function App() {
   });
 
   const login = useCallback((u) => {
+    // Cache API (apiCache.js) là biến module dùng chung toàn trang, không
+    // phân biệt theo user — nếu không xoá khi đổi tài khoản, dữ liệu của
+    // tài khoản cũ (VD: danh sách đội theo field được phân quyền) có thể
+    // còn "dính" lại trong TTL 2 phút và hiện nhầm cho tài khoản mới.
+    clearApiCache();
     setUser(u);
     localStorage.setItem('enjoy-ai-user', JSON.stringify(u));
   }, []);
@@ -76,6 +82,7 @@ export default function App() {
 
   const logout = useCallback(() => {
     signOut();
+    clearApiCache();
     setUser(null);
     localStorage.removeItem('enjoy-ai-user');
   }, []);
