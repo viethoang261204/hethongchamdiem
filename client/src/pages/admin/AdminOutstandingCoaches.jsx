@@ -5,6 +5,7 @@ import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import { classifyRank, isOutstandingCoach } from '../../lib/outstandingCoach';
+import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
 import './AdminLayout.css';
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
@@ -52,7 +53,29 @@ async function computeQualifyingEntries(competitionId) {
         });
       });
     } else {
-      await Promise.all(boards.map(async (board) => {
+      // Bảng nào nằm trong nhóm gộp (boardMerge.js) thì xét hạng theo ĐÚNG
+      // hạng đã gộp (giống file Excel xuất ra), không xét riêng theo từng
+      // bảng tách — vì bảng tách ít đội sẽ cho hạng sai lệch so với thực tế
+      // đã thi đấu/xếp hạng chung.
+      const mergeGroups = getMergeGroupsForContent(content.name, boards);
+      const mergedBoardIds = new Set(mergeGroups.flat().map((b) => b.id));
+
+      await Promise.all(mergeGroups.map(async (groupBoards) => {
+        const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(content.id, b.id).catch(() => null)));
+        const mergedTeams = mergeMeasurementTeams(rankingResults);
+        const boardLabel = groupBoards.map((b) => b.name).join(' + ');
+        mergedTeams.forEach((t, idx) => {
+          const rank = idx + 1;
+          const tier = classifyRank(content.name, boardLabel, rank);
+          if (!tier) return;
+          const team = teamById.get(t.team_id);
+          addEntry(team?.coach_id, {
+            team_name: t.team_name, content_name: content.name, board_name: boardLabel, rank, tier,
+          });
+        });
+      }));
+
+      await Promise.all(boards.filter((b) => !mergedBoardIds.has(b.id)).map(async (board) => {
         const r = await api.getRanking(content.id, board.id).catch(() => null);
         if (!r) return;
         if (r.ranking_format === 'measurement') {

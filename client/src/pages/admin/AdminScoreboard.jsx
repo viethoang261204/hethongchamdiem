@@ -7,29 +7,10 @@ import { formatSecondsAsMinutes } from '../../lib/time';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import { writeStyledBlock, downloadWorkbook } from '../../lib/excelReport';
+import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
 import './AdminLayout.css';
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
-
-// Ghép xếp hạng của nhiều bảng đấu vào 1 bảng xếp hạng chung khi xuất Excel —
-// CHỈ áp dụng lúc xuất (không đổi board_id thật của đội, không đổi màn hình
-// xem trực tiếp) — dùng cho các nội dung có bảng nào đó quá ít đội nên BTC
-// quyết định gộp chung xếp hạng lại. Khớp theo tên nội dung (tiếng Việt, nên
-// không đụng tới các cuộc thi khác dùng tên tiếng Anh như Asian Open).
-const BOARD_MERGE_GROUPS = {
-  'Con đường phát minh': [['Bảng D', 'Bảng E']],
-  'Cuộc phiêu lưu trên bầu trời': [['Bảng B', 'Bảng C'], ['Bảng D', 'Bảng E']],
-};
-
-// So sánh 2 đội để xếp hạng — ĐÚNG tie-break server dùng ở GET
-// /contents/:id/boards/:id/ranking (server/routes.cjs): điểm giảm dần → thời
-// gian tăng dần → số lần chạy lại tăng dần → điểm lượt tốt nhất giảm dần.
-function compareRankedTeams(a, b) {
-  return b.total_score - a.total_score
-    || a.total_time - b.total_time
-    || a.total_retry - b.total_retry
-    || b.best_round_score - a.best_round_score;
-}
 
 function MeasurementTable({ teams }) {
   return (
@@ -319,28 +300,16 @@ export default function AdminScoreboard() {
           return [rank, teamName, info.coach, info.school, info.field, info.students];
         };
 
-        // Ghép xếp hạng theo BOARD_MERGE_GROUPS (nếu nội dung này có cấu hình) —
+        // Ghép xếp hạng theo boardMerge.js (nếu nội dung này có cấu hình) —
         // chỉ áp dụng cho bảng đang xếp hạng đo lường (measurement), không đụng
         // tới nhánh đấu loại trực tiếp (combat). Bảng đã gộp thì bỏ qua ở vòng
         // lặp per-board bên dưới, tránh xuất trùng 2 lần.
         const mergedBoardIds = new Set();
         if (!isCombat) {
-          for (const group of BOARD_MERGE_GROUPS[content.name] || []) {
-            const groupBoards = contentBoards.filter((b) => group.includes(b.name));
-            if (groupBoards.length < 2 || groupBoards.some((b) => b.ranking_format === 'combat')) continue;
-
+          for (const groupBoards of getMergeGroupsForContent(content.name, contentBoards)) {
             const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(content.id, b.id).catch(() => null)));
-            const mergedTeams = [];
-            rankingResults.forEach((r) => { if (r?.ranking_format === 'measurement') mergedTeams.push(...(r.teams || [])); });
+            const mergedTeams = mergeMeasurementTeams(rankingResults);
             if (!mergedTeams.length) continue;
-
-            mergedTeams.sort(compareRankedTeams);
-            for (let i = 1; i < mergedTeams.length; i++) {
-              const prev = mergedTeams[i - 1], cur = mergedTeams[i];
-              const tied = prev.total_score === cur.total_score && prev.total_time === cur.total_time
-                && prev.total_retry === cur.total_retry && prev.best_round_score === cur.best_round_score;
-              if (tied) { prev.needs_playoff = true; cur.needs_playoff = true; }
-            }
 
             blocks.push({
               title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
