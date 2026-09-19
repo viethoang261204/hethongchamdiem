@@ -11,6 +11,26 @@ import './AdminLayout.css';
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
 
+// Ghép xếp hạng của nhiều bảng đấu vào 1 bảng xếp hạng chung khi xuất Excel —
+// CHỈ áp dụng lúc xuất (không đổi board_id thật của đội, không đổi màn hình
+// xem trực tiếp) — dùng cho các nội dung có bảng nào đó quá ít đội nên BTC
+// quyết định gộp chung xếp hạng lại. Khớp theo tên nội dung (tiếng Việt, nên
+// không đụng tới các cuộc thi khác dùng tên tiếng Anh như Asian Open).
+const BOARD_MERGE_GROUPS = {
+  'Con đường phát minh': [['Bảng D', 'Bảng E']],
+  'Cuộc phiêu lưu trên bầu trời': [['Bảng B', 'Bảng C'], ['Bảng D', 'Bảng E']],
+};
+
+// So sánh 2 đội để xếp hạng — ĐÚNG tie-break server dùng ở GET
+// /contents/:id/boards/:id/ranking (server/routes.cjs): điểm giảm dần → thời
+// gian tăng dần → số lần chạy lại tăng dần → điểm lượt tốt nhất giảm dần.
+function compareRankedTeams(a, b) {
+  return b.total_score - a.total_score
+    || a.total_time - b.total_time
+    || a.total_retry - b.total_retry
+    || b.best_round_score - a.best_round_score;
+}
+
 function MeasurementTable({ teams }) {
   return (
     <div className="table-container">
@@ -292,14 +312,55 @@ export default function AdminScoreboard() {
         }]));
         const infoOf = (id) => teamInfoById.get(id) || { coach: '', school: '', field: '', students: '' };
 
+        const IDENTITY_HEADER = ['Hạng', 'Đội', 'HLV', 'Trường', 'Sân thi đấu', 'Học sinh'];
+        const IDENTITY_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
+        const identityRow = (rank, teamName, id) => {
+          const info = infoOf(id);
+          return [rank, teamName, info.coach, info.school, info.field, info.students];
+        };
+
+        // Ghép xếp hạng theo BOARD_MERGE_GROUPS (nếu nội dung này có cấu hình) —
+        // chỉ áp dụng cho bảng đang xếp hạng đo lường (measurement), không đụng
+        // tới nhánh đấu loại trực tiếp (combat). Bảng đã gộp thì bỏ qua ở vòng
+        // lặp per-board bên dưới, tránh xuất trùng 2 lần.
+        const mergedBoardIds = new Set();
+        if (!isCombat) {
+          for (const group of BOARD_MERGE_GROUPS[content.name] || []) {
+            const groupBoards = contentBoards.filter((b) => group.includes(b.name));
+            if (groupBoards.length < 2 || groupBoards.some((b) => b.ranking_format === 'combat')) continue;
+
+            const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(content.id, b.id).catch(() => null)));
+            const mergedTeams = [];
+            rankingResults.forEach((r) => { if (r?.ranking_format === 'measurement') mergedTeams.push(...(r.teams || [])); });
+            if (!mergedTeams.length) continue;
+
+            mergedTeams.sort(compareRankedTeams);
+            for (let i = 1; i < mergedTeams.length; i++) {
+              const prev = mergedTeams[i - 1], cur = mergedTeams[i];
+              const tied = prev.total_score === cur.total_score && prev.total_time === cur.total_time
+                && prev.total_retry === cur.total_retry && prev.best_round_score === cur.best_round_score;
+              if (tied) { prev.needs_playoff = true; cur.needs_playoff = true; }
+            }
+
+            blocks.push({
+              title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
+              subtitle: `${groupBoards.map((b) => b.name).join(' + ')} (gộp xếp hạng)`,
+              header: [...IDENTITY_HEADER, 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'],
+              columnKinds: [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number'],
+              rows: mergedTeams.map((t, idx) => [
+                ...identityRow(idx + 1, t.team_name, t.team_id),
+                t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
+                t.total_score, t.total_time, t.total_retry,
+              ]),
+            });
+
+            groupBoards.forEach((b) => mergedBoardIds.add(b.id));
+          }
+        }
+
         for (const board of contentBoards) {
+          if (mergedBoardIds.has(board.id)) continue;
           let header, columnKinds, dataRows;
-          const IDENTITY_HEADER = ['Hạng', 'Đội', 'HLV', 'Trường', 'Sân thi đấu', 'Học sinh'];
-          const IDENTITY_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
-          const identityRow = (rank, teamName, id) => {
-            const info = infoOf(id);
-            return [rank, teamName, info.coach, info.school, info.field, info.students];
-          };
 
           if (isCombat) {
             const boardTeams = combatTeams.filter((t) => t.board_id === board.id);
