@@ -39,3 +39,13 @@ export function isOutstandingCoach(entries) {
   const majorCount = entries.filter((e) => e.tier === 'major').length;
   return majorCount >= 1 || entries.length >= 3;
 }
+
+// Giải "Rising Star" — giải đặc biệt do BTC chọn thủ công (không dựa vào xếp
+// hạng thi đấu), đội đạt giải này thì HLV cũng được tính vào "HLV xuất sắc"
+// (coi như giải chính, tương đương Top 1-3). Enjoy AI Đà Nẵng — khớp theo
+// đúng tên đội (case-sensitive).
+export const RISING_STAR_TEAMS = ['FPT ĐN 12', 'Brave Lions', 'STEM SQUARE 07'];
+
+export function isRisingStarTeam(teamName) {
+  return RISING_STAR_TEAMS.includes(teamName);
+}

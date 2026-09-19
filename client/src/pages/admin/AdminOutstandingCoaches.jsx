@@ -4,7 +4,7 @@ import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
-import { classifyRank, isOutstandingCoach } from '../../lib/outstandingCoach';
+import { classifyRank, isOutstandingCoach, isRisingStarTeam } from '../../lib/outstandingCoach';
 import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
 import './AdminLayout.css';
 
@@ -30,10 +30,22 @@ async function computeQualifyingEntries(competitionId) {
       api.getBoards(content.id).catch(() => []),
       api.getTeams(content.id).catch(() => []),
     ]);
-    if (!boards.length || !teams.length) continue;
+    if (!teams.length) continue;
     const teamById = new Map(teams.map((t) => [t.id, t]));
     const isCombat = COMBAT_FORMATS.includes(content.content_format);
     const isStars = content.content_format === 'combat_stars';
+
+    // Rising Star — giải đặc biệt do BTC chọn thủ công, không phụ thuộc xếp
+    // hạng/bảng đấu (xem lib/outstandingCoach.js), nên xét TRƯỚC và độc lập
+    // với phần tính hạng theo bảng bên dưới.
+    teams.forEach((t) => {
+      if (!isRisingStarTeam(t.name)) return;
+      addEntry(t.coach_id, {
+        team_name: t.name, content_name: content.name, board_name: 'Rising Star', rank: 0, tier: 'major', award: 'rising_star',
+      });
+    });
+
+    if (!boards.length) continue;
 
     if (isCombat) {
       const matches = await api.getCombatMatches(content.id).catch(() => []);
@@ -208,7 +220,8 @@ export default function AdminOutstandingCoaches() {
           <h1 className="page-title">HLV xuất sắc</h1>
           <p className="page-subtitle">
             Tự động xét theo kết quả thi đấu thật — đạt giải Nhất/Nhì/Ba ở bất kỳ bảng đấu nào,
-            hoặc có từ 3 đội trở lên nằm trong Top + giải phụ (theo đúng bảng đấu quy định giải phụ).
+            hoặc có từ 3 đội trở lên nằm trong Top + giải phụ (theo đúng bảng đấu quy định giải phụ),
+            hoặc có đội đạt giải Rising Star (do BTC chọn thủ công).
           </p>
         </div>
         <button type="button" className="btn btn-secondary" onClick={runCompute} disabled={!selectedComp || computing}>
@@ -268,7 +281,7 @@ export default function AdminOutstandingCoaches() {
                     <td style={{ fontSize: 12.5 }}>
                       {row.entries.map((e, idx) => (
                         <div key={idx}>
-                          <strong>Top {e.rank}</strong> — {e.team_name} ({e.content_name} · {e.board_name})
+                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>Top {e.rank}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
                           {e.tier === 'phu' && <span style={{ color: '#94a3b8' }}> — giải phụ</span>}
                         </div>
                       ))}
