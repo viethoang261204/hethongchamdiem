@@ -85,6 +85,9 @@ export default function AdminReports() {
 
   const [selectedComp, setSelectedComp] = useState('');
   const [selectedContent, setSelectedContent] = useState('');
+  // Nhóm báo cáo theo Trường/Trung tâm (mặc định) hoặc theo Huấn luyện viên —
+  // đổi qua lại chỉ đổi cách gộp nhóm để xem/xuất Excel, không đổi dữ liệu.
+  const [groupBy, setGroupBy] = useState('school');
   const [rows, setRows] = useState(null);
   const [rowsLoading, setRowsLoading] = useState(false);
   const [rowsError, setRowsError] = useState(null);
@@ -148,6 +151,7 @@ export default function AdminReports() {
           const standingsRows = standings.map((s) => ({
             team_id: s.teamId, team_name: s.teamName,
             school: teams.find((t) => t.id === s.teamId)?.schools?.name || 'Chưa có trường',
+            coach_name: teams.find((t) => t.id === s.teamId)?.coaches?.name || '',
             content_name: c.name, contest_content_id: c.id, content_format: c.content_format,
             played: s.played, wins: s.wins, draws: s.draws, losses: s.losses,
             match_points: s.matchPoints, total_score: s.totalScore,
@@ -223,18 +227,22 @@ export default function AdminReports() {
     }
   };
 
-  // Gộp theo (đội × nội dung) rồi nhóm theo trường/trung tâm — 1 đội có thể
-  // thi nhiều nội dung khác nhau trong cùng cuộc thi nên không gộp theo đội
-  // đơn thuần (tránh trộn lẫn điểm 2 nội dung khác nhau vào 1 dòng).
+  // Gộp theo (đội × nội dung) rồi nhóm theo Trường/Trung tâm hoặc Huấn luyện
+  // viên (tùy `groupBy`) — 1 đội có thể thi nhiều nội dung khác nhau trong
+  // cùng cuộc thi nên không gộp theo đội đơn thuần (tránh trộn lẫn điểm 2
+  // nội dung khác nhau vào 1 dòng).
   const groups = useMemo(() => {
     if (!rows) return [];
+    const noSchoolLabel = 'Chưa có trường';
+    const noCoachLabel = 'Chưa có HLV';
     const byTeam = new Map();
     for (const r of rows.measurement || []) {
       const key = `${r.team_id}|${r.contest_content_id}`;
       if (!byTeam.has(key)) {
         byTeam.set(key, {
           key, team_id: r.team_id, team_name: r.team_name,
-          school: r.schools?.name || 'Chưa có trường',
+          school: r.schools?.name || noSchoolLabel,
+          coach: r.coaches?.name || noCoachLabel,
           content_name: r.content_name, contest_content_id: r.contest_content_id,
           format: 'measurement', total_score: 0, total_time: 0, rounds: 0,
         });
@@ -248,6 +256,7 @@ export default function AdminReports() {
       const key = `${r.team_id}|${r.contest_content_id}`;
       byTeam.set(key, {
         key, team_id: r.team_id, team_name: r.team_name, school: r.school,
+        coach: r.coach_name || noCoachLabel,
         content_name: r.content_name, contest_content_id: r.contest_content_id,
         format: 'combat', content_format: r.content_format, total_score: r.total_score, total_time: null, rounds: r.played,
         wins: r.wins, draws: r.draws, losses: r.losses, match_points: r.match_points,
@@ -256,7 +265,7 @@ export default function AdminReports() {
     const teams = Array.from(byTeam.values());
     const byGroup = new Map();
     for (const t of teams) {
-      const g = t.school;
+      const g = groupBy === 'coach' ? t.coach : t.school;
       if (!byGroup.has(g)) byGroup.set(g, []);
       byGroup.get(g).push(t);
     }
@@ -266,7 +275,7 @@ export default function AdminReports() {
         teams: teamsList.sort((a, b) => b.total_score - a.total_score),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows]);
+  }, [rows, groupBy]);
 
   const compName = competitions.find((c) => c.id === selectedComp)?.name || '';
   const contentName = contents.find((c) => c.id === selectedContent)?.name || 'Tất cả nội dung';
@@ -324,8 +333,12 @@ export default function AdminReports() {
   const handleExportGroupExcel = async (group) => {
     setExportingExcelGroup(group.name);
     try {
-      const measurementRows = (rows.measurement || []).filter((r) => (r.schools?.name || 'Chưa có trường') === group.name);
-      const combatRows = (rows.combatMatchRows || []).filter((r) => r.school === group.name);
+      const measurementRows = (rows.measurement || []).filter((r) => (
+        groupBy === 'coach' ? (r.coaches?.name || 'Chưa có HLV') : (r.schools?.name || 'Chưa có trường')
+      ) === group.name);
+      const combatRows = (rows.combatMatchRows || []).filter((r) => (
+        groupBy === 'coach' ? (r.coach_name || 'Chưa có HLV') : r.school
+      ) === group.name);
       const contentIdsInScope = new Set([
         ...measurementRows.map((r) => r.contest_content_id),
         ...combatRows.map((r) => r.contest_content_id),
@@ -458,7 +471,7 @@ export default function AdminReports() {
       <div className="page-header no-print">
         <div>
           <h1 className="page-title">Báo cáo điểm</h1>
-          <p className="page-subtitle">Chọn nội dung để xem theo từng trường/trung tâm, tải PDF chi tiết phiếu điểm ngay trong từng nhóm</p>
+          <p className="page-subtitle">Chọn nội dung để xem theo từng trường/trung tâm hoặc huấn luyện viên, tải PDF chi tiết phiếu điểm ngay trong từng nhóm</p>
         </div>
       </div>
 
@@ -480,6 +493,13 @@ export default function AdminReports() {
               {contentsForComp.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
+          <div className="form-group" style={{ marginBottom: 0, minWidth: 200 }}>
+            <label className="form-label">Nhóm theo</label>
+            <select className="form-input form-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+              <option value="school">Trường/Trung tâm</option>
+              <option value="coach">Huấn luyện viên</option>
+            </select>
+          </div>
           <button type="button" className="btn btn-primary" onClick={loadReport} disabled={!selectedComp || rowsLoading} style={{ alignSelf: 'flex-end' }}>
             {rowsLoading ? 'Đang tải...' : 'Xem báo cáo'}
           </button>
@@ -493,7 +513,7 @@ export default function AdminReports() {
           <div style={{ marginBottom: 20, textAlign: 'center' }}>
             <h2 style={{ margin: 0, color: '#0f172a' }}>Báo cáo điểm — {compName}</h2>
             <p style={{ color: '#64748b', margin: '4px 0 0' }}>
-              {contentName} · Nhóm theo trung tâm · Xem lúc {new Date().toLocaleString('vi-VN')}
+              {contentName} · Nhóm theo {groupBy === 'coach' ? 'huấn luyện viên' : 'trường/trung tâm'} · Xem lúc {new Date().toLocaleString('vi-VN')}
             </p>
             {rows.combatMatches?.length > 0 && (
               <button
