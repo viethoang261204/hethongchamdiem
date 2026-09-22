@@ -14,6 +14,13 @@ const GIAI_PHU_TOPN_BY_KEY = {
   'Mining Expedition|Bảng C': 10,
   'Battle of Stars|Bảng D': 10,
   'Skyline Adventures|Bảng D': 5,
+  // Enjoy AI Đà Nẵng (tên nội dung tiếng Việt — không đụng key tiếng Anh ở
+  // trên). Bảng đã gộp (xem lib/boardMerge.js) dùng đúng nhãn gộp làm key,
+  // vì hạng được tính trên tập đội đã gộp, không phải bảng tách.
+  'Cuộc thám hiểm khai khoáng|Bảng B': 5,
+  'Cuộc thám hiểm khai khoáng|Bảng C': 5,
+  'Con đường phát minh|Bảng C': 10,
+  'Cuộc phiêu lưu trên bầu trời|Bảng D + Bảng E': 10,
 };
 
 // Inventions Trail: TẤT CẢ bảng đấu đều xét Top 10 (không phân biệt bảng nào).
@@ -29,8 +36,23 @@ export function classifyRank(contentName, boardName, rank) {
   if (!rank || rank < 1) return null;
   if (rank <= 3) return 'major';
   const topN = giaiPhuTopN(contentName, boardName);
-  if (topN && rank <= topN) return 'phu';
+  // "Top 5" = 5 hạng NGAY SAU Top 3 (hạng 4..3+5=8), "Top 10" = hạng 4..13 —
+  // xem comment GIAI_PHU_TOPN_BY_KEY ở trên. (rank <= topN đơn thuần sẽ SAI —
+  // với topN=5 chỉ khớp hạng 4-5 thay vì đúng 5 hạng 4-8.)
+  if (topN && rank <= 3 + topN) return 'phu';
   return null;
+}
+
+// Nhãn hạng để hiển thị/xuất báo cáo — Top 1/2/3 hiện đúng số, hạng trong dải
+// giải phụ hiện gộp thành "Top 5"/"Top 10" (không hiện riêng "Top 4"/"Top 6"
+// .../), hạng ngoài mọi dải giải phụ (kể cả không có bảng nào được cấu hình)
+// thì để TRỐNG — không có ý nghĩa giải thưởng nên không ghi số hạng ra.
+export function formatRankLabel(contentName, boardName, rank) {
+  if (!rank || rank < 1) return '';
+  if (rank <= 3) return `Top ${rank}`;
+  const topN = giaiPhuTopN(contentName, boardName);
+  if (topN && rank <= 3 + topN) return `Top ${topN}`;
+  return '';
 }
 
 // Có đạt chuẩn "HLV xuất sắc" không, dựa trên danh sách các đội đã qua

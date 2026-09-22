@@ -13,11 +13,8 @@ const REPORT_BORDER_GRAY = 'FFBFBFBF';
 const REPORT_THIN_BORDER = { style: 'thin', color: { argb: REPORT_BORDER_GRAY } };
 const REPORT_CELL_BORDER = { top: REPORT_THIN_BORDER, bottom: REPORT_THIN_BORDER, left: REPORT_THIN_BORDER, right: REPORT_THIN_BORDER };
 
-// "Top N" cho cột Thứ hạng — để trống (không phải "Top null") khi đội chưa
-// có hạng (chưa gán Bảng đấu, hoặc nhánh đấu loại trực tiếp chưa đấu xong).
-export function formatRankLabel(rank) {
-  return rank ? `Top ${rank}` : '';
-}
+// "Top N" cho cột Thứ hạng, có gộp dải giải phụ (Top 5/Top 10) — xem
+// lib/outstandingCoach.js::formatRankLabel(contentName, boardName, rank).
 
 // Tên sheet Excel tối đa 31 ký tự, không chứa \ / * ? : [ ], và không trùng
 // nhau trong cùng 1 workbook — tên nội dung/bảng đấu có thể vi phạm cả 3.

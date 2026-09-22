@@ -15,7 +15,9 @@ import {
   computeGroupStandings as computeDroneStandings, computeSideScore,
   sideFromDetails as droneSideFromDetails, computeMatchPoints as computeDroneMatchPoints,
 } from '../../lib/flySmartCupScoring';
-import { formatRankLabel, safeSheetName, buildStyledSheet, downloadWorkbook } from '../../lib/excelReport';
+import { safeSheetName, buildStyledSheet, downloadWorkbook } from '../../lib/excelReport';
+import { formatRankLabel } from '../../lib/outstandingCoach';
+import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
 import './AdminLayout.css';
 
 // Cột file Excel "Báo cáo điểm" cho nội dung đo lường — 1 dòng/thí sinh theo
@@ -196,23 +198,38 @@ export default function AdminReports() {
         })),
         Promise.all(scopedMeasurementContents.map(async (c) => {
           const boards = await api.getBoards(c.id).catch(() => []);
-          const perBoard = await Promise.all(boards.map((b) => api.getRanking(c.id, b.id).catch(() => null)));
           const entries = [];
-          perBoard.forEach((r) => {
+
+          // Bảng nào nằm trong nhóm gộp (boardMerge.js) thì tính hạng theo
+          // ĐÚNG hạng đã gộp (khớp Bảng xếp hạng + HLV xuất sắc), không tính
+          // riêng theo từng bảng tách.
+          const mergeGroups = getMergeGroupsForContent(c.name, boards);
+          const mergedBoardIds = new Set(mergeGroups.flat().map((b) => b.id));
+          await Promise.all(mergeGroups.map(async (groupBoards) => {
+            const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(c.id, b.id).catch(() => null)));
+            const mergedTeams = mergeMeasurementTeams(rankingResults);
+            const boardLabel = groupBoards.map((b) => b.name).join(' + ');
+            mergedTeams.forEach((t, idx) => entries.push({ team_id: t.team_id, contest_content_id: c.id, board_name: boardLabel, rank: idx + 1 }));
+          }));
+
+          const perBoard = await Promise.all(
+            boards.filter((b) => !mergedBoardIds.has(b.id)).map((b) => api.getRanking(c.id, b.id).catch((e) => [null, b, e]).then((r) => [r, b]))
+          );
+          perBoard.forEach(([r, b]) => {
             if (!r) return;
             if (r.ranking_format === 'measurement') {
-              (r.teams || []).forEach((t, idx) => entries.push({ team_id: t.team_id, contest_content_id: c.id, rank: idx + 1 }));
+              (r.teams || []).forEach((t, idx) => entries.push({ team_id: t.team_id, contest_content_id: c.id, board_name: b.name, rank: idx + 1 }));
             } else if (r.ranking_format === 'combat' && r.bracket_resolved) {
-              (r.placements || []).forEach((p) => entries.push({ team_id: p.team_id, contest_content_id: c.id, rank: p.rank }));
+              (r.placements || []).forEach((p) => entries.push({ team_id: p.team_id, contest_content_id: c.id, board_name: b.name, rank: p.rank }));
             }
           });
-          return entries;
+          return entries.map((e) => ({ ...e, content_name: c.name }));
         })),
       ]);
       setRows({
         measurement,
         rankByMeasurementKey: Object.fromEntries(
-          measurementRankEntries.flat().map((e) => [`${e.team_id}|${e.contest_content_id}`, e.rank])
+          measurementRankEntries.flat().map((e) => [`${e.team_id}|${e.contest_content_id}`, e])
         ),
         combat: combatPerContent.flatMap((c) => c.standingsRows),
         combatMatchRows: combatPerContent.flatMap((c) => c.matchRows),
@@ -379,7 +396,7 @@ export default function AdminReports() {
           dataRows = matchRowsForContent.map((r, idx) => [
             idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
             r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
-            r.total_wins, r.total_draws, r.total_losses, formatRankLabel(r.rank),
+            r.total_wins, r.total_draws, r.total_losses, formatRankLabel(content.name, r.board_name, r.rank),
           ]);
         } else {
           const scoresByTeam = new Map();
@@ -417,7 +434,10 @@ export default function AdminReports() {
                 r1?.score ?? '', r1?.time ?? '',
                 r2?.score ?? '', r2?.time ?? '',
                 totalScore, totalTime,
-                idx === 0 ? formatRankLabel(rows.rankByMeasurementKey?.[`${team.id}|${content.id}`]) : '',
+                idx === 0 ? (() => {
+                  const rankInfo = rows.rankByMeasurementKey?.[`${team.id}|${content.id}`];
+                  return rankInfo ? formatRankLabel(content.name, rankInfo.board_name, rankInfo.rank) : '';
+                })() : '',
               ]);
             });
           }
