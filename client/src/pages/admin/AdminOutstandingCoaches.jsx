@@ -4,7 +4,7 @@ import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
-import { classifyRank, isOutstandingCoach, isRisingStarTeam } from '../../lib/outstandingCoach';
+import { classifyRank, isOutstandingCoach, isRisingStarTeam, formatRankLabel } from '../../lib/outstandingCoach';
 import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
 import './AdminLayout.css';
 
@@ -281,7 +281,7 @@ export default function AdminOutstandingCoaches() {
                     <td style={{ fontSize: 12.5 }}>
                       {row.entries.map((e, idx) => (
                         <div key={idx}>
-                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>Top {e.rank}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
+                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>{formatRankLabel(e.content_name, e.board_name, e.rank)}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
                           {e.tier === 'phu' && <span style={{ color: '#94a3b8' }}> — giải phụ</span>}
                         </div>
                       ))}
