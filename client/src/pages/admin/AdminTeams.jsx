@@ -196,6 +196,12 @@ export default function AdminTeams() {
     [schools, form.competitionId]
   );
 
+  // HLV gắn theo cuộc thi — cùng lý do với Field/Trường ở trên.
+  const coachesForForm = useMemo(
+    () => coaches.filter(c => !form.competitionId || c.competition_id === form.competitionId),
+    [coaches, form.competitionId]
+  );
+
   const { pageItems: teamsPage, page, setPage, pageCount, totalItems, pageSize } = usePagination(teamsFiltered, 10);
 
   const studentsFiltered = useMemo(() => {
@@ -571,10 +577,16 @@ export default function AdminTeams() {
                   className="form-input form-select"
                   value={form.coachId}
                   onChange={(e) => setForm({ ...form, coachId: e.target.value })}
+                  disabled={!form.competitionId}
                 >
                   <option value="">-- Chưa có HLV --</option>
-                  {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {coachesForForm.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {form.competitionId && coachesForForm.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                    Cuộc thi này chưa có HLV nào — tạo ở mục "Huấn luyện viên".
+                  </div>
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Field <span style={{ fontWeight: 400, color: '#94a3b8' }}>(chọn nhiều nếu đội thi ở nhiều field)</span></label>

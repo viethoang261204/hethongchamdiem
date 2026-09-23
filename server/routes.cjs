@@ -636,28 +636,18 @@ router.delete('/teams/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// helper: resolve theo tên, TỰ TẠO mới nếu chưa có — dùng cho HLV/Field
-// (không có danh sách cố định, khác với Bảng đấu chỉ có đúng 5 bảng hệ thống).
-async function resolveOrCreateByName(table, name) {
-  if (!name) return null;
-  const { rows: existing } = await query(`select id from ${table} where lower(name) = lower($1) limit 1`, [name]);
-  if (existing[0]) return existing[0].id;
-  const { rows: created } = await query(`insert into ${table} (name) values ($1) returning id`, [name]);
-  return created[0].id;
-}
-
-// Field giờ gắn theo cuộc thi (competition_id not null) — resolve/tạo mới
-// phải scope theo cuộc thi, khác resolveOrCreateByName dùng cho HLV (vẫn
-// dùng chung toàn hệ thống).
-async function resolveOrCreateFieldByName(name, competitionId) {
+// Field/HLV/Trường đều gắn theo cuộc thi (competition_id not null) — resolve
+// theo tên PHẢI scope đúng cuộc thi, tự tạo mới nếu chưa có (không có danh
+// sách cố định, khác với Bảng đấu chỉ có đúng 5 bảng hệ thống).
+async function resolveOrCreateByName(table, name, competitionId) {
   if (!name) return null;
   const { rows: existing } = await query(
-    'select id from fields where lower(name) = lower($1) and competition_id = $2 limit 1',
+    `select id from ${table} where lower(name) = lower($1) and competition_id = $2 limit 1`,
     [name, competitionId]
   );
   if (existing[0]) return existing[0].id;
   const { rows: created } = await query(
-    'insert into fields (name, competition_id) values ($1, $2) returning id',
+    `insert into ${table} (name, competition_id) values ($1, $2) returning id`,
     [name, competitionId]
   );
   return created[0].id;
@@ -687,18 +677,24 @@ router.post('/teams/import', requireAdmin, h(async (req, res) => {
     }
     let schoolId = null;
     if (row.school_name) {
-      const { rows: s } = await query('select id from schools where lower(name) = lower($1) limit 1', [row.school_name]);
+      const { rows: s } = await query(
+        'select id from schools where lower(name) = lower($1) and competition_id = $2 limit 1',
+        [row.school_name, competitionId]
+      );
       schoolId = s[0]
         ? s[0].id
-        : (await query("insert into schools (name, source) values ($1, 'import') returning id", [row.school_name])).rows[0].id;
+        : (await query(
+            "insert into schools (name, source, competition_id) values ($1, 'import', $2) returning id",
+            [row.school_name, competitionId]
+          )).rows[0].id;
     }
-    const coachId = await resolveOrCreateByName('coaches', row.coach_name);
+    const coachId = await resolveOrCreateByName('coaches', row.coach_name, competitionId);
     // 1 đội có thể thi ở nhiều field — ô field_names ghi nhiều tên cách nhau
     // bởi dấu ; hoặc , (vd "Field 3; Field 7"), mỗi tên tự tạo field mới nếu
-    // chưa có, giống resolveOrCreateByName đang dùng cho HLV.
+    // chưa có, giống resolveOrCreateByName đang dùng cho HLV/Trường.
     const fieldNames = String(row.field_names || '').split(/[;,]/).map((s) => s.trim()).filter(Boolean);
     const fieldIds = [];
-    for (const fname of fieldNames) fieldIds.push(await resolveOrCreateFieldByName(fname, competitionId));
+    for (const fname of fieldNames) fieldIds.push(await resolveOrCreateByName('fields', fname, competitionId));
 
     const { rows: created } = await query(
       `insert into teams (contest_content_id, name, school_id, board_id, coach_id, region)
@@ -1499,16 +1495,21 @@ router.put('/complaints/:id', requireAdmin, h(async (req, res) => {
 // ============================================================
 // Huấn luyện viên (HLV)
 // ============================================================
-router.get('/coaches', h(async (_req, res) => {
-  const { rows } = await query('select * from coaches order by name');
+router.get('/coaches', h(async (req, res) => {
+  const cond = [];
+  const vals = [];
+  if (req.query.competitionId) { vals.push(req.query.competitionId); cond.push(`competition_id = $${vals.length}`); }
+  const where = cond.length ? `where ${cond.join(' and ')}` : '';
+  const { rows } = await query(`select * from coaches ${where} order by name`, vals);
   res.json(rows);
 }));
 
 router.post('/coaches', requireAdmin, h(async (req, res) => {
-  const b = pick(req.body, ['name', 'phone', 'email', 'notes']);
+  const b = pick(req.body, ['name', 'phone', 'email', 'notes', 'competition_id']);
+  if (!b.competition_id) return res.status(400).json({ error: 'Thiếu cuộc thi.' });
   const { rows } = await query(
-    'insert into coaches (name, phone, email, notes) values ($1, $2, $3, $4) returning *',
-    [b.name, b.phone ?? null, b.email ?? null, b.notes ?? null]
+    'insert into coaches (name, phone, email, notes, competition_id) values ($1, $2, $3, $4, $5) returning *',
+    [b.name, b.phone ?? null, b.email ?? null, b.notes ?? null, b.competition_id]
   );
   res.json(rows[0]);
 }));
@@ -1526,20 +1527,22 @@ router.delete('/coaches/:id', requireAdmin, h(async (req, res) => {
   res.json({ ok: true });
 }));
 
-// Nhập hàng loạt từ Excel — bỏ qua trùng (tên + SĐT), không có unique
-// constraint sẵn nên tự SELECT kiểm tra trước.
+// Nhập hàng loạt từ Excel — bỏ qua trùng (tên + SĐT trong cùng cuộc thi),
+// không có unique constraint theo (tên, SĐT) sẵn nên tự SELECT kiểm tra trước.
 router.post('/coaches/import', requireAdmin, h(async (req, res) => {
   const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const competitionId = req.body.competitionId || req.query.competitionId;
+  if (!competitionId) return res.status(400).json({ error: 'Thiếu cuộc thi.' });
   const result = await bulkImport(rows, async (row) => {
     if (!row.name) throw new Error('Thiếu Tên HLV.');
     const { rows: dup } = await query(
-      'select 1 from coaches where lower(name) = lower($1) and coalesce(phone,\'\') = coalesce($2,\'\') limit 1',
-      [row.name, row.phone || null]
+      'select 1 from coaches where lower(name) = lower($1) and coalesce(phone,\'\') = coalesce($2,\'\') and competition_id = $3 limit 1',
+      [row.name, row.phone || null, competitionId]
     );
     if (dup[0]) return { skipped: true };
     await query(
-      'insert into coaches (name, phone, email, notes) values ($1, $2, $3, $4)',
-      [row.name, row.phone || null, row.email || null, row.notes || null]
+      'insert into coaches (name, phone, email, notes, competition_id) values ($1, $2, $3, $4, $5)',
+      [row.name, row.phone || null, row.email || null, row.notes || null, competitionId]
     );
     return {};
   });

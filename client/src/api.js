@@ -489,11 +489,19 @@ export const api = {
   // ============================================================
   // Huấn luyện viên (HLV)
   // ============================================================
-  getCoaches: () => withRetry(() => request('/coaches'), 'getCoaches'),
+  getCoaches: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.competitionId) qs.set('competitionId', params.competitionId);
+    const q = qs.toString();
+    return withRetry(() => request(`/coaches${q ? `?${q}` : ''}`), 'getCoaches');
+  },
 
   postCoach: (body) => withRetry(() => request('/coaches', {
     method: 'POST',
-    body: { name: body.name, phone: body.phone ?? null, email: body.email ?? null, notes: body.notes ?? null },
+    body: {
+      name: body.name, phone: body.phone ?? null, email: body.email ?? null, notes: body.notes ?? null,
+      competition_id: body.competition_id ?? body.competitionId,
+    },
   }), 'postCoach'),
 
   putCoach: (id, body) => {
@@ -507,7 +515,7 @@ export const api = {
 
   deleteCoach: (id) => withRetry(() => request(`/coaches/${id}`, { method: 'DELETE' }), 'deleteCoach'),
 
-  importCoaches: (rows) => withRetry(() => request('/coaches/import', { method: 'POST', body: rows }), 'importCoaches'),
+  importCoaches: (rows, competitionId) => withRetry(() => request('/coaches/import', { method: 'POST', body: { rows, competitionId } }), 'importCoaches'),
 
   // ============================================================
   // HLV xuất sắc — bình chọn theo từng cuộc thi

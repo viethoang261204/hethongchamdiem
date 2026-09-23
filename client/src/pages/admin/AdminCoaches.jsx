@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react';
 import { api } from '../../api';
-import { createCachedApi, clearApiCache } from '../../apiCache';
+import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 import ExcelImportModal from '../../components/ExcelImportModal';
 import './AdminLayout.css';
-
-const capi = createCachedApi(api);
 
 const IMPORT_COLUMNS = [
   { key: 'name', label: 'Tên HLV', required: true, example: 'Nguyễn Văn A' },
@@ -19,21 +17,18 @@ const IMPORT_COLUMNS = [
 
 export default function AdminCoaches() {
   const { showConfirm, showAlert } = useNotify();
-  const { data, loading, error, reload, setData } = useApiLoader(async () => {
-    const [coaches, comps, allContents, teams] = await Promise.all([
-      api.getCoaches(),
-      capi.getCompetitions(),
-      capi.getAllContents(),
-      capi.getAllTeams(),
-    ]);
-    return { coaches, competitions: comps, allContents, teams };
-  }, []);
-  const list = data?.coaches || [];
-  const competitions = data?.competitions || [];
-  const allContents = data?.allContents || [];
-  const teams = data?.teams || [];
-  const [search, setSearch] = useState('');
+  const { data, loading, error, reload } = useApiLoader(() => api.getCompetitions(), []);
+  const competitions = data || [];
   const [filterComp, setFilterComp] = useState('');
+
+  // HLV gắn theo cuộc thi — chỉ tải/hiện HLV của cuộc thi đang chọn.
+  const { data: coachesData, loading: coachesLoading, error: coachesError, reload: reloadCoaches } = useApiLoader(
+    () => (filterComp ? api.getCoaches({ competitionId: filterComp }) : Promise.resolve([])),
+    [filterComp]
+  );
+  const list = coachesData || [];
+
+  const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', email: '', notes: '' });
@@ -41,28 +36,22 @@ export default function AdminCoaches() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const SECURITY_CODE = '26122004';
 
-  // HLV có đội thi đấu trong cuộc thi đang chọn (qua contest_content_id)
-  const coachIdsInComp = useMemo(() => {
-    if (!filterComp) return null;
-    const contentIds = new Set(allContents.filter(c => c.competition_id === filterComp).map(c => c.id));
-    return new Set(teams.filter(t => contentIds.has(t.contest_content_id) && t.coach_id).map(t => t.coach_id));
-  }, [teams, allContents, filterComp]);
-
   const filtered = useMemo(() => {
-    let l = list;
-    if (coachIdsInComp) l = l.filter(x => coachIdsInComp.has(x.id));
-    if (search.trim()) {
-      const s = search.toLowerCase().trim();
-      l = l.filter(x =>
-        (x.name || '').toLowerCase().includes(s) ||
-        (x.phone || '').toLowerCase().includes(s) ||
-        (x.email || '').toLowerCase().includes(s)
-      );
-    }
-    return l;
-  }, [list, search, coachIdsInComp]);
+    if (!search.trim()) return list;
+    const s = search.toLowerCase().trim();
+    return list.filter(x =>
+      (x.name || '').toLowerCase().includes(s) ||
+      (x.phone || '').toLowerCase().includes(s) ||
+      (x.email || '').toLowerCase().includes(s)
+    );
+  }, [list, search]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 10);
+
+  const reloadList = async () => {
+    await reloadCoaches();
+    clearApiCache('getCoaches');
+  };
 
   const openAdd = () => {
     setModal('add');
@@ -83,12 +72,6 @@ export default function AdminCoaches() {
     return Object.keys(errs).length === 0;
   };
 
-  const reloadList = async () => {
-    clearApiCache('getCoaches');
-    const updated = await api.getCoaches();
-    setData((prev) => (prev ? { ...prev, coaches: updated } : prev));
-  };
-
   const save = async () => {
     if (!validate()) {
       showAlert('Vui lòng nhập tên HLV.', 'error');
@@ -101,7 +84,7 @@ export default function AdminCoaches() {
         email: form.email.trim() || null,
         notes: form.notes.trim() || null,
       };
-      if (modal === 'add') await api.postCoach(body);
+      if (modal === 'add') await api.postCoach({ ...body, competition_id: filterComp });
       else await api.putCoach(modal.id, body);
       setModal(null);
       await reloadList();
@@ -138,56 +121,63 @@ export default function AdminCoaches() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Huấn luyện viên</h1>
-          <p className="page-subtitle">Tổng số: {filtered.length} HLV</p>
+          <p className="page-subtitle">{filterComp ? `Tổng số: ${filtered.length} HLV` : 'Chọn cuộc thi để xem/quản lý HLV'}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel</button>
-          <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm HLV</button>
+          <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)} disabled={!filterComp}>Nhập từ Excel</button>
+          <button type="button" className="btn btn-primary" onClick={openAdd} disabled={!filterComp}>Thêm HLV</button>
         </div>
       </div>
       {error && <ErrorBox error={error} onRetry={reload} />}
+      {coachesError && <ErrorBox error={coachesError} onRetry={reloadCoaches} />}
       <div className="filters-bar">
-        <div className="search-box">
-          <input type="text" placeholder="Tìm theo tên, SĐT, email..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
         <select className="filter-select" value={filterComp} onChange={(e) => setFilterComp(e.target.value)}>
-          <option value="">Tất cả cuộc thi</option>
+          <option value="">-- Chọn cuộc thi --</option>
           {competitions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        <div className="search-box">
+          <input type="text" placeholder="Tìm theo tên, SĐT, email..." value={search} onChange={(e) => setSearch(e.target.value)} disabled={!filterComp} />
+        </div>
       </div>
       <div className="card">
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Tên HLV</th>
-                <th>SĐT</th>
-                <th>Email</th>
-                <th>Ghi chú</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có HLV nào.</td></tr>
-              ) : pageItems.map((c) => (
-                <tr key={c.id}>
-                  <td style={{ fontWeight: 600 }}>{c.name}</td>
-                  <td>{c.phone || '-'}</td>
-                  <td>{c.email || '-'}</td>
-                  <td style={{ fontSize: 13, color: '#64748b' }}>{c.notes || '-'}</td>
-                  <td>
-                    <button type="button" className="btn btn-secondary" onClick={() => openEdit(c)}>Sửa</button>
-                    <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(c.id)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+        {!filterComp ? (
+          <p style={{ padding: 24, textAlign: 'center', color: '#888' }}>Chọn cuộc thi ở trên để xem danh sách HLV.</p>
+        ) : (
+          <>
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tên HLV</th>
+                    <th>SĐT</th>
+                    <th>Email</th>
+                    <th>Ghi chú</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coachesLoading ? (
+                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                  ) : filtered.length === 0 ? (
+                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có HLV nào.</td></tr>
+                  ) : pageItems.map((c) => (
+                    <tr key={c.id}>
+                      <td style={{ fontWeight: 600 }}>{c.name}</td>
+                      <td>{c.phone || '-'}</td>
+                      <td>{c.email || '-'}</td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>{c.notes || '-'}</td>
+                      <td>
+                        <button type="button" className="btn btn-secondary" onClick={() => openEdit(c)}>Sửa</button>
+                        <button type="button" className="btn btn-danger" style={{ marginLeft: 8 }} onClick={() => remove(c.id)}>Xóa</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+          </>
+        )}
       </div>
 
       {modal && (
@@ -265,7 +255,7 @@ export default function AdminCoaches() {
           title="Nhập huấn luyện viên từ Excel"
           columns={IMPORT_COLUMNS}
           templateFilename="mau-huan-luyen-vien.xlsx"
-          onImport={(rows) => api.importCoaches(rows)}
+          onImport={(rows) => api.importCoaches(rows, filterComp)}
           onDone={reloadList}
           onClose={() => setImportOpen(false)}
         />

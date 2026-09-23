@@ -553,6 +553,21 @@ alter table schools drop constraint if exists schools_name_competition_key;
 alter table schools add constraint schools_name_competition_key unique (name, competition_id);
 create index if not exists idx_schools_competition on schools(competition_id);
 
+-- HLV gắn theo từng cuộc thi — cùng lý do với Field/Trường ở trên. Backfill
+-- chung: HLV cũ (chưa gắn cuộc thi) gán về cuộc thi cũ nhất. HLV nào thi đấu
+-- ở NHIỀU cuộc thi (coach_id được nhiều team ở nhiều cuộc thi khác nhau
+-- tham chiếu) cần NHÂN BẢN thành 1 dòng riêng mỗi cuộc thi rồi trỏ lại
+-- teams.coach_id cho đúng — việc này làm 1 lần thủ công trên dữ liệu thật
+-- (không tự động hoá được an toàn trong migration chung), không lặp lại ở
+-- đây. Đổi unique index từ không có gì sang (name, competition_id).
+alter table coaches add column if not exists competition_id uuid references competitions(id) on delete cascade;
+update coaches set competition_id = (select id from competitions order by created_at limit 1)
+  where competition_id is null;
+alter table coaches alter column competition_id set not null;
+alter table coaches drop constraint if exists coaches_name_competition_key;
+create unique index if not exists coaches_name_competition_key on coaches(name, competition_id);
+create index if not exists idx_coaches_competition on coaches(competition_id);
+
 -- ============================================================
 -- 2. INDEXES
 -- ============================================================
