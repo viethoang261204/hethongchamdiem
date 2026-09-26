@@ -35,29 +35,30 @@ const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
 const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: '', bSuccess: false, bTimeSeconds: '' });
 
-// Sắp xếp lại thứ tự các cặp giữa các round để né việc 1 đội thi 2 trận
-// LIÊN TIẾP về số thứ tự (match_no) — round-robin gốc (generateRoundRobin)
-// đã đảm bảo 1 đội chỉ xuất hiện đúng 1 lần / round, nên rủi ro chỉ nằm ở
-// ranh giới giữa 2 round: đội đá cặp CUỐI round trước trùng đội đá cặp ĐẦU
-// round sau (2 số thứ tự liền kề). Nếu trùng và round hiện tại có >1 cặp,
-// đẩy cặp đó xuống cuối round hiện tại. Round chỉ có đúng 1 cặp thì không
-// có chỗ để hoán đổi (không tránh được) — chấp nhận giới hạn này.
+// Sắp xếp lại thứ tự các cặp giữa các round sao cho 1 đội đá xong 1 trận thì
+// PHẢI NGHỈ ÍT NHẤT 2 trận (số thứ tự) mới đá tiếp — không chỉ né đá 2 trận
+// LIÊN TIẾP như trước. round-robin gốc (generateRoundRobin) đã đảm bảo 1 đội
+// chỉ xuất hiện đúng 1 lần / round nên trong CÙNG 1 round không có xung đột;
+// thuật toán dưới đây greedy chọn, trong số các cặp CÒN LẠI của round đang
+// xét, cặp nào không đụng đội của 2 trận vừa xếp gần nhất (tính xuyên suốt
+// mọi round, không reset theo từng round) để xếp tiếp theo — nếu round hiện
+// tại không còn cặp nào "sạch" (VD round chỉ có 1 cặp và đội đó vừa đá) thì
+// đành chấp nhận xếp cặp còn lại, không có cách nào tránh được trong TH đó.
 function orderPairsAcrossRounds(rounds) {
+  const remainingRounds = rounds.map((r) => ({ pairs: r.pairs.slice() }));
   const ordered = [];
-  let prevPairTeams = null;
-  for (const round of rounds) {
-    const pairs = round.pairs.slice();
-    if (prevPairTeams && pairs.length > 1) {
-      const idx = pairs.findIndex((p) => prevPairTeams.has(p.teamAId) || prevPairTeams.has(p.teamBId));
-      if (idx > -1 && idx !== pairs.length - 1) {
-        const [moved] = pairs.splice(idx, 1);
-        pairs.push(moved);
-      }
-    }
-    ordered.push(...pairs);
-    if (pairs.length) {
-      const last = pairs[pairs.length - 1];
-      prevPairTeams = new Set([last.teamAId, last.teamBId]);
+  const recentTeamSets = []; // tối đa 2 phần tử gần nhất, mỗi phần tử là Set(2 teamId của 1 trận)
+
+  for (const round of remainingRounds) {
+    const pairs = round.pairs;
+    while (pairs.length) {
+      const recentTeams = new Set(recentTeamSets.flatMap((s) => [...s]));
+      let idx = pairs.findIndex((p) => !recentTeams.has(p.teamAId) && !recentTeams.has(p.teamBId));
+      if (idx === -1) idx = 0; // không còn lựa chọn "sạch" — chấp nhận, không tránh được
+      const [chosen] = pairs.splice(idx, 1);
+      ordered.push(chosen);
+      recentTeamSets.push(new Set([chosen.teamAId, chosen.teamBId]));
+      if (recentTeamSets.length > 2) recentTeamSets.shift();
     }
   }
   return ordered;
