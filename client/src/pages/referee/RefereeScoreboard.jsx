@@ -2,8 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
 import { useAuth } from '../../App';
 import { formatSecondsAsMinutes } from '../../lib/time';
+import { computeGroupStandings } from '../../lib/battleScoring';
+import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
+
+const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
 
 // Bảng xếp hạng CHO TRỌNG TÀI — chỉ hiện với tài khoản được admin bật quyền
 // "Xem bảng xếp hạng" (users.can_view_scoreboard, quản lý ở AdminRefereeAccounts).
@@ -51,6 +55,46 @@ function MeasurementTable({ teams }) {
   );
 }
 
+// Bảng xếp hạng đối kháng (Battle of Stars/Fly Smart Cup) theo Board — tính
+// từ TOÀN BỘ trận của nội dung (không chỉ lọc theo group vòng tròn), giống
+// hệt cách AdminScoreboard.jsx tính combatBoardStandings, vì nội dung đối
+// kháng không dùng bảng `scores`/API /ranking (đó là cho nội dung đo lường).
+function CombatBoardTable({ standings, isStars }) {
+  if (standings.length === 0) return <p style={{ color: '#64748b', fontSize: 13.5 }}>Chưa có đội nào ở bảng này.</p>;
+  return (
+    <div className="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th style={{ width: 56 }}>Hạng</th>
+            <th>Đội</th>
+            <th style={{ width: 70 }}>Trận</th>
+            <th style={{ width: 50 }}>W</th>
+            <th style={{ width: 50 }}>D</th>
+            <th style={{ width: 50 }}>L</th>
+            <th style={{ width: 100 }}>Match Points</th>
+            <th style={{ width: 100 }}>Total Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((s) => (
+            <tr key={s.teamId}>
+              <td><RankBadge rank={s.rank} /></td>
+              <td>{s.teamName}</td>
+              <td>{s.played}</td>
+              <td>{s.wins}</td>
+              <td>{s.draws}</td>
+              <td>{s.losses}</td>
+              <td><strong style={{ color: '#f1f5f9' }}>{s.matchPoints}</strong></td>
+              <td>{s.totalScore}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function CombatSummary({ data }) {
   if (!data.matches?.length) {
     return <p style={{ padding: '12px 4px', color: '#64748b', fontSize: 13.5 }}>Chưa có nhánh đấu.</p>;
@@ -80,26 +124,55 @@ function CombatSummary({ data }) {
 }
 
 function ContentSection({ content }) {
+  const isCombat = COMBAT_FORMATS.includes(content.content_format);
+  const isStars = content.content_format === 'combat_stars';
   const [boards, setBoards] = useState([]);
   const [rankings, setRankings] = useState({});
+  const [combatData, setCombatData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.getBoards(content.id)
-      .then(async (bd) => {
-        if (cancelled) return;
-        setBoards(bd);
-        const pairs = await Promise.all(
-          bd.map((b) => api.getRanking(content.id, b.id).then((r) => [b.id, r]).catch(() => [b.id, null]))
-        );
-        if (!cancelled) setRankings(Object.fromEntries(pairs));
-      })
-      .catch(() => { if (!cancelled) setBoards([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    if (isCombat) {
+      // Nội dung đối kháng KHÔNG dùng bảng `scores`/API /ranking (đó là cho
+      // nội dung đo lường) — phải tự lấy teams + combat_matches rồi tính
+      // bằng đúng luật riêng của từng format, giống AdminScoreboard.jsx.
+      Promise.all([api.getBoards(content.id), api.getTeams(content.id), api.getCombatMatches(content.id)])
+        .then(([bd, tm, ms]) => {
+          if (cancelled) return;
+          setBoards(bd);
+          setCombatData({ teams: tm, matches: ms });
+        })
+        .catch(() => { if (!cancelled) { setBoards([]); setCombatData({ teams: [], matches: [] }); } })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    } else {
+      api.getBoards(content.id)
+        .then(async (bd) => {
+          if (cancelled) return;
+          setBoards(bd);
+          const pairs = await Promise.all(
+            bd.map((b) => api.getRanking(content.id, b.id).then((r) => [b.id, r]).catch(() => [b.id, null]))
+          );
+          if (!cancelled) setRankings(Object.fromEntries(pairs));
+        })
+        .catch(() => { if (!cancelled) setBoards([]); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }
     return () => { cancelled = true; };
-  }, [content.id]);
+  }, [content.id, isCombat]);
+
+  const combatBoardStandings = useMemo(() => {
+    if (!isCombat || !combatData) return {};
+    const result = {};
+    for (const b of boards) {
+      const boardTeams = combatData.teams.filter((t) => t.board_id === b.id);
+      result[b.id] = isStars
+        ? computeGroupStandings(boardTeams, combatData.matches)
+        : computeDroneStandings(boardTeams, combatData.matches);
+    }
+    return result;
+  }, [isCombat, isStars, combatData, boards]);
 
   return (
     <div className="ts-card" style={{ marginBottom: 20 }}>
@@ -108,6 +181,19 @@ function ContentSection({ content }) {
         <p style={{ color: '#64748b' }}>Đang tải...</p>
       ) : boards.length === 0 ? (
         <p style={{ color: '#64748b' }}>Nội dung này chưa có bảng đấu nào.</p>
+      ) : isCombat ? (
+        boards.map((b) => (
+          <div key={b.id} style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <strong style={{ color: '#e2e8f0', fontSize: 14 }}>
+                {b.name}{b.age_group ? ` — ${b.age_group}` : ''}
+              </strong>
+              <span className="ts-board-chip">{isStars ? 'Battle of Stars' : 'Fly Smart Cup'}</span>
+              <span style={{ fontSize: 12, color: '#64748b' }}>{(combatBoardStandings[b.id] || []).length} đội</span>
+            </div>
+            <CombatBoardTable standings={combatBoardStandings[b.id] || []} isStars={isStars} />
+          </div>
+        ))
       ) : (
         boards.map((b) => {
           const r = rankings[b.id];
