@@ -32,6 +32,15 @@ const GIAI_PHU_TOPN_BY_COMPETITION = {
     'Con đường phát minh|Bảng C': 10,
     'Cuộc phiêu lưu trên bầu trời|Bảng D + Bảng E': 10,
   },
+  // Enjoy AI TP HCM — theo đúng BXH_ONESPACE_ACADEMY.pdf: chỉ 3 bảng có giải
+  // phụ Top 10 (Nền văn minh cổ đại Bảng B, Con đường phát minh Bảng C và D);
+  // Cuộc thám hiểm khai khoáng, Fly Smart Cup, Con đường phát minh Bảng B/E
+  // chỉ xét Top 1-3 (không có giải phụ) — KHÁC Đà Nẵng dù trùng tên nội dung.
+  [HCM]: {
+    'Nền văn minh cổ đại|Bảng B': 10,
+    'Con đường phát minh|Bảng C': 10,
+    'Con đường phát minh|Bảng D': 10,
+  },
 };
 
 function giaiPhuTopN(competitionId, contentName, boardName) {
