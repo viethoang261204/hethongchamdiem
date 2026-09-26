@@ -39,9 +39,9 @@ async function computeQualifyingEntries(competitionId) {
     // hạng/bảng đấu (xem lib/outstandingCoach.js), nên xét TRƯỚC và độc lập
     // với phần tính hạng theo bảng bên dưới.
     teams.forEach((t) => {
-      if (!isRisingStarTeam(t.name)) return;
+      if (!isRisingStarTeam(competitionId, t.name)) return;
       addEntry(t.coach_id, {
-        team_name: t.name, content_name: content.name, board_name: 'Rising Star', rank: 0, tier: 'major', award: 'rising_star',
+        team_name: t.name, content_name: content.name, board_name: 'Rising Star', rank: 0, tier: 'major', award: 'rising_star', competition_id: competitionId,
       });
     });
 
@@ -56,11 +56,11 @@ async function computeQualifyingEntries(competitionId) {
           ? computeGroupStandings(boardTeams, matches)
           : computeDroneStandings(boardTeams, matches);
         standings.forEach((s) => {
-          const tier = classifyRank(content.name, board.name, s.rank);
+          const tier = classifyRank(competitionId, content.name, board.name, s.rank);
           if (!tier) return;
           const team = teamById.get(s.teamId);
           addEntry(team?.coach_id, {
-            team_name: s.teamName, content_name: content.name, board_name: board.name, rank: s.rank, tier,
+            team_name: s.teamName, content_name: content.name, board_name: board.name, rank: s.rank, tier, competition_id: competitionId,
           });
         });
       });
@@ -78,11 +78,11 @@ async function computeQualifyingEntries(competitionId) {
         const boardLabel = groupBoards.map((b) => b.name).join(' + ');
         mergedTeams.forEach((t, idx) => {
           const rank = idx + 1;
-          const tier = classifyRank(content.name, boardLabel, rank);
+          const tier = classifyRank(competitionId, content.name, boardLabel, rank);
           if (!tier) return;
           const team = teamById.get(t.team_id);
           addEntry(team?.coach_id, {
-            team_name: t.team_name, content_name: content.name, board_name: boardLabel, rank, tier,
+            team_name: t.team_name, content_name: content.name, board_name: boardLabel, rank, tier, competition_id: competitionId,
           });
         });
       }));
@@ -93,22 +93,22 @@ async function computeQualifyingEntries(competitionId) {
         if (r.ranking_format === 'measurement') {
           (r.teams || []).forEach((t, idx) => {
             const rank = idx + 1;
-            const tier = classifyRank(content.name, board.name, rank);
+            const tier = classifyRank(competitionId, content.name, board.name, rank);
             if (!tier) return;
             const team = teamById.get(t.team_id);
             addEntry(team?.coach_id, {
-              team_name: t.team_name, content_name: content.name, board_name: board.name, rank, tier,
+              team_name: t.team_name, content_name: content.name, board_name: board.name, rank, tier, competition_id: competitionId,
             });
           });
         } else if (r.ranking_format === 'combat' && r.bracket_resolved) {
           (r.placements || []).forEach((p) => {
-            const tier = classifyRank(content.name, board.name, p.rank);
+            const tier = classifyRank(competitionId, content.name, board.name, p.rank);
             if (!tier) return;
             const team = teamById.get(p.team_id);
             const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
               || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || team?.name || '';
             addEntry(team?.coach_id, {
-              team_name: name, content_name: content.name, board_name: board.name, rank: p.rank, tier,
+              team_name: name, content_name: content.name, board_name: board.name, rank: p.rank, tier, competition_id: competitionId,
             });
           });
         }
@@ -281,7 +281,7 @@ export default function AdminOutstandingCoaches() {
                     <td style={{ fontSize: 12.5 }}>
                       {row.entries.map((e, idx) => (
                         <div key={idx}>
-                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>{formatRankLabel(e.content_name, e.board_name, e.rank)}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
+                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>{formatRankLabel(e.competition_id, e.content_name, e.board_name, e.rank)}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
                           {e.tier === 'phu' && <span style={{ color: '#94a3b8' }}> — giải phụ</span>}
                         </div>
                       ))}

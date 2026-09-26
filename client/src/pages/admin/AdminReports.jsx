@@ -396,7 +396,7 @@ export default function AdminReports() {
           dataRows = matchRowsForContent.map((r, idx) => [
             idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
             r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
-            r.total_wins, r.total_draws, r.total_losses, formatRankLabel(content.name, r.board_name, r.rank),
+            r.total_wins, r.total_draws, r.total_losses, formatRankLabel(content.competition_id, content.name, r.board_name, r.rank),
           ]);
         } else {
           const scoresByTeam = new Map();
@@ -436,7 +436,7 @@ export default function AdminReports() {
                 totalScore, totalTime,
                 idx === 0 ? (() => {
                   const rankInfo = rows.rankByMeasurementKey?.[`${team.id}|${content.id}`];
-                  return rankInfo ? formatRankLabel(content.name, rankInfo.board_name, rankInfo.rank) : '';
+                  return rankInfo ? formatRankLabel(content.competition_id, content.name, rankInfo.board_name, rankInfo.rank) : '';
                 })() : '',
               ]);
             });
