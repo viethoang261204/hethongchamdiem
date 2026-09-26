@@ -306,7 +306,7 @@ export default function AdminScoreboard() {
         // lặp per-board bên dưới, tránh xuất trùng 2 lần.
         const mergedBoardIds = new Set();
         if (!isCombat) {
-          for (const groupBoards of getMergeGroupsForContent(content.name, contentBoards)) {
+          for (const groupBoards of getMergeGroupsForContent(content.competition_id, content.name, contentBoards)) {
             const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(content.id, b.id).catch(() => null)));
             const mergedTeams = mergeMeasurementTeams(rankingResults);
             if (!mergedTeams.length) continue;

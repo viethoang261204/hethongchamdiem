@@ -69,7 +69,7 @@ async function computeQualifyingEntries(competitionId) {
       // hạng đã gộp (giống file Excel xuất ra), không xét riêng theo từng
       // bảng tách — vì bảng tách ít đội sẽ cho hạng sai lệch so với thực tế
       // đã thi đấu/xếp hạng chung.
-      const mergeGroups = getMergeGroupsForContent(content.name, boards);
+      const mergeGroups = getMergeGroupsForContent(competitionId, content.name, boards);
       const mergedBoardIds = new Set(mergeGroups.flat().map((b) => b.id));
 
       await Promise.all(mergeGroups.map(async (groupBoards) => {

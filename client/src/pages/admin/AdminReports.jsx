@@ -203,7 +203,7 @@ export default function AdminReports() {
           // Bảng nào nằm trong nhóm gộp (boardMerge.js) thì tính hạng theo
           // ĐÚNG hạng đã gộp (khớp Bảng xếp hạng + HLV xuất sắc), không tính
           // riêng theo từng bảng tách.
-          const mergeGroups = getMergeGroupsForContent(c.name, boards);
+          const mergeGroups = getMergeGroupsForContent(c.competition_id, c.name, boards);
           const mergedBoardIds = new Set(mergeGroups.flat().map((b) => b.id));
           await Promise.all(mergeGroups.map(async (groupBoards) => {
             const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(c.id, b.id).catch(() => null)));
