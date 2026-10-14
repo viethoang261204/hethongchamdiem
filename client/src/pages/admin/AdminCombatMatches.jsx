@@ -19,7 +19,7 @@ import {
   determineKnockoutResult, resolveShootoutWinner,
   computeGroupStandings as computeDroneGroupStandings,
 } from '../../lib/flySmartCupScoring';
-import { planGroupSchedule } from '../../lib/combatSchedule';
+import { compareMatchOrder, planGroupSchedule } from '../../lib/combatSchedule';
 import { buildStyledSheet, downloadWorkbook, safeSheetName } from '../../lib/excelReport';
 import './AdminLayout.css';
 
@@ -97,8 +97,10 @@ export default function AdminCombatMatches() {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [matches]);
   const matchesForList = useMemo(() => {
-    if (!matchListFieldFilter) return matches;
-    return matches.filter((m) => m.field_id === matchListFieldFilter);
+    // Xếp theo STT rồi Sân — đúng thứ tự file Xuất Excel (trận cùng STT ở các
+    // sân là cùng 1 lượt), không theo thời điểm tạo trận.
+    const list = matchListFieldFilter ? matches.filter((m) => m.field_id === matchListFieldFilter) : matches.slice();
+    return list.sort(compareMatchOrder);
   }, [matches, matchListFieldFilter]);
 
   const { pageItems: matchesPage, page: matchesPageNo, setPage: setMatchesPage, pageCount: matchesPageCount, totalItems: matchesTotal, pageSize: matchesPageSize } = usePagination(matchesForList, 10);
@@ -234,8 +236,7 @@ export default function AdminCombatMatches() {
       const workbook = new ExcelJS.Workbook();
       const compName = competitions.find((c) => c.id === selectedContent?.competition_id)?.name || '';
       const noOf = (m) => { const n = parseInt(m.match_no, 10); return Number.isNaN(n) ? Infinity : n; };
-      const sorted = matchesForList.slice().sort((a, b) =>
-        noOf(a) - noOf(b) || (a.field?.name || '').localeCompare(b.field?.name || '', undefined, { numeric: true }));
+      const sorted = matchesForList; // đã xếp theo STT rồi Sân (compareMatchOrder)
       const resultOf = (m) => (m.details?.status === 'cancelled' ? 'Đã hủy'
         : m.details?.status === 'disqualified' ? 'Truất quyền'
         : m.is_draw ? 'Hòa' : m.winner_id ? `Thắng: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}` : '');

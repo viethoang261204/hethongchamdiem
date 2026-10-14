@@ -185,3 +185,12 @@ export function planGroupSchedule({ pairs, teamsById, allFields, matches }) {
   });
   return result;
 }
+
+// Thứ tự hiển thị/xuất trận: theo STT (match_no, số) rồi theo tên sân — trận
+// cùng STT ở các sân là cùng 1 lượt. Trận chưa có STT xếp cuối.
+export function compareMatchOrder(a, b) {
+  const no = (m) => { const n = parseInt(m.match_no, 10); return Number.isNaN(n) ? Infinity : n; };
+  const d = no(a) - no(b);
+  if (d) return d;
+  return (a.field?.name || '').localeCompare(b.field?.name || '', undefined, { numeric: true });
+}

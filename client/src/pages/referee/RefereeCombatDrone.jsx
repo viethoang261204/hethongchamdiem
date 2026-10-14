@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useLang } from '../../lib/i18n';
+import { compareMatchOrder } from '../../lib/combatSchedule';
 import './RefereeLayout.css';
 import './TaskScoringWizard.css';
 
@@ -17,7 +18,7 @@ export default function RefereeCombatDrone() {
 
   useEffect(() => {
     setLoading(true);
-    api.getCombatMatches(contentId).then(setMatches).catch(() => setMatches([])).finally(() => setLoading(false));
+    api.getCombatMatches(contentId).then((rows) => setMatches(rows.slice().sort(compareMatchOrder))).catch(() => setMatches([])).finally(() => setLoading(false));
   }, [contentId]);
 
   const openMatch = (m) => {
@@ -55,9 +56,11 @@ export default function RefereeCombatDrone() {
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMatch(m); } }}
               >
                 <strong style={{ color: '#f1f5f9' }}>
+                  {m.match_no && <span style={{ color: '#38bdf8', marginRight: 8 }}>{lang === 'vi' ? 'Trận' : 'Match'} {m.match_no}</span>}
                   {m.team_a?.name || '—'} <span style={{ color: '#64748b' }}>vs</span> {m.team_b?.name || '—'}
                 </strong>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {m.field?.name && <span className="ts-board-chip">{lang === 'vi' ? 'Sân' : 'Field'} {m.field.name}</span>}
                   {m.stage && <span className="ts-board-chip">{m.stage}</span>}
                   {done && (
                     <span className="rt-badge rt-badge-done">
