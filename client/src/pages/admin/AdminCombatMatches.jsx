@@ -19,6 +19,8 @@ import {
   determineKnockoutResult, resolveShootoutWinner,
   computeGroupStandings as computeDroneGroupStandings,
 } from '../../lib/flySmartCupScoring';
+import { planGroupSchedule } from '../../lib/combatSchedule';
+import { buildStyledSheet, downloadWorkbook, safeSheetName } from '../../lib/excelReport';
 import './AdminLayout.css';
 
 const CONTENT_FORMAT_LABEL = {
@@ -34,57 +36,6 @@ const MISSION_NAMES = ['Meteor Tower', 'Energy Defense', 'Full Firepower', 'Fina
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
 const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: '', bSuccess: false, bTimeSeconds: '' });
-
-// Sắp xếp lại thứ tự các cặp giữa các round sao cho 1 đội đá xong 1 trận thì
-// PHẢI NGHỈ ÍT NHẤT 2 trận (số thứ tự) mới đá tiếp — không chỉ né đá 2 trận
-// LIÊN TIẾP như trước. round-robin gốc (generateRoundRobin) đã đảm bảo 1 đội
-// chỉ xuất hiện đúng 1 lần / round nên trong CÙNG 1 round không có xung đột;
-// thuật toán dưới đây greedy chọn, trong số các cặp CÒN LẠI của round đang
-// xét, cặp nào không đụng đội của 2 trận vừa xếp gần nhất (tính xuyên suốt
-// mọi round, không reset theo từng round) để xếp tiếp theo — nếu round hiện
-// tại không còn cặp nào "sạch" (VD round chỉ có 1 cặp và đội đó vừa đá) thì
-// đành chấp nhận xếp cặp còn lại, không có cách nào tránh được trong TH đó.
-function orderPairsAcrossRounds(rounds) {
-  const remainingRounds = rounds.map((r) => ({ pairs: r.pairs.slice() }));
-  const ordered = [];
-  const recentTeamSets = []; // tối đa 2 phần tử gần nhất, mỗi phần tử là Set(2 teamId của 1 trận)
-
-  for (const round of remainingRounds) {
-    const pairs = round.pairs;
-    while (pairs.length) {
-      const recentTeams = new Set(recentTeamSets.flatMap((s) => [...s]));
-      let idx = pairs.findIndex((p) => !recentTeams.has(p.teamAId) && !recentTeams.has(p.teamBId));
-      if (idx === -1) idx = 0; // không còn lựa chọn "sạch" — chấp nhận, không tránh được
-      const [chosen] = pairs.splice(idx, 1);
-      ordered.push(chosen);
-      recentTeamSets.push(new Set([chosen.teamAId, chosen.teamBId]));
-      if (recentTeamSets.length > 2) recentTeamSets.shift();
-    }
-  }
-  return ordered;
-}
-
-// STT (match_no) đánh theo SÂN, không theo group/bảng — nhiều group khác
-// nhau vẫn có thể thi chung 1 sân, và 1 sân chỉ chạy được từng trận một
-// theo thời gian thực nên STT phải liền mạch xuyên suốt sân đó (vd sân S03
-// có 32 trận thì STT 1-32 trên chính sân S03, bất kể trận đó thuộc group
-// nào). Bộ đếm `counters` truyền vào từ ngoài để nhiều trận SINH CÙNG 1 lượt
-// gọi (cùng đợt "Sinh lịch vòng tròn") tiếp tục tăng đúng cho cùng 1 sân
-// thay vì mỗi trận tự tính lại từ `matches` gốc (dữ liệu cũ, chưa có trận
-// vừa tạo trong vòng lặp).
-function nextMatchNoForField(matches, counters, fieldId) {
-  if (!fieldId) return null;
-  if (!counters.has(fieldId)) {
-    const nums = matches
-      .filter((m) => m.field_id === fieldId)
-      .map((m) => parseInt(m.match_no, 10))
-      .filter((n) => !Number.isNaN(n));
-    counters.set(fieldId, (nums.length ? Math.max(...nums) : 0) + 1);
-  }
-  const no = counters.get(fieldId);
-  counters.set(fieldId, no + 1);
-  return no;
-}
 
 export default function AdminCombatMatches() {
   const { showConfirm, showAlert } = useNotify();
@@ -268,6 +219,59 @@ export default function AdminCombatMatches() {
       showAlert('Đã xóa.', 'success');
     } catch (e) {
       showAlert(e.message || 'Lỗi', 'error');
+    }
+  };
+
+  // Xuất "Danh sách trận" (theo đúng bộ lọc Sân đang chọn) ra Excel: sheet
+  // "Tất cả" xếp theo STT rồi Sân (trận cùng STT = cùng lượt chạy song song),
+  // kèm mỗi sân 1 sheet riêng để in phát cho trọng tài từng sân.
+  const [exportingMatches, setExportingMatches] = useState(false);
+  const exportMatchesExcel = async () => {
+    if (!matchesForList.length) return;
+    setExportingMatches(true);
+    try {
+      const { default: ExcelJS } = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const compName = competitions.find((c) => c.id === selectedContent?.competition_id)?.name || '';
+      const noOf = (m) => { const n = parseInt(m.match_no, 10); return Number.isNaN(n) ? Infinity : n; };
+      const sorted = matchesForList.slice().sort((a, b) =>
+        noOf(a) - noOf(b) || (a.field?.name || '').localeCompare(b.field?.name || '', undefined, { numeric: true }));
+      const resultOf = (m) => (m.details?.status === 'cancelled' ? 'Đã hủy'
+        : m.details?.status === 'disqualified' ? 'Truất quyền'
+        : m.is_draw ? 'Hòa' : m.winner_id ? `Thắng: ${m.winner_id === m.team_a_id ? m.team_a?.name : m.team_b?.name}` : '');
+      const header = ['STT', 'Sân', 'Division', 'Bảng', 'Vòng', ...(isStars ? ['Lượt'] : []),
+        isDrone ? 'Đội 1' : 'Đội Đỏ', isDrone ? 'Đội 2' : 'Đội Xanh', 'Kết quả'];
+      const columnKinds = ['index', 'label', 'label', 'label', 'label', ...(isStars ? ['label'] : []), 'text', 'text', 'text'];
+      const columnWidths = [8, 10, 16, 12, 16, ...(isStars ? [10] : []), 32, 32, 28];
+      const toRow = (m) => [
+        noOf(m) === Infinity ? (m.match_no || '') : noOf(m), m.field?.name || '', m.boards?.name || '', m.group_label || '', m.stage || '',
+        ...(isStars ? [m.group_label ? ((m.details?.leg ?? 1) === 2 ? 'Lượt về' : 'Lượt đi') : ''] : []),
+        `${m.team_a?.name || ''}${m.team_a_no ? ` (No.${m.team_a_no})` : ''}`,
+        `${m.team_b?.name || ''}${m.team_b_no ? ` (No.${m.team_b_no})` : ''}`,
+        resultOf(m),
+      ];
+      const used = new Set();
+      const title = `DANH SÁCH THI ĐẤU — ${selectedContent?.name || ''}`.toUpperCase();
+      buildStyledSheet(workbook, safeSheetName('Tất cả', used), {
+        title, subtitle: compName, header, columnKinds, columnWidths, rows: sorted.map(toRow),
+      });
+      const fieldNames = [...new Set(sorted.map((m) => m.field?.name).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      if (fieldNames.length > 1) {
+        for (const name of fieldNames) {
+          buildStyledSheet(workbook, safeSheetName(`Sân ${name}`, used), {
+            title, subtitle: `${compName} — Sân ${name}`, header, columnKinds, columnWidths,
+            rows: sorted.filter((m) => m.field?.name === name).map(toRow),
+          });
+        }
+      }
+      const slug = (selectedContent?.name || 'doi-khang').normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/đ/gi, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      await downloadWorkbook(workbook, `danh-sach-tran-${slug}.xlsx`);
+    } catch (e) {
+      showAlert(e.message || 'Lỗi xuất Excel', 'error');
+    } finally {
+      setExportingMatches(false);
     }
   };
 
@@ -591,11 +595,10 @@ export default function AdminCombatMatches() {
       });
   }, [isStars, scheduleByGroup, matches]);
 
-  // Sinh trận còn thiếu của 1 bảng, rải đều field: ưu tiên chọn field nằm
-  // trong tập field mà 1 trong 2 đội (team_a/team_b) đã được gán riêng (đội
-  // có thể gán nhiều field — xem team_fields/AdminTeams.jsx), cân bằng theo
-  // số trận CHÍNH 2 đội đó đã chơi ở từng field ứng viên; đội chưa gán field
-  // nào thì fallback dùng field ít được dùng nhất toàn nội dung (hành vi cũ).
+  // Sinh trận còn thiếu của 1 bảng — xếp theo LƯỢT chạy song song trên các
+  // sân đã gán cho đội trong group (team_fields, xem AdminTeams.jsx), STT
+  // thẳng hàng giữa các sân và 1 đội không bao giờ đá 2 lượt liền nhau — xem
+  // lib/combatSchedule.js. Đội chưa gán sân nào thì dùng mọi sân của cuộc thi.
   const generateSchedule = async (group) => {
     if (!group.missingPairs.length) return;
     const teamsById = new Map(group.teamIds.map((id) => [id, teams.find((t) => t.id === id)]));
@@ -606,51 +609,14 @@ export default function AdminCombatMatches() {
       showAlert(`Đội "${missingBoard.name}" chưa có Division (Bảng đấu theo tuổi) — vào module Teams để gán trước khi sinh lịch.`, 'error');
       return;
     }
-    const fieldUsage = new Map();
-    const teamFieldUsage = new Map(); // key `${teamId}:${fieldId}` -> số trận đội đó đã chơi ở field đó
-    const bumpTeamField = (teamId, fieldId) => {
-      if (!teamId) return;
-      const key = `${teamId}:${fieldId}`;
-      teamFieldUsage.set(key, (teamFieldUsage.get(key) || 0) + 1);
-    };
-    for (const m of matches) {
-      if (!m.field_id) continue;
-      fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1);
-      bumpTeamField(m.team_a_id, m.field_id);
-      bumpTeamField(m.team_b_id, m.field_id);
-    }
-    const pickField = (teamA, teamB) => {
-      if (!fieldsForComp.length) return null;
-      const candidateIds = new Set([...(teamA?.fields || []), ...(teamB?.fields || [])].map((f) => f.id));
-      const candidates = candidateIds.size ? fieldsForComp.filter((f) => candidateIds.has(f.id)) : fieldsForComp;
-      let best = candidates[0], bestScore = Infinity;
-      for (const f of candidates) {
-        const teamScore = (teamFieldUsage.get(`${teamA?.id}:${f.id}`) || 0) + (teamFieldUsage.get(`${teamB?.id}:${f.id}`) || 0);
-        const score = teamScore * 1000 + (fieldUsage.get(f.id) || 0);
-        if (score < bestScore) { bestScore = score; best = f; }
-      }
-      fieldUsage.set(best.id, (fieldUsage.get(best.id) || 0) + 1);
-      bumpTeamField(teamA?.id, best.id);
-      bumpTeamField(teamB?.id, best.id);
-      return best;
-    };
-    // Xếp thứ tự theo round (né 1 đội đá 2 trận liên tiếp) rồi đánh STT theo
-    // SÂN được chọn cho từng trận (không theo group) — xem nextMatchNoForField.
-    const orderedPairs = orderPairsAcrossRounds(
-      group.rounds.map((r) => ({ ...r, pairs: r.pairs.filter((p) => !p.match) }))
-    );
-    const fieldNoCounters = new Map();
+    const plan = planGroupSchedule({ pairs: group.missingPairs, teamsById, allFields: fieldsForComp, matches });
     setGeneratingGroup(group.label);
     try {
-      for (const p of orderedPairs) {
-        const teamA = teamsById.get(p.teamAId);
-        const teamB = teamsById.get(p.teamBId);
-        const field = pickField(teamA, teamB);
-        const matchNo = nextMatchNoForField(matches, fieldNoCounters, field?.id);
+      for (const { pair: p, field, matchNo } of plan) {
         await api.postCombatMatch(selectedContentId, {
           team_a_id: p.teamAId, team_b_id: p.teamBId,
-          group_label: group.label, board_id: teamA.board_id, field_id: field?.id || null,
-          match_no: matchNo != null ? String(matchNo) : null,
+          group_label: group.label, board_id: teamsById.get(p.teamAId).board_id, field_id: field?.id || null,
+          match_no: String(matchNo),
           details: { leg: 1 },
         });
       }
@@ -670,36 +636,9 @@ export default function AdminCombatMatches() {
   const generateReturnLeg = async (returnGroup) => {
     if (!returnGroup.missingReturnPairs.length) return;
     const teamsById = new Map(returnGroup.teamIds.map((id) => [id, teams.find((t) => t.id === id)]));
-    const fieldUsage = new Map();
-    const teamFieldUsage = new Map();
-    const bumpTeamField = (teamId, fieldId) => {
-      if (!teamId) return;
-      const key = `${teamId}:${fieldId}`;
-      teamFieldUsage.set(key, (teamFieldUsage.get(key) || 0) + 1);
-    };
-    for (const m of matches) {
-      if (!m.field_id) continue;
-      fieldUsage.set(m.field_id, (fieldUsage.get(m.field_id) || 0) + 1);
-      bumpTeamField(m.team_a_id, m.field_id);
-      bumpTeamField(m.team_b_id, m.field_id);
-    }
-    const pickField = (teamA, teamB) => {
-      if (!fieldsForComp.length) return null;
-      const candidateIds = new Set([...(teamA?.fields || []), ...(teamB?.fields || [])].map((f) => f.id));
-      const candidates = candidateIds.size ? fieldsForComp.filter((f) => candidateIds.has(f.id)) : fieldsForComp;
-      let best = candidates[0], bestScore = Infinity;
-      for (const f of candidates) {
-        const teamScore = (teamFieldUsage.get(`${teamA?.id}:${f.id}`) || 0) + (teamFieldUsage.get(`${teamB?.id}:${f.id}`) || 0);
-        const score = teamScore * 1000 + (fieldUsage.get(f.id) || 0);
-        if (score < bestScore) { bestScore = score; best = f; }
-      }
-      fieldUsage.set(best.id, (fieldUsage.get(best.id) || 0) + 1);
-      bumpTeamField(teamA?.id, best.id);
-      bumpTeamField(teamB?.id, best.id);
-      return best;
-    };
-    const orderedPairs = orderPairsAcrossRounds(returnGroup.rounds);
-    const fieldNoCounters = new Map();
+    // đảo ngược: đội B lượt đi thành đội A (Đỏ) lượt về
+    const reversedPairs = returnGroup.missingReturnPairs.map((p) => ({ teamAId: p.teamBId, teamBId: p.teamAId }));
+    const plan = planGroupSchedule({ pairs: reversedPairs, teamsById, allFields: fieldsForComp, matches });
     setGeneratingReturnGroup(returnGroup.label);
     try {
       // Các trận lượt đi tạo trước khi có tính năng này chưa có details.leg
@@ -712,15 +651,11 @@ export default function AdminCombatMatches() {
       for (const m of unlabeledLeg1) {
         await api.putCombatMatch(m.id, { details: { ...(m.details || {}), leg: 1 } });
       }
-      for (const p of orderedPairs) {
-        const homeTeam = teamsById.get(p.teamBId); // đảo ngược: đội B lượt đi thành đội A lượt về
-        const awayTeam = teamsById.get(p.teamAId);
-        const field = pickField(homeTeam, awayTeam);
-        const matchNo = nextMatchNoForField(matches, fieldNoCounters, field?.id);
+      for (const { pair: p, field, matchNo } of plan) {
         await api.postCombatMatch(selectedContentId, {
-          team_a_id: p.teamBId, team_b_id: p.teamAId,
-          group_label: returnGroup.label, board_id: homeTeam.board_id, field_id: field?.id || null,
-          match_no: matchNo != null ? String(matchNo) : null,
+          team_a_id: p.teamAId, team_b_id: p.teamBId,
+          group_label: returnGroup.label, board_id: teamsById.get(p.teamAId).board_id, field_id: field?.id || null,
+          match_no: String(matchNo),
           details: { leg: 2 },
         });
       }
@@ -997,6 +932,9 @@ export default function AdminCombatMatches() {
           <div className="page-header" style={{ marginBottom: 12 }}>
             <div><h3 className="card-title">Danh sách trận ({matchesForList.length}{matchListFieldFilter ? `/${matches.length}` : ''})</h3></div>
             <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn btn-secondary" onClick={exportMatchesExcel} disabled={matchesForList.length === 0 || exportingMatches}>
+                {exportingMatches ? 'Đang xuất...' : 'Xuất Excel'}
+              </button>
               <button type="button" className="btn btn-danger" onClick={removeAllMatches} disabled={matches.length === 0}>Xóa tất cả trận</button>
               <button type="button" className="btn btn-primary" onClick={openAdd}>Thêm trận</button>
             </div>
