@@ -101,6 +101,19 @@ export default function RefereeLayout() {
       </aside>
 
       <main className="main-content">
+        <div className="referee-mobile-bar">
+          <div className="user-info">
+            <div className="user-avatar">{initials}</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="user-name">{user?.fullName || user?.username}</div>
+              <div className="user-email">Trọng tài</div>
+            </div>
+          </div>
+          <button type="button" className="logout-btn" onClick={handleLogout}>
+            {NAV_ICONS.logout}
+            <span>Đăng xuất</span>
+          </button>
+        </div>
         <Outlet />
       </main>
     </div>
