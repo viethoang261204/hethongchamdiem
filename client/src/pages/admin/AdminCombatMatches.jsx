@@ -11,7 +11,7 @@ import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
 import SignatureBox from '../../components/SignaturePad';
 import {
   ENERGY_BLOCK_MAX, FIREPOWER_BALL_MAX, ENERGY_BLOCK_SCORE, FIREPOWER_BALL_SCORE, METEOR_TOWER_SCORE,
-  computeTaskScore, determineGroupMatchResult, determineFinalsMatchResult, computeGroupStandings, generateRoundRobin,
+  computeTaskScore, determineGroupMatchResult, determineFinalsMatchResult, computeGroupStandings, generateRoundRobin, STARS_MISSIONS, findMissionTask,
 } from '../../lib/battleScoring';
 import {
   PENALTY_MAX_SECONDS, computeSideScore,
@@ -31,7 +31,7 @@ const CONTENT_FORMAT_LABEL = {
 // 4 nhiệm vụ cố định Battle of Stars — ảnh minh hoạ lấy từ "Nhiệm vụ" (bảng
 // tasks) đã tạo sẵn cùng tên cho content này, khớp theo tên (không phân biệt
 // hoa/thường) — không có kho ảnh riêng, admin quản lý ảnh như task bình thường.
-const MISSION_NAMES = ['Meteor Tower', 'Energy Defense', 'Full Firepower', 'Final Fortress'];
+const MISSIONS = Object.values(STARS_MISSIONS);
 
 const clampEnergy = (v) => Math.min(ENERGY_BLOCK_MAX, Math.max(0, parseInt(v, 10) || 0));
 const clampFirepower = (v) => Math.min(FIREPOWER_BALL_MAX, Math.max(0, parseInt(v, 10) || 0));
@@ -791,7 +791,7 @@ export default function AdminCombatMatches() {
           {/* ── A0. Ảnh minh hoạ nhiệm vụ (chỉ Battle of Stars) — lấy từ "Nhiệm
                vụ" đã tạo sẵn cho content này, khớp theo tên. Muốn thêm/đổi ảnh
                thì vào trang "Nhiệm vụ", không quản lý riêng ở đây. ── */}
-          {isStars && missionTasks.some((t) => MISSION_NAMES.some((n) => n.toLowerCase() === (t.name || '').trim().toLowerCase()) && t.has_image) && (
+          {isStars && MISSIONS.some((ms) => findMissionTask(missionTasks, ms)?.has_image) && (
             <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <h3 className="card-title">Ảnh minh họa nhiệm vụ</h3>
@@ -800,8 +800,9 @@ export default function AdminCombatMatches() {
                 Lấy từ "Nhiệm vụ" cùng tên trong content này — muốn đổi ảnh thì vào trang "Nhiệm vụ" để sửa.
               </p>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                {MISSION_NAMES.map((name) => {
-                  const task = missionTasks.find((t) => (t.name || '').trim().toLowerCase() === name.toLowerCase());
+                {MISSIONS.map((ms) => {
+                  const name = ms.vi;
+                  const task = findMissionTask(missionTasks, ms);
                   const url = taskImageUrl(task);
                   if (!url) return null;
                   return (
@@ -1338,13 +1339,13 @@ export default function AdminCombatMatches() {
                 <>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Meteor Tower — Đỏ ({METEOR_TOWER_SCORE}đ nếu hoàn thành)</label>
+                      <label className="form-label">Tháp thiên thạch (Meteor Tower) — Đỏ ({METEOR_TOWER_SCORE}đ nếu hoàn thành)</label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input type="checkbox" style={{ width: 'auto' }} checked={!!detailForm.meteorCompletedA} onChange={(e) => setDetailForm({ ...detailForm, meteorCompletedA: e.target.checked })} /> Completed
                       </label>
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Meteor Tower — Xanh ({METEOR_TOWER_SCORE}đ nếu hoàn thành)</label>
+                      <label className="form-label">Tháp thiên thạch (Meteor Tower) — Xanh ({METEOR_TOWER_SCORE}đ nếu hoàn thành)</label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input type="checkbox" style={{ width: 'auto' }} checked={!!detailForm.meteorCompletedB} onChange={(e) => setDetailForm({ ...detailForm, meteorCompletedB: e.target.checked })} /> Completed
                       </label>
@@ -1352,37 +1353,37 @@ export default function AdminCombatMatches() {
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Energy Defense — Đỏ (số block, {ENERGY_BLOCK_SCORE}đ/block, tối đa {ENERGY_BLOCK_MAX})</label>
+                      <label className="form-label">Phòng thủ năng lượng (Energy Defense) — Đỏ (số block, {ENERGY_BLOCK_SCORE}đ/block, tối đa {ENERGY_BLOCK_MAX})</label>
                       <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" value={detailForm.energyBlocksA ?? 0}
                         onChange={(e) => setDetailForm({ ...detailForm, energyBlocksA: clampEnergy(e.target.value) })} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Energy Defense — Xanh (số block, {ENERGY_BLOCK_SCORE}đ/block, tối đa {ENERGY_BLOCK_MAX})</label>
+                      <label className="form-label">Phòng thủ năng lượng (Energy Defense) — Xanh (số block, {ENERGY_BLOCK_SCORE}đ/block, tối đa {ENERGY_BLOCK_MAX})</label>
                       <input type="number" min="0" max={ENERGY_BLOCK_MAX} className="form-input" value={detailForm.energyBlocksB ?? 0}
                         onChange={(e) => setDetailForm({ ...detailForm, energyBlocksB: clampEnergy(e.target.value) })} />
                     </div>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Full Firepower — Đỏ (số ball, {FIREPOWER_BALL_SCORE}đ/ball, tối đa {FIREPOWER_BALL_MAX})</label>
+                      <label className="form-label">Hỏa lực tối đa (Full Firepower) — Đỏ (số ball, {FIREPOWER_BALL_SCORE}đ/ball, tối đa {FIREPOWER_BALL_MAX})</label>
                       <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" value={detailForm.firepowerBallsA ?? 0}
                         onChange={(e) => setDetailForm({ ...detailForm, firepowerBallsA: clampFirepower(e.target.value) })} />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Full Firepower — Xanh (số ball, {FIREPOWER_BALL_SCORE}đ/ball, tối đa {FIREPOWER_BALL_MAX})</label>
+                      <label className="form-label">Hỏa lực tối đa (Full Firepower) — Xanh (số ball, {FIREPOWER_BALL_SCORE}đ/ball, tối đa {FIREPOWER_BALL_MAX})</label>
                       <input type="number" min="0" max={FIREPOWER_BALL_MAX} className="form-input" value={detailForm.firepowerBallsB ?? 0}
                         onChange={(e) => setDetailForm({ ...detailForm, firepowerBallsB: clampFirepower(e.target.value) })} />
                     </div>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Final Fortress — Đỏ (không tính điểm, chỉ Direct Win)</label>
+                      <label className="form-label">Pháo đài cuối cùng (Final Fortress) — Đỏ (không tính điểm, chỉ Direct Win)</label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input type="checkbox" style={{ width: 'auto' }} checked={!!detailForm.directWinA} onChange={(e) => setDetailDirectWin('A', e.target.checked)} /> Direct Win
                       </label>
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Final Fortress — Xanh (không tính điểm, chỉ Direct Win)</label>
+                      <label className="form-label">Pháo đài cuối cùng (Final Fortress) — Xanh (không tính điểm, chỉ Direct Win)</label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <input type="checkbox" style={{ width: 'auto' }} checked={!!detailForm.directWinB} onChange={(e) => setDetailDirectWin('B', e.target.checked)} /> Direct Win
                       </label>
@@ -1425,8 +1426,8 @@ export default function AdminCombatMatches() {
                     const scoreB = computeTaskScore(sideB);
                     const isGroupStage = !!detailModal.group_label;
                     const { result } = isGroupStage ? determineGroupMatchResult(sideA, sideB) : determineFinalsMatchResult(sideA, sideB);
-                    const resultText = detailForm.directWinA ? `${detailModal.team_a?.name} thắng — Direct Win (Final Fortress)`
-                      : detailForm.directWinB ? `${detailModal.team_b?.name} thắng — Direct Win (Final Fortress)`
+                    const resultText = detailForm.directWinA ? `${detailModal.team_a?.name} thắng — Direct Win (Pháo đài cuối cùng)`
+                      : detailForm.directWinB ? `${detailModal.team_b?.name} thắng — Direct Win (Pháo đài cuối cùng)`
                       : result === 'DRAW' ? `Hòa (${scoreA.taskScore} - ${scoreB.taskScore})`
                       : result === 'A' ? `${detailModal.team_a?.name} thắng (${scoreA.taskScore} - ${scoreB.taskScore})`
                       : result === 'B' ? `${detailModal.team_b?.name} thắng (${scoreA.taskScore} - ${scoreB.taskScore})`

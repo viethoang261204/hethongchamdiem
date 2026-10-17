@@ -12,6 +12,38 @@ export const ENERGY_BLOCK_MAX = 8;
 export const FIREPOWER_BALL_SCORE = 15;
 export const FIREPOWER_BALL_MAX = 8;
 
+// Tên + mô tả 4 nhiệm vụ (Anh/Việt) — bản tiếng Việt lấy đúng theo "Phiếu chấm
+// điểm Trận chiến giữa các vì sao". Dùng cho phiếu điểm, form chấm và để tìm
+// ảnh minh hoạ trong "Nhiệm vụ" của content (khớp theo tên Việt HOẶC Anh).
+export const STARS_MISSIONS = {
+  meteor: {
+    en: 'Meteor Tower', vi: 'Tháp thiên thạch',
+    descEn: 'Three pillars from largest at the bottom to smallest at the top and top down.',
+    descVi: 'Ba trụ được sắp xếp từ lớn nhất ở dưới cùng đến nhỏ nhất ở trên cùng (nhìn từ trên xuống).',
+  },
+  energy: {
+    en: 'Energy Defense', vi: 'Phòng thủ năng lượng',
+    descEn: 'The top down projection of a block is within the defense zone.',
+    descVi: 'Khối năng lượng nằm trong khu vực phòng thủ.',
+  },
+  firepower: {
+    en: 'Full Firepower', vi: 'Hỏa lực tối đa',
+    descEn: 'A star power ball enters a collection box.',
+    descVi: 'Quả bóng năng lượng ở trong hộp thu thập.',
+  },
+  fortress: {
+    en: 'Final Fortress', vi: 'Pháo đài cuối cùng',
+    descEn: "The energy ball is removed from the task frame at the top center of the field and brought into the team's half.",
+    descVi: 'Quả bóng năng lượng được lấy ra khỏi khung nhiệm vụ ở vị trí trên cùng, giữa sân và đưa về nửa sân của đội mình.',
+  },
+};
+
+const normMissionName = (s) => (s || '').trim().toLowerCase().replace(/^the\s+/, '');
+export function findMissionTask(tasks, mission) {
+  const targets = [mission.en, mission.vi].map(normMissionName);
+  return (tasks || []).find((t) => targets.includes(normMissionName(t.name)) || targets.includes(normMissionName(t.name_en)));
+}
+
 // Extra Reward: 0 retry=+40, 1=+30, 2=+20, 3=+10, ≥4=+0
 export function computeExtraReward(retryCount) {
   const r = Math.max(0, Number(retryCount) || 0);

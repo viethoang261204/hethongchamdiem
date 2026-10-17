@@ -52,7 +52,7 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
   return (
     <table className="ss-sheet" ref={sheetRef}>
       <tbody>
-        <tr><td colSpan={7} className="ss-title">{t(lang, 'Scoring Sheet of Drone Cup', 'Phiếu điểm Fly Smart Cup')}</td></tr>
+        <tr><td colSpan={7} className="ss-title">{t(lang, 'Scoring Sheet of Drone Cup', 'Phiếu chấm điểm: Fly Smart Cup')}</td></tr>
 
         {isVoid && (
           <tr>
@@ -65,14 +65,14 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
         )}
 
         <tr>
-          <td colSpan={3}><span className="ss-label">Division:</span> {d.division || ''}</td>
-          <td colSpan={2}><span className="ss-label">{t(lang, 'Preliminary / Intermediate:', 'Vòng bảng / Vòng giữa:')}</span> {match?.stage || ''}</td>
+          <td colSpan={3}><span className="ss-label">{t(lang, 'Division:', 'Bảng thi:')}</span> {d.division || ''}</td>
+          <td colSpan={2}><span className="ss-label">{t(lang, 'Preliminary / Intermediate:', 'Vòng:')}</span> {match?.stage || ''}</td>
           <td colSpan={2}><span className="ss-label">{t(lang, 'Team:', 'Đội:')}</span> {match?.match_no || ''}</td>
         </tr>
 
         <tr>
-          <td colSpan={2}><span className="ss-label">{match?.team_a?.name || t(lang, 'Team 1', 'Đội 1')} {t(lang, 'No.:', 'Số báo danh:')}</span> {match?.team_a_no || ''}</td>
-          <td colSpan={2}><span className="ss-label">{match?.team_b?.name || t(lang, 'Team 2', 'Đội 2')} {t(lang, 'No.:', 'Số báo danh:')}</span> {match?.team_b_no || ''}</td>
+          <td colSpan={2}><span className="ss-label">{t(lang, `${match?.team_a?.name || 'Team 1'} No.:`, 'STT Đội A:')}</span> {match?.team_a_no || ''}</td>
+          <td colSpan={2}><span className="ss-label">{t(lang, `${match?.team_b?.name || 'Team 2'} No.:`, 'STT Đội B:')}</span> {match?.team_b_no || ''}</td>
           <td colSpan={3}><span className="ss-label">{t(lang, 'Group:', 'Bảng:')}</span> {match?.group_label || ''}</td>
         </tr>
 
@@ -84,14 +84,14 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
           <th></th>
         </tr>
         <tr>
-          <td className="ss-label" colSpan={2}>{t(lang, 'First-half scoring', 'Điểm Hiệp 1')}</td>
+          <td className="ss-label" colSpan={2}>{t(lang, 'First-half scoring', 'Điểm hiệp 1')}</td>
           <td className="ss-center"><strong>{firstHalfA}</strong> <span className="ss-small">({colorFor('A', 1)})</span></td>
           <td colSpan={2}></td>
           <td className="ss-center"><strong>{firstHalfB}</strong> <span className="ss-small">({colorFor('B', 1)})</span></td>
           <td></td>
         </tr>
         <tr>
-          <td className="ss-label" colSpan={2}>{t(lang, 'Second-half scoring', 'Điểm Hiệp 2')}</td>
+          <td className="ss-label" colSpan={2}>{t(lang, 'Second-half scoring', 'Điểm hiệp 2')}</td>
           <td className="ss-center"><strong>{secondHalfA}</strong> <span className="ss-small">({colorFor('A', 2)})</span></td>
           <td colSpan={2}></td>
           <td className="ss-center"><strong>{secondHalfB}</strong> <span className="ss-small">({colorFor('B', 2)})</span></td>
@@ -160,10 +160,10 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
         </tr>
 
         <tr><td colSpan={7} className="ss-section">{t(lang, 'Scoring confirmation', 'Xác nhận điểm')}</td></tr>
-        <tr><td colSpan={7} className="ss-confirm-text">{t(lang, 'I hereby confirm that the scores above are correct and valid, with no objection.', 'Tôi xác nhận điểm số ở trên là chính xác và hợp lệ, không có khiếu nại.')}</td></tr>
+        <tr><td colSpan={7} className="ss-confirm-text">{t(lang, 'I hereby confirm that the scores above are correct and valid, with no objection.', 'Tôi xin xác nhận các điểm số ghi trên đây là chính xác, hợp lệ và không có ý kiến thắc mắc.')}</td></tr>
         <tr>
           <td colSpan={4}>
-            <div className="ss-label">{t(lang, "Team's confirmation", 'Xác nhận của đội')}</div>
+            <div className="ss-label">{t(lang, "Team's confirmation", 'Xác nhận của đội thi')}</div>
             <div>
               {match?.team_a?.name || t(lang, 'Team 1', 'Đội 1')}: <strong>{d.teamMembersA || ''}</strong>
               {d.studentSignatureImageA && <div><img src={d.studentSignatureImageA} alt={`${match?.team_a?.name || 'Team 1'} signature`} style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
@@ -183,13 +183,13 @@ export default function CombatDroneSheetTable({ match, sheetRef }) {
         </tr>
 
         <tr>
-          <td className="ss-label" colSpan={2}>{t(lang, 'Recommendation', 'Kiến nghị')}</td>
+          <td className="ss-label" colSpan={2}>{t(lang, 'Recommendation', 'Đề xuất')}</td>
           <td colSpan={5}>{d.objection || ''}</td>
         </tr>
         <tr>
-          <td className="ss-label" colSpan={2}>{t(lang, 'Head Referee', 'Trưởng ban trọng tài')}</td>
-          <td colSpan={2}>{d.headRefereeName || 'Mr Ly Quang Van'}</td>
-          <td className="ss-label">{t(lang, 'Scorekeeper', 'Người ghi điểm')}</td>
+          <td className="ss-label" colSpan={2}>{t(lang, 'Head Referee', 'Trọng tài trưởng')}</td>
+          <td colSpan={2}>{d.headRefereeName || t(lang, 'Mr Ly Quang Van', 'Ông Lý Quảng Văn')}</td>
+          <td className="ss-label">{t(lang, 'Scorekeeper', 'Thư ký')}</td>
           <td colSpan={2}>{d.scorekeeperName || ''}</td>
         </tr>
         {d.remarks && (

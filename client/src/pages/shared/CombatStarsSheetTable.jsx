@@ -2,7 +2,7 @@ import { useLang, t } from '../../lib/i18n';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import {
   ENERGY_BLOCK_MAX, FIREPOWER_BALL_MAX, ENERGY_BLOCK_SCORE, FIREPOWER_BALL_SCORE, METEOR_TOWER_SCORE,
-  computeTaskScore, sideFromDetails,
+  computeTaskScore, sideFromDetails, STARS_MISSIONS,
 } from '../../lib/battleScoring';
 import '../referee/InventionTrailScoreForm.css';
 
@@ -28,11 +28,13 @@ export default function CombatStarsSheetTable({ match, sheetRef }) {
     ? (match.winner_id === match?.team_a_id ? 'Red' : match.winner_id === match?.team_b_id ? 'Blue' : '')
     : '';
 
-  const taskRow = (label, hint, valueA, valueB, scoreCellA, scoreCellB) => (
+  // Tên + mô tả + cột "Điểm (tối đa)" theo đúng phiếu giấy; giá trị trọng tài
+  // nhập (hoàn thành / số khối / số quả) hiện kèm trong ô điểm từng đội.
+  const taskRow = (mission, maxPoints, valueA, valueB, scoreCellA, scoreCellB) => (
     <tr>
-      <td className="ss-label">{label}</td>
-      <td colSpan={2}>{hint}</td>
-      <td className="ss-center"></td>
+      <td className="ss-label">{t(lang, mission.en, mission.vi)}</td>
+      <td colSpan={2}>{t(lang, mission.descEn, mission.descVi)}</td>
+      <td className="ss-center">{maxPoints}</td>
       <td className="ss-center">{valueA} <strong>{scoreCellA}</strong></td>
       <td className="ss-center" colSpan={2}>{valueB} <strong>{scoreCellB}</strong></td>
     </tr>
@@ -41,15 +43,15 @@ export default function CombatStarsSheetTable({ match, sheetRef }) {
   return (
     <table className="ss-sheet" ref={sheetRef}>
       <tbody>
-        <tr><td colSpan={7} className="ss-title">{t(lang, 'Scoring Sheet of Battle of Stars', 'Phiếu điểm Battle of Stars')}</td></tr>
+        <tr><td colSpan={7} className="ss-title">{t(lang, 'Scoring Sheet of Battle of Stars', 'Phiếu chấm điểm: Đại Chiến Vì Sao')}</td></tr>
 
         <tr>
           <td colSpan={4}><span className="ss-label">{t(lang, 'Red team:', 'Đội Đỏ:')}</span> {match?.team_a?.name || ''}</td>
-          <td colSpan={3}><span className="ss-label">Division:</span> {d.division || ''}</td>
+          <td colSpan={3}><span className="ss-label">{t(lang, 'Division:', 'Bảng thi:')}</span> {d.division || ''}</td>
         </tr>
         <tr>
           <td colSpan={4}><span className="ss-label">{t(lang, 'Blue team:', 'Đội Xanh:')}</span> {match?.team_b?.name || ''}</td>
-          <td colSpan={3}><span className="ss-label">{t(lang, 'Stage:', 'Vòng đấu:')}</span> {match?.stage || match?.group_label || ''}</td>
+          <td colSpan={3}><span className="ss-label">{t(lang, 'Stage:', 'Vòng thi:')}</span> {match?.stage || match?.group_label || ''}</td>
         </tr>
 
         <tr className="ss-header-row">
@@ -60,38 +62,38 @@ export default function CombatStarsSheetTable({ match, sheetRef }) {
           <th className="ss-center" colSpan={2}>{t(lang, 'Blue', 'Xanh')}</th>
         </tr>
 
-        {taskRow('Meteor Tower', t(lang, 'Completed = 100, not completed = 0', 'Hoàn thành = 100, chưa hoàn thành = 0'),
+        {taskRow(STARS_MISSIONS.meteor, METEOR_TOWER_SCORE,
           sideA.meteorCompleted ? t(lang, 'Completed', 'Hoàn thành') : t(lang, 'Not completed', 'Chưa hoàn thành'),
           sideB.meteorCompleted ? t(lang, 'Completed', 'Hoàn thành') : t(lang, 'Not completed', 'Chưa hoàn thành'),
           scoreA.meteorScore, scoreB.meteorScore)}
-        {taskRow('Energy Defense', `${ENERGY_BLOCK_SCORE} ${t(lang, 'pts / block', 'đ/khối')} (${t(lang, 'max', 'tối đa')} ${ENERGY_BLOCK_MAX})`,
+        {taskRow(STARS_MISSIONS.energy, `${ENERGY_BLOCK_SCORE} / ${t(lang, 'block', '1 khối')} (${t(lang, 'max', 'tối đa')} ${ENERGY_BLOCK_MAX})`,
           `${sideA.energyBlocks} ${t(lang, 'blocks', 'khối')}`, `${sideB.energyBlocks} ${t(lang, 'blocks', 'khối')}`,
           scoreA.energyScore, scoreB.energyScore)}
-        {taskRow('Full Firepower', `${FIREPOWER_BALL_SCORE} ${t(lang, 'pts / star power ball', 'đ/quả năng lượng')} (${t(lang, 'max', 'tối đa')} ${FIREPOWER_BALL_MAX})`,
+        {taskRow(STARS_MISSIONS.firepower, `${FIREPOWER_BALL_SCORE} / ${t(lang, 'ball', '1 quả')} (${t(lang, 'max', 'tối đa')} ${FIREPOWER_BALL_MAX})`,
           `${sideA.firepowerBalls} ${t(lang, 'balls', 'quả')}`, `${sideB.firepowerBalls} ${t(lang, 'balls', 'quả')}`,
           scoreA.firepowerScore, scoreB.firepowerScore)}
-        {taskRow('Final Fortress', t(lang, 'No points — valid energy ball capture = Direct Win', 'Không tính điểm — thu năng lượng hợp lệ = Direct Win'),
+        {taskRow(STARS_MISSIONS.fortress, 'Direct Win',
           sideA.directWin ? 'Direct Win' : '—', sideB.directWin ? 'Direct Win' : '—', '', '')}
 
         <tr className="ss-row-extra">
-          <td className="ss-label">{t(lang, 'Extra reward', 'Điểm thưởng thêm')}</td>
+          <td className="ss-label">{t(lang, 'Extra reward', 'Điểm thưởng')}</td>
           <td colSpan={2}>
-            {t(lang, '0 retry = 40, 1 = 30, 2 = 20, 3 = 10, ≥4 = 0', '0 lần thử lại = 40, 1 = 30, 2 = 20, 3 = 10, ≥4 = 0')}
+            {t(lang, '40 − (retries) × 10, ≥ 0', '40 − (Số lần thử lại) × 10, ≥ 0')}
             <div className="ss-small">{t(lang, 'Retries', 'Số lần thử lại')} — {t(lang, 'Red', 'Đỏ')}: <strong>{sideA.retryCount}</strong> · {t(lang, 'Blue', 'Xanh')}: <strong>{sideB.retryCount}</strong></div>
           </td>
-          <td></td>
+          <td className="ss-center">40</td>
           <td className="ss-center"><strong>{scoreA.extraReward}</strong></td>
           <td className="ss-center" colSpan={2}><strong>{scoreB.extraReward}</strong></td>
         </tr>
         <tr>
-          <td className="ss-label">{t(lang, 'Points lost', 'Điểm bị trừ')}</td>
+          <td className="ss-label">{t(lang, 'Points lost', 'Điểm trừ')}</td>
           <td colSpan={2}></td>
           <td></td>
           <td className="ss-center"><strong>{sideA.pointsLost}</strong></td>
           <td className="ss-center" colSpan={2}><strong>{sideB.pointsLost}</strong></td>
         </tr>
         <tr className="ss-row-total">
-          <td className="ss-label">{t(lang, 'Task Score', 'Điểm nhiệm vụ')}</td>
+          <td className="ss-label">{t(lang, 'Task Score', 'Điểm Nhiệm Vụ')}</td>
           <td colSpan={2}></td>
           <td></td>
           <td className="ss-center"><strong>{scoreA.taskScore}</strong></td>
@@ -117,10 +119,10 @@ export default function CombatStarsSheetTable({ match, sheetRef }) {
         </tr>
 
         <tr><td colSpan={7} className="ss-section">{t(lang, 'Scoring confirmation', 'Xác nhận điểm')}</td></tr>
-        <tr><td colSpan={7} className="ss-confirm-text">{t(lang, 'I hereby confirm that the scores above are correct and valid, with no objection.', 'Tôi xác nhận điểm số ở trên là chính xác và hợp lệ, không có khiếu nại.')}</td></tr>
+        <tr><td colSpan={7} className="ss-confirm-text">{t(lang, 'I hereby confirm that the scores above are correct and valid, with no objection.', 'Tôi xin xác nhận các điểm số ghi trên đây là chính xác, hợp lệ và không có ý kiến thắc mắc.')}</td></tr>
         <tr>
           <td colSpan={4}>
-            <div className="ss-label">{t(lang, "Team's confirmation", 'Xác nhận của đội')}</div>
+            <div className="ss-label">{t(lang, "Team's confirmation", 'Xác nhận của đội thi')}</div>
             <div>
               {t(lang, 'Red', 'Đỏ')}: <strong>{d.teamMembersA || ''}</strong>
               {d.studentSignatureImageA && <div><img src={d.studentSignatureImageA} alt="Red team signature" style={{ maxHeight: 50, maxWidth: '100%' }} /></div>}
@@ -140,13 +142,13 @@ export default function CombatStarsSheetTable({ match, sheetRef }) {
         </tr>
 
         <tr>
-          <td className="ss-label">{t(lang, 'Recommendation', 'Kiến nghị')}</td>
+          <td className="ss-label">{t(lang, 'Recommendation', 'Đề xuất')}</td>
           <td colSpan={6}>{d.objection || ''}</td>
         </tr>
         <tr>
-          <td className="ss-label">{t(lang, 'Head Referee', 'Trưởng ban trọng tài')}</td>
-          <td colSpan={2}>{d.headRefereeName || 'Mr Ly Quang Van'}</td>
-          <td className="ss-label">{t(lang, 'Scorekeeper', 'Người ghi điểm')}</td>
+          <td className="ss-label">{t(lang, 'Head Referee', 'Trọng tài trưởng')}</td>
+          <td colSpan={2}>{d.headRefereeName || t(lang, 'Mr Ly Quang Van', 'Ông Lý Quảng Văn')}</td>
+          <td className="ss-label">{t(lang, 'Scorekeeper', 'Thư ký')}</td>
           <td colSpan={3}>{d.scorekeeperName || ''}</td>
         </tr>
         {d.remarks && (

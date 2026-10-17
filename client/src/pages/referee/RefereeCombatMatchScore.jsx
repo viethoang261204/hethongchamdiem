@@ -11,7 +11,7 @@ import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
 import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 import {
   ENERGY_BLOCK_MAX, FIREPOWER_BALL_MAX, ENERGY_BLOCK_SCORE, FIREPOWER_BALL_SCORE, METEOR_TOWER_SCORE,
-  computeTaskScore, determineGroupMatchResult,
+  computeTaskScore, determineGroupMatchResult, STARS_MISSIONS, findMissionTask,
 } from '../../lib/battleScoring';
 import {
   PENALTY_MAX_SECONDS, computeSideScore,
@@ -252,8 +252,9 @@ export default function RefereeCombatMatchScore({ format }) {
 
   // Ảnh minh hoạ 4 nhiệm vụ cố định Battle of Stars — lấy từ "Nhiệm vụ" cùng
   // tên trong content này (admin quản lý ảnh y hệt task đo lường bình thường).
-  const missionImageThumb = (missionName) => {
-    const task = missionTasks.find((t) => (t.name || '').trim().toLowerCase() === missionName.toLowerCase());
+  const missionImageThumb = (mission) => {
+    const task = findMissionTask(missionTasks, mission);
+    const missionName = t(lang, mission.en, mission.vi);
     const url = taskImageUrl(task);
     if (!url) return null;
     return (
@@ -615,7 +616,7 @@ export default function RefereeCombatMatchScore({ format }) {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Meteor Tower <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} {t(lang, 'if completed', 'nếu hoàn thành')})</span>{missionImageThumb('Meteor Tower')}</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, STARS_MISSIONS.meteor.en, STARS_MISSIONS.meteor.vi)} <span style={{ color: '#94a3b8' }}>({METEOR_TOWER_SCORE} {t(lang, 'if completed', 'nếu hoàn thành')})</span>{missionImageThumb(STARS_MISSIONS.meteor)}</td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.meteorCompletedA} onChange={(e) => setForm({ ...form, meteorCompletedA: e.target.checked })} /> {t(lang, 'Completed', 'Hoàn thành')}
@@ -628,7 +629,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Energy Defense <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}{t(lang, 'pts/block', 'đ/khối')}, {t(lang, 'max', 'tối đa')} {ENERGY_BLOCK_MAX})</span>{missionImageThumb('Energy Defense')}</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, STARS_MISSIONS.energy.en, STARS_MISSIONS.energy.vi)} <span style={{ color: '#94a3b8' }}>({ENERGY_BLOCK_SCORE}{t(lang, 'pts/block', 'đ/khối')}, {t(lang, 'max', 'tối đa')} {ENERGY_BLOCK_MAX})</span>{missionImageThumb(STARS_MISSIONS.energy)}</td>
                         <td style={{ textAlign: 'center' }}>
                           <MiniStepper value={form.energyBlocksA} max={ENERGY_BLOCK_MAX} onChange={(v) => setForm({ ...form, energyBlocksA: v })} />
                         </td>
@@ -637,7 +638,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Full Firepower <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}{t(lang, 'pts/ball', 'đ/quả')}, {t(lang, 'max', 'tối đa')} {FIREPOWER_BALL_MAX})</span>{missionImageThumb('Full Firepower')}</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, STARS_MISSIONS.firepower.en, STARS_MISSIONS.firepower.vi)} <span style={{ color: '#94a3b8' }}>({FIREPOWER_BALL_SCORE}{t(lang, 'pts/ball', 'đ/quả')}, {t(lang, 'max', 'tối đa')} {FIREPOWER_BALL_MAX})</span>{missionImageThumb(STARS_MISSIONS.firepower)}</td>
                         <td style={{ textAlign: 'center' }}>
                           <MiniStepper value={form.firepowerBallsA} max={FIREPOWER_BALL_MAX} onChange={(v) => setForm({ ...form, firepowerBallsA: v })} />
                         </td>
@@ -646,7 +647,7 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>Final Fortress <span style={{ color: '#94a3b8' }}>({t(lang, 'no points — Direct Win only', 'không tính điểm — chỉ Direct Win')})</span>{missionImageThumb('Final Fortress')}</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, STARS_MISSIONS.fortress.en, STARS_MISSIONS.fortress.vi)} <span style={{ color: '#94a3b8' }}>({t(lang, 'no points — Direct Win only', 'không tính điểm — chỉ Direct Win')})</span>{missionImageThumb(STARS_MISSIONS.fortress)}</td>
                         <td style={{ textAlign: 'center' }}>
                           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                             <input type="checkbox" checked={!!form.directWinA} onChange={(e) => setDirectWin('A', e.target.checked)} /> Direct Win
@@ -668,12 +669,12 @@ export default function RefereeCombatMatchScore({ format }) {
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>{t(lang, 'Extra Reward', 'Điểm thưởng thêm')} <span style={{ color: '#94a3b8' }}>({t(lang, 'auto — 40/30/20/10/0 by retries', 'tự động — 40/30/20/10/0 theo số lần thử lại')})</span></td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Extra Reward', 'Điểm thưởng')} <span style={{ color: '#94a3b8' }}>({t(lang, 'auto — 40/30/20/10/0 by retries', 'tự động — 40/30/20/10/0 theo số lần thử lại')})</span></td>
                         <td style={{ textAlign: 'center' }}>{scoreA.extraReward}</td>
                         <td style={{ textAlign: 'center' }}>{scoreB.extraReward}</td>
                       </tr>
                       <tr>
-                        <td style={{ fontSize: 13 }}>{t(lang, 'Points lost (penalty)', 'Điểm bị trừ (phạt)')}</td>
+                        <td style={{ fontSize: 13 }}>{t(lang, 'Points lost (penalty)', 'Điểm trừ')}</td>
                         <td style={{ textAlign: 'center' }}>
                           <MiniStepper value={form.pointsLostA} onChange={(v) => setForm({ ...form, pointsLostA: v })} />
                         </td>
