@@ -584,8 +584,9 @@ export const api = {
 
   // Đội đủ điều kiện đi Trung Quốc (có giải thưởng chính thức) + liên hệ
   getChinaEligible: () => withRetry(() => request('/china-eligible'), 'getChinaEligible'),
-  putTeamContact: (teamId, body) => request(`/teams/${teamId}/contact`, { method: 'PUT', body }),
-  importTeamContacts: (rows) => request('/teams/contacts/import', { method: 'POST', body: rows }),
+  putStudentInfo: (studentId, body) => request(`/students/${studentId}/info`, { method: 'PUT', body }),
+  importStudentInfo: (rows) => request('/students/info-import', { method: 'POST', body: rows }),
+  importRegistration: (rows) => request('/students/registration-import', { method: 'POST', body: rows }),
 
   // Giải thưởng chính thức (team_awards) của 1 cuộc thi
   getCompetitionAwards: (competitionId) => withRetry(() => request(`/competitions/${competitionId}/awards`), 'getCompetitionAwards'),

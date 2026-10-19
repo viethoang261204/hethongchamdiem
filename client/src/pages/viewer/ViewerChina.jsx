@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api';
-import { exportChinaExcel, filterChinaRows, prepareChinaRows } from '../../lib/china';
+import { chinaStats, exportChinaExcel, filterChinaRows, fmtDate, prepareChinaRows } from '../../lib/china';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 
+const Missing = () => <span className="viewer-missing">Chưa có</span>;
+
 // Đội đủ điều kiện đi Trung Quốc = có giải thưởng chính thức (mọi giải, mọi
-// loại giải). Cổng Tra cứu chỉ XEM + xuất Excel; nhập liên hệ ở trang admin.
+// loại giải), kèm thông tin từng học sinh. Cổng Tra cứu chỉ XEM + xuất Excel;
+// nhập thông tin ở trang admin.
 export default function ViewerChina() {
   const [raw, setRaw] = useState(null);
   const [error, setError] = useState('');
-  const [f, setF] = useState({ q: '', giai: '', nhom: '', loai: '', lienHe: '' });
+  const [f, setF] = useState({ q: '', giai: '', nhom: '', loai: '', thongTin: '' });
   const [exporting, setExporting] = useState(false);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
 
@@ -19,10 +22,10 @@ export default function ViewerChina() {
 
   const rows = raw || [];
   const filtered = useMemo(() => filterChinaRows(rows, f), [rows, f]);
-  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 30);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 20);
   const comps = useMemo(() => [...new Map(rows.map((r) => [r.competition_id, r.competition_name])).entries()], [rows]);
   const groups = useMemo(() => [...new Map(rows.map((r) => [r.contentGroup.key, r.contentGroup.name])).entries()], [rows]);
-  const full = rows.filter((r) => r.hasEmail && r.hasPhone).length;
+  const stats = useMemo(() => chinaStats(rows), [rows]);
 
   if (error) return <div className="card" style={{ padding: 24, color: '#f87171' }}>{error}</div>;
   if (!raw) return <p style={{ color: '#94a3b8', padding: 24 }}>Đang tải danh sách...</p>;
@@ -31,14 +34,14 @@ export default function ViewerChina() {
     <div className="referee-content-wrap">
       <div className="referee-page-header">
         <h1 className="referee-page-title">Đội đủ điều kiện đi Trung Quốc</h1>
-        <p className="referee-page-subtitle">Tất cả các đội có giải thưởng chính thức ở mọi giải (Giải Nhất / Nhì / Ba, Top 5 / Top 10, Rising Star...), kèm email và số điện thoại liên hệ.</p>
+        <p className="referee-page-subtitle">Tất cả các đội có giải thưởng chính thức ở mọi giải (Giải Nhất / Nhì / Ba, Top 5 / Top 10, Rising Star...), kèm họ tên, ngày sinh, giới tính, SĐT và email của từng học sinh.</p>
       </div>
 
       <div className="rt-stats">
-        <div className="rt-stat"><div className="rt-stat-value">{rows.length}</div><div className="rt-stat-label">Đội đủ điều kiện</div></div>
-        <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{full}</div><div className="rt-stat-label">Đã có đủ email + SĐT</div></div>
-        <div className="rt-stat rt-stat-pending"><div className="rt-stat-value">{rows.length - full}</div><div className="rt-stat-label">Còn thiếu liên hệ</div></div>
-        <div className="rt-stat"><div className="rt-stat-value">{new Set(rows.flatMap((r) => r.student_ids || [])).size}</div><div className="rt-stat-label">Học sinh trong các đội này</div></div>
+        <div className="rt-stat"><div className="rt-stat-value">{stats.teams}</div><div className="rt-stat-label">Đội đủ điều kiện</div></div>
+        <div className="rt-stat"><div className="rt-stat-value">{stats.students}</div><div className="rt-stat-label">Học sinh</div></div>
+        <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{stats.complete}</div><div className="rt-stat-label">HS đủ 4 thông tin</div></div>
+        <div className="rt-stat rt-stat-pending"><div className="rt-stat-value">{stats.students - stats.complete}</div><div className="rt-stat-label">HS còn thiếu thông tin</div></div>
       </div>
 
       <div className="filters-bar viewer-filters">
@@ -57,37 +60,54 @@ export default function ViewerChina() {
           <option value="rising">Rising Star</option>
           <option value="phu">Chỉ giải phụ (Top 5 / Top 10...)</option>
         </select>
-        <select className="filter-select" value={f.lienHe} onChange={(e) => set('lienHe', e.target.value)}>
-          <option value="">Liên hệ: tất cả</option>
-          <option value="du">Đã đủ email + SĐT</option>
-          <option value="thieu">Còn thiếu liên hệ</option>
+        <select className="filter-select" value={f.thongTin} onChange={(e) => set('thongTin', e.target.value)}>
+          <option value="">Thông tin HS: tất cả</option>
+          <option value="du">Đội đã đủ thông tin</option>
+          <option value="thieu">Đội còn HS thiếu thông tin</option>
         </select>
         <button type="button" className="btn btn-secondary" disabled={!filtered.length || exporting}
           onClick={async () => { setExporting(true); try { await exportChinaExcel(filtered); } finally { setExporting(false); } }}>
-          {exporting ? 'Đang xuất...' : `Xuất Excel (${filtered.length})`}
+          {exporting ? 'Đang xuất...' : `Xuất Excel (${filtered.length} đội)`}
         </button>
       </div>
 
       <div className="card">
         <div className="table-container">
-          <table>
+          <table className="viewer-china-table">
             <thead>
-              <tr><th>Đội</th><th>Giải đấu</th><th>Nội dung · Bảng</th><th>Giải thưởng</th><th>Trường / HLV</th><th>Email</th><th>SĐT</th></tr>
+              <tr><th>Đội</th><th>Giải thưởng</th><th>Học sinh</th><th>Ngày sinh</th><th>Giới tính</th><th>SĐT</th><th>Email</th></tr>
             </thead>
             <tbody>
               {pageItems.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có đội nào.</td></tr>
-              ) : pageItems.map((r) => (
-                <tr key={r.id}>
-                  <td><strong>{r.name}</strong><div className="viewer-sub">{r.students}</div></td>
-                  <td>{r.competition_name}</td>
-                  <td>{r.content_name}<div className="viewer-sub">{r.board_name}</div></td>
-                  <td><div className="viewer-chips">{r.awards.map((a) => <span key={a} className={`viewer-chip ${a !== 'Top 5' && a !== 'Top 10' ? 'viewer-chip-gold' : ''}`}>{a}</span>)}</div></td>
-                  <td>{r.school_name || '—'}<div className="viewer-sub">{r.coach_name || ''}</div></td>
-                  <td>{r.contact_email || <span className="viewer-missing">Chưa có</span>}</td>
-                  <td>{r.contact_phone || <span className="viewer-missing">Chưa có</span>}</td>
-                </tr>
-              ))}
+              ) : pageItems.map((r) => {
+                const list = r.students.length ? r.students : [null];
+                const span = list.length;
+                return list.map((s, i) => (
+                  <tr key={`${r.id}-${s?.id || i}`} className={i === 0 ? 'viewer-team-first' : ''}>
+                    {i === 0 && (
+                      <>
+                        <td rowSpan={span}>
+                          <strong>{r.name}</strong>
+                          <div className="viewer-sub">{r.competition_name}</div>
+                          <div className="viewer-sub">{r.content_name}{r.board_name ? ` · ${r.board_name}` : ''}</div>
+                          <div className="viewer-sub">{[r.school_name, r.coach_name && `HLV ${r.coach_name}`].filter(Boolean).join(' · ')}</div>
+                        </td>
+                        <td rowSpan={span}><div className="viewer-chips">{r.awards.map((a) => <span key={a} className={`viewer-chip ${a !== 'Top 5' && a !== 'Top 10' ? 'viewer-chip-gold' : ''}`}>{a}</span>)}</div></td>
+                      </>
+                    )}
+                    {s ? (
+                      <>
+                        <td>{s.full_name}</td>
+                        <td className="viewer-nowrap">{fmtDate(s.birth_date) || <Missing />}</td>
+                        <td>{s.gender || <Missing />}</td>
+                        <td className="viewer-nowrap">{s.phone || <Missing />}{s.phone && s.phone_source && <div className="viewer-sub">{s.phone_source}</div>}</td>
+                        <td>{s.email || <Missing />}{s.email && s.email_source && <div className="viewer-sub">{s.email_source}</div>}</td>
+                      </>
+                    ) : <td colSpan={5} className="viewer-sub">Đội chưa có học sinh trong hệ thống</td>}
+                  </tr>
+                ));
+              })}
             </tbody>
           </table>
         </div>

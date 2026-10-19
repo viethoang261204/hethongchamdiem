@@ -40,6 +40,18 @@ app.use((err, _req, res, _next) => {
   res.status(status).json({ error: status >= 500 ? 'Lỗi máy chủ.' : (err.expose === false ? 'Yêu cầu không hợp lệ.' : err.message || 'Yêu cầu không hợp lệ.') });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server chạy tại http://localhost:${PORT} (API: /api, DB: Neon)`);
-});
+// Migration nhỏ, chạy lại không sao (add column if not exists) — để deploy
+// tự có cột mới mà không cần chạy tay db:setup. Đồng bộ với db/schema.sql.
+const STARTUP_MIGRATIONS = `
+  alter table students add column if not exists email text;
+  alter table students add column if not exists phone text;
+  alter table students add column if not exists email_source text;
+  alter table students add column if not exists phone_source text;`;
+
+require('./db.cjs').query(STARTUP_MIGRATIONS)
+  .catch((err) => console.error('[migrate]', err.message))
+  .finally(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server chạy tại http://localhost:${PORT} (API: /api, DB: Neon)`);
+    });
+  });

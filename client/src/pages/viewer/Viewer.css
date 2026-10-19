@@ -166,3 +166,8 @@
 .viewer-panel .viz-tip-total { border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 6px; }
 .viewer-panel .viz-empty { color: #64748b; font-size: 13px; padding: 12px 0; }
 @media (max-width: 899px) { .viewer-panel .viz-grid { grid-template-columns: 1fr; } }
+
+/* Đội đi Trung Quốc: mỗi học sinh 1 dòng, cột đội gộp ô (rowSpan) */
+.viewer-panel .viewer-china-table td { vertical-align: top; }
+.viewer-panel .viewer-china-table tr:not(.viewer-team-first) td { border-top-color: transparent; }
+.viewer-panel .viewer-nowrap { white-space: nowrap; }

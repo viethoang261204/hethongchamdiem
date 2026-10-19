@@ -32,7 +32,18 @@ export function parseExcelFile(file, columns) {
           resolve({ rows: [], errors: ['File không có sheet dữ liệu nào.'] });
           return;
         }
-        const raw = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+        // Dòng tiêu đề cột thường là dòng 1; file báo cáo xuất từ hệ thống
+        // (excelReport.js) có tiêu đề + phụ đề ở trên, tên cột ở dòng 4 → tìm
+        // dòng đầu tiên (trong 10 dòng đầu) chứa đủ các cột bắt buộc.
+        const top = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false }).slice(0, 10);
+        const required = columns.filter((c) => c.required).map((c) => normalizeHeader(c.label));
+        const headerIdx = Math.max(0, top.findIndex((r) => {
+          const cells = r.map(normalizeHeader);
+          return required.length > 0 && required.every((h) => cells.includes(h));
+        }));
+        const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+        range.s.r += headerIdx;
+        const raw = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false, range });
         if (raw.length === 0) {
           resolve({ rows: [], errors: ['File không có dữ liệu (chỉ có dòng tiêu đề hoặc trống).'] });
           return;
@@ -56,7 +67,7 @@ export function parseExcelFile(file, columns) {
         }
 
         const rows = raw.map((rawRow, i) => {
-          const row = { __row: i + 2, __errors: [] }; // +2: dòng 1 = tiêu đề, data bắt đầu dòng 2
+          const row = { __row: range.s.r + i + 2, __errors: [] }; // số dòng thật trong file (sau dòng tiêu đề cột)
           for (const [header, key] of Object.entries(headerToKey)) {
             row[key] = String(rawRow[header] ?? '').trim();
           }

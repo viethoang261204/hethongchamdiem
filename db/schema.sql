@@ -763,3 +763,12 @@ create index if not exists idx_team_awards_competition on team_awards(competitio
 -- Trung Quốc (đội có giải thưởng chính thức, xem team_awards).
 alter table teams add column if not exists contact_email text;
 alter table teams add column if not exists contact_phone text;
+
+-- Thông tin học sinh cho danh sách đi Trung Quốc — lấy từ file "Danh sách
+-- đăng ký đội thi EAVN" (POST /students/registration-import) hoặc admin nhập.
+-- *_source: Thí sinh / Phụ huynh / HLV / Đơn vị / Admin — file đăng ký không có
+-- SĐT riêng của học sinh nên phải ghi rõ số/email đó là của ai.
+alter table students add column if not exists email text;
+alter table students add column if not exists phone text;
+alter table students add column if not exists email_source text;
+alter table students add column if not exists phone_source text;

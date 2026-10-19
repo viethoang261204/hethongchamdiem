@@ -1795,14 +1795,18 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
 
 // ============================================================
 // Đội đủ điều kiện đi Trung Quốc = đội có ít nhất 1 giải thưởng chính thức
-// (team_awards), kèm email + SĐT liên hệ của đội. Xem: viewer + admin;
-// sửa/nhập liên hệ: chỉ admin.
+// (team_awards), kèm thông tin từng học sinh (họ tên, ngày sinh, giới tính,
+// SĐT, email). Xem: viewer + admin; sửa/nhập thông tin học sinh: chỉ admin.
 // ============================================================
 const ELIGIBLE_SQL = `
-  select t.id, t.name, t.contact_email, t.contact_phone, t.student_ids,
+  select t.id, t.name, t.student_ids,
     co.id as competition_id, co.name as competition_name, cc.name as content_name, cc.name_en as content_name_en,
     b.name as board_name, sch.name as school_name, coa.name as coach_name,
-    (select string_agg(st.full_name, ', ') from students st where st.id = any(t.student_ids)) as students,
+    (select coalesce(json_agg(json_build_object(
+        'id', st.id, 'full_name', st.full_name, 'birth_date', st.birth_date, 'gender', st.gender,
+        'email', st.email, 'phone', st.phone, 'email_source', st.email_source, 'phone_source', st.phone_source
+      ) order by array_position(t.student_ids, st.id)), '[]'::json)
+     from students st where st.id = any(t.student_ids)) as students,
     array_agg(a.label order by a.label) as awards,
     bool_or(a.tier = 'major') as has_major
   from team_awards a
@@ -1820,38 +1824,152 @@ router.get('/china-eligible', requireViewer, h(async (_req, res) => {
   res.json(rows);
 }));
 
-const cleanContact = (v, max) => {
+const cleanText = (v, max) => {
   const s = String(v ?? '').trim();
   return s ? s.slice(0, max) : null;
 };
+const cleanGender = (v) => (['Nam', 'Nữ'].includes(v) ? v : null);
+const cleanDate = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : null);
 
-router.put('/teams/:id/contact', requireAdmin, h(async (req, res) => {
-  const { rows } = await query(
-    'update teams set contact_email = $1, contact_phone = $2 where id = $3 returning id, contact_email, contact_phone',
-    [cleanContact(req.body?.contact_email, 200), cleanContact(req.body?.contact_phone, 50), req.params.id]
-  );
-  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy đội.' });
-  res.json(rows[0]);
+// Admin sửa thông tin 1 học sinh ngay trên bảng "Đi Trung Quốc". Email/SĐT
+// admin nhập → nguồn = 'Admin' (lần nhập file đăng ký sau không ghi đè).
+router.put('/students/:id/info', requireAdmin, h(async (req, res) => {
+  const b = req.body || {};
+  const data = {};
+  if ('gender' in b) data.gender = cleanGender(b.gender);
+  if ('birth_date' in b) data.birth_date = cleanDate(b.birth_date);
+  if ('email' in b) { data.email = cleanText(b.email, 200); data.email_source = data.email ? 'Admin' : null; }
+  if ('phone' in b) { data.phone = cleanText(b.phone, 50); data.phone_source = data.phone ? 'Admin' : null; }
+  const q = buildUpdate('students', req.params.id, data);
+  if (!q) return res.json({});
+  const { rows } = await query(q.text, q.values);
+  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy học sinh.' });
+  const st = rows[0];
+  res.json({
+    id: st.id, birth_date: st.birth_date, gender: st.gender, email: st.email, phone: st.phone,
+    email_source: st.email_source, phone_source: st.phone_source,
+  });
 }));
 
-// Nhập liên hệ hàng loạt từ file Excel đã xuất ở màn "Đi Trung Quốc" (khớp
-// theo cột Mã đội). Ô để trống = giữ nguyên giá trị cũ.
-router.post('/teams/contacts/import', requireAdmin, h(async (req, res) => {
-  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+// Nhập lại file Excel đã xuất ở màn "Đi Trung Quốc" (khớp theo Mã HS; client
+// đã chuẩn hoá ngày sinh về YYYY-MM-DD, giới tính về Nam/Nữ). Ô trống = giữ
+// nguyên; email/SĐT nhập kiểu này coi như admin nhập (nguồn = 'Admin').
+router.post('/students/info-import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body?.rows || [];
   const result = await bulkImport(rows, async (row) => {
-    const id = String(row.team_id || '').trim();
-    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Mã đội không hợp lệ.');
-    const email = cleanContact(row.contact_email, 200);
-    const phone = cleanContact(row.contact_phone, 50);
-    if (!email && !phone) return { skipped: true };
-    const { rowCount } = await query(
-      'update teams set contact_email = coalesce($1, contact_email), contact_phone = coalesce($2, contact_phone) where id = $3',
-      [email, phone, id]
-    );
-    if (!rowCount) throw new Error('Không tìm thấy đội.');
+    const id = String(row.student_id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Mã HS không hợp lệ.');
+    const { rows: cur } = await query('select birth_date, gender, email, phone from students where id = $1', [id]);
+    if (!cur[0]) throw new Error('Không tìm thấy học sinh.');
+    // Chỉ ghi ô có giá trị KHÁC hiện tại — file xuất ra đã chứa sẵn email/SĐT
+    // lấy từ file đăng ký, nhập lại nguyên file không được đổi nguồn thành Admin
+    const data = {};
+    if (cleanDate(row.birth_date) && row.birth_date !== cur[0].birth_date) data.birth_date = row.birth_date;
+    if (cleanGender(row.gender) && row.gender !== cur[0].gender) data.gender = row.gender;
+    const email = cleanText(row.email, 200);
+    if (email && email !== cur[0].email) { data.email = email; data.email_source = 'Admin'; }
+    const phone = cleanText(row.phone, 50);
+    if (phone && phone !== cur[0].phone) { data.phone = phone; data.phone_source = 'Admin'; }
+    const q = buildUpdate('students', id, data);
+    if (!q) return { skipped: true };
+    await query(q.text, q.values);
     return {};
   });
   res.json(result);
+}));
+
+// Nhập thông tin học sinh từ file "Danh sách đăng ký đội thi EAVN" (client
+// đọc file → mỗi dòng 1 học sinh: full_name, team, team_alt, birth_date,
+// gender, email/phone + nguồn). Khớp với học sinh đang nằm trong 1 đội:
+//   1) họ tên + tên đội (bỏ dấu, bỏ khoảng trắng/ký tự đặc biệt) — áp cho mọi
+//      bản ghi khớp (cùng 1 em có thể có bản ghi riêng ở nhiều giải);
+//   2) không có thì chỉ theo họ tên, nhưng phải duy nhất (lọc thêm ngày sinh
+//      nếu có) — trùng tên mà không phân biệt được thì bỏ qua, không đoán.
+// Ngày sinh / giới tính chỉ điền vào ô còn trống; email/SĐT ghi đè khi nguồn
+// mới tốt hơn (Thí sinh > Phụ huynh > HLV > Đơn vị), không đè dữ liệu admin nhập.
+const SOURCE_RANK = { Admin: 0, 'Thí sinh': 1, 'Phụ huynh': 2, HLV: 3, 'Đơn vị': 4 };
+const rankOf = (src) => SOURCE_RANK[src] ?? 9;
+const fold = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+const nameKey = (v) => fold(v).replace(/[^a-z0-9]+/g, ' ').trim();
+const teamKey = (v) => fold(v).replace(/[^a-z0-9]+/g, '');
+
+router.post('/students/registration-import', requireAdmin, h(async (req, res) => {
+  const input = (Array.isArray(req.body) ? req.body : req.body?.rows || []).slice(0, 6000);
+  const { rows: dbRows } = await query(`
+    select st.id, st.full_name, st.birth_date, st.gender, st.email, st.phone, st.email_source, st.phone_source,
+      array_agg(t.name) as teams
+    from students st
+    join teams t on st.id = any(t.student_ids)
+    group by st.id`);
+
+  const byName = new Map();
+  const byNameTeam = new Map();
+  const push = (map, k, v) => { if (!map.has(k)) map.set(k, new Set()); map.get(k).add(v); };
+  for (const st of dbRows) {
+    const nk = nameKey(st.full_name);
+    push(byName, nk, st);
+    for (const tn of st.teams) push(byNameTeam, `${nk}|${teamKey(tn)}`, st);
+  }
+
+  // Gom thông tin tốt nhất cho từng học sinh (1 em có thể có ở nhiều sheet)
+  const best = new Map();
+  const unmatched = [];
+  let matchedRows = 0;
+  for (const r of input) {
+    const nk = nameKey(r.full_name);
+    if (!nk) continue;
+    let targets = [];
+    for (const tn of [r.team, r.team_alt]) {
+      const k = `${nk}|${teamKey(tn)}`;
+      if (teamKey(tn) && byNameTeam.has(k)) { targets = [...byNameTeam.get(k)]; break; }
+    }
+    let reason = '';
+    if (!targets.length) {
+      const sameName = [...(byName.get(nk) || [])];
+      const cands = sameName.length > 1 && r.birth_date ? sameName.filter((c) => c.birth_date === r.birth_date) : sameName;
+      if (cands.length === 1) targets = cands;
+      else reason = sameName.length ? 'Trùng tên, không xác định được là em nào' : 'Không có học sinh này trong đội nào';
+    }
+    if (!targets.length) {
+      unmatched.push({ sheet: String(r.sheet || ''), row: r.row, full_name: r.full_name, team: r.team || '', reason });
+      continue;
+    }
+    matchedRows += 1;
+    for (const st of targets) {
+      const cur = best.get(st.id) || { st };
+      if (!cur.birth_date && cleanDate(r.birth_date)) cur.birth_date = r.birth_date;
+      if (!cur.gender && cleanGender(r.gender)) cur.gender = r.gender;
+      const email = cleanText(r.email, 200);
+      if (email && rankOf(r.email_source) < rankOf(cur.email_source)) { cur.email = email; cur.email_source = r.email_source; }
+      const phone = cleanText(r.phone, 50);
+      if (phone && rankOf(r.phone_source) < rankOf(cur.phone_source)) { cur.phone = phone; cur.phone_source = r.phone_source; }
+      best.set(st.id, cur);
+    }
+  }
+
+  let updated = 0;
+  await withTransaction(async (q) => {
+    for (const [id, b] of best) {
+      const { st } = b;
+      const data = {};
+      if (!st.birth_date && b.birth_date) data.birth_date = b.birth_date;
+      if (!st.gender && b.gender) data.gender = b.gender;
+      if (b.email && (!st.email || rankOf(b.email_source) < rankOf(st.email_source))) {
+        data.email = b.email; data.email_source = b.email_source;
+      }
+      if (b.phone && (!st.phone || rankOf(b.phone_source) < rankOf(st.phone_source))) {
+        data.phone = b.phone; data.phone_source = b.phone_source;
+      }
+      const u = buildUpdate('students', id, data);
+      if (u) { await q(u.text, u.values); updated += 1; }
+    }
+  });
+
+  res.json({
+    total: input.length, matchedRows, matchedStudents: best.size, updated,
+    unmatchedCount: unmatched.length, unmatched: unmatched.slice(0, 500),
+  });
 }));
 
 // Giải thưởng chính thức (team_awards) của 1 cuộc thi — dùng xét HLV xuất sắc
