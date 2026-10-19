@@ -40,6 +40,10 @@
 .viewer-panel .viewer-res-draw { color: #fbbf24; font-weight: 700; }
 .viewer-panel .viewer-total-row td { font-weight: 700; border-top: 2px solid rgba(255, 255, 255, 0.12); }
 
+.viewer-panel .viewer-chip-gold { background: rgba(251, 191, 36, 0.14); border-color: rgba(251, 191, 36, 0.4); color: #fde68a; }
+.viewer-panel .viewer-award { font-size: 13px; margin: 2px 0; }
+.viewer-panel .viewer-check { display: inline-flex; align-items: center; gap: 8px; color: #cbd5e1; font-size: 13px; cursor: pointer; }
+
 /* ─── Modal chi tiết đội ─── */
 .viewer-modal-overlay {
   position: fixed;

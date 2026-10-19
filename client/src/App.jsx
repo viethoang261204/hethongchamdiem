@@ -46,6 +46,7 @@ import ViewerStudents from './pages/viewer/ViewerStudents';
 import ViewerGroups from './pages/viewer/ViewerGroups';
 import ViewerScoreDetail from './pages/viewer/ViewerScoreDetail';
 import ViewerScoreboard from './pages/viewer/ViewerScoreboard';
+import ViewerCoaches from './pages/viewer/ViewerCoaches';
 
 const AuthContext = createContext(null);
 
@@ -153,6 +154,7 @@ export default function App() {
               <Route path="doi-thi" element={<ViewerTeams />} />
               <Route path="hoc-sinh" element={<ViewerStudents />} />
               <Route path="truong-hlv" element={<ViewerGroups />} />
+              <Route path="hlv-xuat-sac" element={<ViewerCoaches />} />
               <Route path="bang-xep-hang" element={<ViewerScoreboard />} />
               <Route path="phieu/:scoreId" element={<ViewerScoreDetail />} />
             </>
