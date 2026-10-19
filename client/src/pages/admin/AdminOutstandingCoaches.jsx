@@ -6,6 +6,8 @@ import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
 import { awardOrder, classifyRank, isOutstandingCoach, isRisingStarTeam, formatRankLabel } from '../../lib/outstandingCoach';
 import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import './AdminLayout.css';
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
@@ -196,6 +198,7 @@ export default function AdminOutstandingCoaches() {
     list.sort((a, b) => b.majorCount - a.majorCount || b.totalCount - a.totalCount || a.coachName.localeCompare(b.coachName));
     return list;
   }, [entriesByCoach, coaches, noteByCoachId]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(qualifyingList, 20);
 
   const [noteModal, setNoteModal] = useState(null); // { coachId, coachName, text }
   const [savingNote, setSavingNote] = useState(false);
@@ -282,7 +285,9 @@ export default function AdminOutstandingCoaches() {
               <tbody>
                 {qualifyingList.length === 0 ? (
                   <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có HLV nào đạt chuẩn "HLV xuất sắc" cho cuộc thi này.</td></tr>
-                ) : qualifyingList.map((row, i) => (
+                ) : pageItems.map((row, idx) => {
+                  const i = (page - 1) * pageSize + idx;
+                  return (
                   <tr key={row.coachId}>
                     <td><span className={`rank-badge rank-${i + 1}`}>{i + 1}</span></td>
                     <td style={{ fontWeight: 600 }}>{row.coachName}</td>
@@ -304,10 +309,12 @@ export default function AdminOutstandingCoaches() {
                       <button type="button" className="btn btn-secondary" onClick={() => openNoteModal(row)}>Ghi chú</button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
         </div>
       )}
 

@@ -9,6 +9,8 @@ import CombatStarsSheetTable from '../shared/CombatStarsSheetTable';
 import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 import { downloadWorkbook } from '../../lib/excelReport';
 import { loadReportRows, groupReportRows, buildGroupWorkbook } from '../../lib/scoreExports';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import './AdminLayout.css';
 
 export default function AdminReports() {
@@ -70,6 +72,7 @@ export default function AdminReports() {
   const groups = useMemo(() => {
     return groupReportRows(rows, groupBy);
   }, [rows, groupBy]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(groups, 10);
 
   const compName = competitions.find((c) => c.id === selectedComp)?.name || '';
   const contentName = contents.find((c) => c.id === selectedContent)?.name || 'Tất cả nội dung';
@@ -234,7 +237,7 @@ export default function AdminReports() {
 
           {groups.length === 0 ? (
             <div className="card" style={{ padding: 24, textAlign: 'center', color: '#888' }}>Chưa có dữ liệu điểm.</div>
-          ) : groups.map((g) => (
+          ) : pageItems.map((g) => (
             <div className="card report-group" key={g.name} style={{ marginBottom: 20 }}>
               <div className="card-header">
                 <h3 className="card-title">{g.name}</h3>
@@ -286,6 +289,7 @@ export default function AdminReports() {
               </div>
             </div>
           ))}
+          {groups.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />}
         </div>
       )}
 

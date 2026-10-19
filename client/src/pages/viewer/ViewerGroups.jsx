@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
 import { normalizeText } from '../../lib/lookup';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 
 // Tổng hợp theo Trường / Trung tâm hoặc theo HLV — bấm tên để sang trang
 // Tra cứu đội đã lọc sẵn (?truong= / ?hlv=), xem từng đội + phiếu điểm.
@@ -35,6 +37,7 @@ export default function ViewerGroups() {
       .filter((r) => !nq || normalizeText(r.name).includes(nq) || [...r.other].some((o) => normalizeText(o).includes(nq)))
       .sort((a, b) => b.teams.length - a.teams.length || a.name.localeCompare(b.name, 'vi'));
   }, [lookup, mode, q]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(rows, 30);
 
   if (!lookup) return null;
   const param = mode === 'truong' ? 'truong' : 'hlv';
@@ -71,7 +74,7 @@ export default function ViewerGroups() {
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có kết quả.</td></tr>
-              ) : rows.map((r) => (
+              ) : pageItems.map((r) => (
                 <tr key={r.name}>
                   <td><Link className="viewer-link" to={`/tra-cuu/doi-thi?${param}=${encodeURIComponent(r.name)}`}><strong>{r.name}</strong></Link></td>
                   <td className="viewer-num">{r.teams.length}</td>
@@ -85,6 +88,7 @@ export default function ViewerGroups() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
     </div>
   );

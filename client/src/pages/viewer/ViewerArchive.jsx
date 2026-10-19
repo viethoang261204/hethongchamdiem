@@ -5,6 +5,8 @@ import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { downloadBlob, downloadWorkbook } from '../../lib/excelReport';
 import { loadReportRows, groupReportRows, buildGroupWorkbook, buildScoreboardWorkbook } from '../../lib/scoreExports';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 
 // "Lưu trữ bảng điểm" — sắp xếp file như thư mục Drive để tải về gửi riêng
 // cho từng trường / HLV:
@@ -77,7 +79,8 @@ export default function ViewerArchive() {
     [folder, report, compId]
   );
   const [q, setQ] = useState('');
-  const shown = groups.filter((g) => g.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const shown = useMemo(() => groups.filter((g) => g.name.toLowerCase().includes(q.trim().toLowerCase())), [groups, q]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(shown, 30);
 
   const [busy, setBusy] = useState(''); // khoá đang tải (tên file / 'zip')
   const [progress, setProgress] = useState('');
@@ -228,7 +231,7 @@ export default function ViewerArchive() {
                 <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24 }}>Đang tổng hợp điểm của giải...</td></tr>
               ) : shown.length === 0 ? (
                 <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>{groups.length ? 'Không tìm thấy.' : 'Giải này chưa có dữ liệu điểm.'}</td></tr>
-              ) : shown.map((g) => (
+              ) : pageItems.map((g) => (
                 <tr key={g.name}>
                   <td>
                     <div style={nameCell}><XlsxIcon />{fileOf(g)}</div>
@@ -246,6 +249,7 @@ export default function ViewerArchive() {
             </tbody>
           </table>
         </div>
+        {folder && report.rows && <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />}
       </div>
     </div>
   );

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
 import { normalizeText } from '../../lib/lookup';
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/Pagination';
 import { awardOrder, classifyRank, formatRankLabel, isOutstandingCoach, isRisingStarTeam } from '../../lib/outstandingCoach';
 
 // Tổng hợp "HLV xuất sắc" — ĐÚNG tiêu chí ở lib/outstandingCoach.js (dùng
@@ -50,6 +52,7 @@ export default function ViewerCoaches() {
       .sort((a, b) => Number(b.outstanding) - Number(a.outstanding) || b.major - a.major || b.entries.length - a.entries.length
         || (a.coach || '').localeCompare(b.coach || '', 'vi'));
   }, [lookup, q, showAll]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(rows, 30);
 
   if (!lookup) return null;
   const outstandingCount = rows.filter((r) => r.outstanding).length;
@@ -90,7 +93,7 @@ export default function ViewerCoaches() {
             <tbody>
               {rows.length === 0 ? (
                 <tr><td colSpan={lookup.all ? 6 : 5} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Chưa có HLV nào đạt tiêu chí (hoặc giải chưa có kết quả).</td></tr>
-              ) : rows.map((r) => (
+              ) : pageItems.map((r) => (
                 <tr key={r.key}>
                   <td>
                     <Link className="viewer-link" to={`/tra-cuu/doi-thi?hlv=${encodeURIComponent(r.coach)}${lookup.all ? `&giai=${r.competition?.id}` : ''}`}><strong>{r.coach}</strong></Link>
@@ -114,6 +117,7 @@ export default function ViewerCoaches() {
             </tbody>
           </table>
         </div>
+        <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
     </div>
   );
