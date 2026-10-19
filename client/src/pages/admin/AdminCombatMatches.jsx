@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { api, taskImageUrl } from '../../api';
 import { clearApiCache } from '../../apiCache';
 import { useNotify } from '../../context/NotifyContext';
@@ -113,6 +113,16 @@ export default function AdminCombatMatches() {
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [viewMatchId, setViewMatchId] = useState(null);
+  // Danh sách trận không kèm ảnh chữ ký (nhẹ) — phiếu đang xem lấy riêng bản
+  // đầy đủ của đúng trận đó để hiện/in chữ ký.
+  const [viewFull, setViewFull] = useState(null);
+  useEffect(() => {
+    setViewFull(null);
+    if (!viewMatchId) return undefined;
+    let cancelled = false;
+    api.getCombatMatch(viewMatchId).then((m) => { if (!cancelled) setViewFull(m); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [viewMatchId]);
   const [exporting, setExporting] = useState(false);
   const [pendingExport, setPendingExport] = useState(null);
   const [generatingGroup, setGeneratingGroup] = useState(null);
@@ -314,7 +324,8 @@ export default function AdminCombatMatches() {
     remarks: d.remarks || '', objection: d.objection || '',
   });
 
-  const openDetail = (m) => {
+  const openDetail = async (listMatch) => {
+    const m = await api.getCombatMatch(listMatch.id).catch(() => listMatch);
     const d = m.details || {};
     setDetailModal(m);
     setStatusAction(null);
@@ -722,9 +733,13 @@ export default function AdminCombatMatches() {
     if (!matches.length) return;
     setExporting(true);
     try {
-      setPendingExport(matches);
+      // In phiếu cần ảnh chữ ký → lấy danh sách ĐẦY ĐỦ (chỉ lúc xuất PDF)
+      const full = await api.getCombatMatches(selectedContentId, { full: true });
+      const fullById = new Map(full.map((m) => [m.id, m]));
+      const toPrint = matches.map((m) => fullById.get(m.id) || m);
+      setPendingExport(toPrint);
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const nodes = matches.map((m) => document.getElementById(`combat-export-${m.id}`));
+      const nodes = toPrint.map((m) => document.getElementById(`combat-export-${m.id}`));
       const slug = (selectedContent?.name || 'doi-khang').replace(/\s+/g, '-').toLowerCase();
       await exportMultipleToPdf(nodes, `phieu-doi-khang-${slug}`);
     } finally {
@@ -1032,7 +1047,7 @@ export default function AdminCombatMatches() {
                   {exporting ? 'Đang xuất...' : 'Tải PDF'}
                 </button>
               </div>
-              {renderSheet(matches.find((m) => m.id === viewMatchId), sheetRef)}
+              {renderSheet(viewFull?.id === viewMatchId ? viewFull : matches.find((m) => m.id === viewMatchId), sheetRef)}
             </div>
           )}
 

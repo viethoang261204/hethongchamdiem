@@ -1283,6 +1283,24 @@ const COMBAT_MATCH_NESTED = `
   left join fields fd on fd.id = cm.field_id
 `;
 
+// Ảnh chữ ký (base64) trong combat_matches.details nặng ~170KB/trận — trả
+// kèm trong DANH SÁCH làm 1 lần mở trang tốn hàng chục MB (nguyên nhân chính
+// của băng thông Render tăng vọt). Danh sách mặc định bỏ ảnh chữ ký (cột
+// details trùng tên ở cuối ghi đè cm.details); cần ảnh (xem / in phiếu, trọng
+// tài mở lại trận đã chấm) thì lấy GET /combat-matches/:id, hoặc ?full=1 khi
+// xuất PDF hàng loạt.
+const COMBAT_SIGNATURE_KEYS = ['studentSignatureImageA', 'studentSignatureImageB', 'refereeSignatureImage'];
+const COMBAT_MATCH_LIGHT = COMBAT_MATCH_NESTED.replace(
+  'select cm.*,',
+  `select cm.*, cm.details ${COMBAT_SIGNATURE_KEYS.map((k) => `- '${k}'`).join(' ')} as details,`
+);
+
+router.get('/combat-matches/:id', h(async (req, res) => {
+  const { rows } = await query(`${COMBAT_MATCH_NESTED} where cm.id = $1`, [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy trận đấu.' });
+  res.json(rows[0]);
+}));
+
 router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
   // Phân quyền theo (Nội dung × Field) — rỗng cho nội dung này = chưa giới
   // hạn, thấy tất cả trận (kể cả trận chưa gán field).
@@ -1295,7 +1313,7 @@ router.get('/contents/:contentId/combat-matches', h(async (req, res) => {
     if (rf.length) assignedFieldIds = rf.map((r) => r.field_id);
   }
   const { rows } = await query(
-    `${COMBAT_MATCH_NESTED}
+    `${req.query.full === '1' ? COMBAT_MATCH_NESTED : COMBAT_MATCH_LIGHT}
      where cm.contest_content_id = $1
        ${assignedFieldIds ? 'and cm.field_id = any($2::uuid[])' : ''}
      order by cm.created_at`,
@@ -1350,6 +1368,13 @@ router.put('/combat-matches/:id', requireAuth, h(async (req, res) => {
   }
 
   const data = pick(req.body, COMBAT_MATCH_FIELDS);
+  // Client gửi details KHÔNG kèm ảnh chữ ký (VD lấy từ danh sách đã lược ảnh)
+  // → giữ nguyên ảnh đang lưu, không để mất chữ ký.
+  if (data.details && typeof data.details === 'object') {
+    for (const k of COMBAT_SIGNATURE_KEYS) {
+      if (data.details[k] === undefined && match.details?.[k]) data.details[k] = match.details[k];
+    }
+  }
   // status không phải cột DB thật — client gửi rời (không qua COMBAT_MATCH_FIELDS).
   const requestedStatus = typeof req.body?.status === 'string' ? req.body.status : undefined;
 
@@ -2281,7 +2306,10 @@ router.get('/tasks/:id/image/raw', h(async (req, res) => {
   const { rows } = await query('select image_mime, image_data from tasks where id = $1', [req.params.id]);
   if (!rows[0] || !rows[0].image_data) return res.status(404).send('Not found');
   res.set('Content-Type', rows[0].image_mime || 'application/octet-stream');
-  res.set('Cache-Control', 'public, max-age=3600');
+  // URL client luôn kèm ?v=<updated_at> (đổi ảnh → trigger đổi updated_at →
+  // URL mới) nên giữ cache lâu được — trọng tài mở phiếu chấm không phải tải
+  // lại ảnh nhiệm vụ mỗi lần.
+  res.set('Cache-Control', 'public, max-age=31536000, immutable');
   res.send(rows[0].image_data);
 }));
 

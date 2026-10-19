@@ -147,10 +147,16 @@ export default function AdminReports() {
   // đó), chỉ khác là gộp theo phạm vi báo cáo (cuộc thi/nội dung đang chọn)
   // thay vì phải vào từng nội dung riêng.
   const handleExportCombatPdf = async () => {
-    const items = rows?.combatMatches || [];
-    if (!items.length) return;
+    const listed = rows?.combatMatches || [];
+    if (!listed.length) return;
     setExportingCombatPdf(true);
     try {
+      // Dữ liệu báo cáo là danh sách trận đã lược ảnh chữ ký — in phiếu thì
+      // lấy bản ĐẦY ĐỦ của từng nội dung đối kháng (chỉ lúc xuất PDF)
+      const contentIds = [...new Set(listed.map((it) => it.content.id))];
+      const fullLists = await Promise.all(contentIds.map((id) => api.getCombatMatches(id, { full: true })));
+      const fullById = new Map(fullLists.flat().map((m) => [m.id, m]));
+      const items = listed.map((it) => ({ ...it, match: fullById.get(it.match.id) || it.match }));
       setPendingCombatExport(items);
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       const nodes = items.map((it) => document.getElementById(`combat-report-export-${it.match.id}`));

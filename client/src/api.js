@@ -215,9 +215,12 @@ export const api = {
   // ============================================================
   // Trận đối kháng riêng (Fly Smart Cup / Battle of Stars) — content_format
   // ============================================================
-  getCombatMatches: (contestContentId) => withRetry(() => request(
-    `/contents/${contestContentId}/combat-matches`
+  // Danh sách KHÔNG kèm ảnh chữ ký (nhẹ); full: true chỉ dùng khi in/xuất
+  // PDF phiếu hàng loạt. Xem/sửa 1 trận → getCombatMatch (đủ chữ ký).
+  getCombatMatches: (contestContentId, { full = false } = {}) => withRetry(() => request(
+    `/contents/${contestContentId}/combat-matches${full ? '?full=1' : ''}`
   ), 'getCombatMatches'),
+  getCombatMatch: (matchId) => withRetry(() => request(`/combat-matches/${matchId}`), 'getCombatMatch'),
 
   postCombatMatch: (contestContentId, body) => withRetry(() => request(
     `/contents/${contestContentId}/combat-matches`, { method: 'POST', body }

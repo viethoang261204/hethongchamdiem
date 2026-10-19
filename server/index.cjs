@@ -3,6 +3,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const { securityHeaders, corsGuard, apiLimiter } = require('./security.cjs');
 
@@ -16,6 +17,9 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(securityHeaders);
+// Nén gzip mọi phản hồi (JSON, JS, CSS) — trước đây gửi nguyên, file JS chính
+// 1.7MB + JSON danh sách lớn làm băng thông Render tăng vọt.
+app.use(compression());
 app.use('/api', corsGuard, apiLimiter);
 app.use(express.json({ limit: '2mb' }));
 app.use(attachUser);
@@ -25,7 +29,15 @@ app.use('/api', apiRouter);
 
 // Serve frontend build
 const distDir = path.join(__dirname, '..', 'client', 'dist');
-app.use(express.static(distDir));
+// File trong /assets/ có mã hash trong tên (mỗi bản build đổi tên) → cho
+// trình duyệt giữ 1 năm, khỏi tải lại mỗi lần mở trang. index.html thì luôn
+// hỏi lại server để nhận bản build mới.
+app.use(express.static(distDir, {
+  setHeaders(res, filePath) {
+    if (/[\\/]assets[\\/]/.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    else res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(distDir, 'index.html'));

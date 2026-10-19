@@ -100,7 +100,9 @@ export default function RefereeCombatMatchScore({ format }) {
     setStep(1);
     setSuccess(false);
     Promise.all([
-      api.getCombatMatches(contentId),
+      // Đúng 1 trận, ĐỦ ảnh chữ ký (danh sách trận đã lược ảnh) — form điền lại
+      // chữ ký đã lưu, lưu lại không làm mất chữ ký.
+      api.getCombatMatch(matchId).catch(() => null),
       api.getTeams(contentId).catch(() => []),
       api.getStudents().catch(() => []),
       // Ảnh minh hoạ nhiệm vụ Battle of Stars — lấy từ "Nhiệm vụ" đã tạo sẵn
@@ -108,12 +110,11 @@ export default function RefereeCombatMatchScore({ format }) {
       isStars ? api.getTasks(contentId).catch(() => []) : Promise.resolve([]),
       // Thời gian tối đa (time_limit_seconds) để tự động dừng đồng hồ bấm giờ.
       api.getContents(competitionId).catch(() => []),
-    ]).then(([list, teams, students, tasks, contents]) => {
+    ]).then(([m, teams, students, tasks, contents]) => {
       if (!cancelled) setMissionTasks(tasks);
       if (!cancelled) setContent(contents.find((c) => c.id === contentId) || null);
       if (cancelled) return;
-      const m = list.find((x) => x.id === matchId);
-      if (!m) { setNotFound(true); return; }
+      if (!m || m.contest_content_id !== contentId) { setNotFound(true); return; }
       setMatch(m);
       const d = m.details || {};
 
