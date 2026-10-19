@@ -20,6 +20,7 @@ import AdminSchools from './pages/admin/AdminSchools';
 import AdminBoards from './pages/admin/AdminBoards';
 import AdminCoaches from './pages/admin/AdminCoaches';
 import AdminOutstandingCoaches from './pages/admin/AdminOutstandingCoaches';
+import AdminChinaTeams from './pages/admin/AdminChinaTeams';
 import AdminFields from './pages/admin/AdminFields';
 import AdminCombatMatches from './pages/admin/AdminCombatMatches';
 import AdminReports from './pages/admin/AdminReports';
@@ -47,6 +48,7 @@ import ViewerGroups from './pages/viewer/ViewerGroups';
 import ViewerScoreDetail from './pages/viewer/ViewerScoreDetail';
 import ViewerScoreboard from './pages/viewer/ViewerScoreboard';
 import ViewerCoaches from './pages/viewer/ViewerCoaches';
+import ViewerChina from './pages/viewer/ViewerChina';
 
 const AuthContext = createContext(null);
 
@@ -114,6 +116,7 @@ export default function App() {
               <Route path="boards" element={<AdminBoards />} />
               <Route path="coaches" element={<AdminCoaches />} />
               <Route path="outstanding-coaches" element={<AdminOutstandingCoaches />} />
+              <Route path="china-teams" element={<AdminChinaTeams />} />
               <Route path="fields" element={<AdminFields />} />
               <Route path="combat-matches" element={<AdminCombatMatches />} />
               <Route path="reports" element={<AdminReports />} />
@@ -163,6 +166,7 @@ export default function App() {
               <Route path="hoc-sinh" element={<ViewerStudents />} />
               <Route path="truong-hlv" element={<ViewerGroups />} />
               <Route path="hlv-xuat-sac" element={<ViewerCoaches />} />
+              <Route path="di-trung-quoc" element={<ViewerChina />} />
               <Route path="bang-xep-hang" element={<ViewerScoreboard />} />
               <Route path="phieu/:scoreId" element={<ViewerScoreDetail />} />
               <Route path="*" element={<Navigate to="/tra-cuu" replace />} />

@@ -758,3 +758,8 @@ create table if not exists team_awards (
   unique (team_id, label)
 );
 create index if not exists idx_team_awards_competition on team_awards(competition_id);
+
+-- Liên hệ của đội (email + SĐT) — dùng cho danh sách đội đủ điều kiện đi
+-- Trung Quốc (đội có giải thưởng chính thức, xem team_awards).
+alter table teams add column if not exists contact_email text;
+alter table teams add column if not exists contact_phone text;

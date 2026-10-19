@@ -624,7 +624,7 @@ router.get('/teams', h(async (_req, res) => {
   res.json(rows);
 }));
 
-const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'region', 'order_index', 'combat_group'];
+const TEAM_FIELDS = ['name', 'student_ids', 'school_id', 'area_id', 'board_id', 'coach_id', 'region', 'order_index', 'combat_group', 'contact_email', 'contact_phone'];
 
 // Ghi đè toàn bộ field của 1 đội (bảng team_fields, không giới hạn số
 // lượng) — cùng pattern full-overwrite với PUT /users/:id/permissions.
@@ -1791,6 +1791,67 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
     matches: matches.rows,
     awards: awards.rows,
   });
+}));
+
+// ============================================================
+// Đội đủ điều kiện đi Trung Quốc = đội có ít nhất 1 giải thưởng chính thức
+// (team_awards), kèm email + SĐT liên hệ của đội. Xem: viewer + admin;
+// sửa/nhập liên hệ: chỉ admin.
+// ============================================================
+const ELIGIBLE_SQL = `
+  select t.id, t.name, t.contact_email, t.contact_phone, t.student_ids,
+    co.id as competition_id, co.name as competition_name, cc.name as content_name, cc.name_en as content_name_en,
+    b.name as board_name, sch.name as school_name, coa.name as coach_name,
+    (select string_agg(st.full_name, ', ') from students st where st.id = any(t.student_ids)) as students,
+    array_agg(a.label order by a.label) as awards,
+    bool_or(a.tier = 'major') as has_major
+  from team_awards a
+  join teams t on t.id = a.team_id
+  join contest_contents cc on cc.id = t.contest_content_id
+  join competitions co on co.id = cc.competition_id
+  left join boards b on b.id = t.board_id
+  left join schools sch on sch.id = t.school_id
+  left join coaches coa on coa.id = t.coach_id
+  group by t.id, co.id, co.name, cc.name, cc.name_en, cc.order_index, b.name, sch.name, coa.name
+  order by co.created_at, cc.order_index, b.name, t.name`;
+
+router.get('/china-eligible', requireViewer, h(async (_req, res) => {
+  const { rows } = await query(ELIGIBLE_SQL);
+  res.json(rows);
+}));
+
+const cleanContact = (v, max) => {
+  const s = String(v ?? '').trim();
+  return s ? s.slice(0, max) : null;
+};
+
+router.put('/teams/:id/contact', requireAdmin, h(async (req, res) => {
+  const { rows } = await query(
+    'update teams set contact_email = $1, contact_phone = $2 where id = $3 returning id, contact_email, contact_phone',
+    [cleanContact(req.body?.contact_email, 200), cleanContact(req.body?.contact_phone, 50), req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy đội.' });
+  res.json(rows[0]);
+}));
+
+// Nhập liên hệ hàng loạt từ file Excel đã xuất ở màn "Đi Trung Quốc" (khớp
+// theo cột Mã đội). Ô để trống = giữ nguyên giá trị cũ.
+router.post('/teams/contacts/import', requireAdmin, h(async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body.rows || [];
+  const result = await bulkImport(rows, async (row) => {
+    const id = String(row.team_id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Mã đội không hợp lệ.');
+    const email = cleanContact(row.contact_email, 200);
+    const phone = cleanContact(row.contact_phone, 50);
+    if (!email && !phone) return { skipped: true };
+    const { rowCount } = await query(
+      'update teams set contact_email = coalesce($1, contact_email), contact_phone = coalesce($2, contact_phone) where id = $3',
+      [email, phone, id]
+    );
+    if (!rowCount) throw new Error('Không tìm thấy đội.');
+    return {};
+  });
+  res.json(result);
 }));
 
 // Giải thưởng chính thức (team_awards) của 1 cuộc thi — dùng xét HLV xuất sắc

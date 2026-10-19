@@ -44,6 +44,8 @@
 .viewer-panel .viewer-award { font-size: 13px; margin: 2px 0; }
 .viewer-panel .viewer-check { display: inline-flex; align-items: center; gap: 8px; color: #cbd5e1; font-size: 13px; cursor: pointer; }
 
+.viewer-panel .viewer-missing { color: #f87171; font-size: 12.5px; font-style: italic; white-space: nowrap; }
+
 /* ─── Modal chi tiết đội ─── */
 .viewer-modal-overlay {
   position: fixed;
@@ -125,3 +127,42 @@
   .viewer-modal-overlay { padding: 12px 8px; }
   .viewer-modal-header, .viewer-modal-body { padding: 16px; }
 }
+
+/* ─── Biểu đồ (ViewerCharts.jsx) — bảng màu nền tối đã kiểm tra bằng
+   validate_palette.js trên nền thẻ #131b2e: xanh / cam / ngọc ─── */
+.viewer-panel .viz-root {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-text: #f1f5f9;
+  --viz-muted: #94a3b8;
+  --viz-track: rgba(255, 255, 255, 0.04);
+}
+.viewer-panel .viz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; margin-bottom: 24px; }
+.viewer-panel .viz-grid .card { margin-bottom: 0; }
+.viewer-panel .viz-grid .viz-wide { grid-column: 1 / -1; }
+.viewer-panel .viz-wide .viz-row { grid-template-columns: minmax(150px, 22%) 1fr; }
+.viewer-panel .viz-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 12px; font-size: 12.5px; color: var(--viz-muted); }
+.viewer-panel .viz-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.viewer-panel .viz-legend-item i, .viewer-panel .viz-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.viewer-panel .viz-rows { display: flex; flex-direction: column; gap: 6px; }
+.viewer-panel .viz-row { position: relative; display: grid; grid-template-columns: minmax(110px, 34%) 1fr; align-items: center; gap: 10px; padding: 3px 4px; border-radius: 8px; cursor: default; }
+.viewer-panel .viz-row.is-active { background: rgba(255, 255, 255, 0.04); }
+.viewer-panel .viz-label { font-size: 13px; color: var(--viz-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viewer-panel .viz-label span { display: block; font-size: 11px; color: var(--viz-muted); }
+.viewer-panel .viz-track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.viewer-panel .viz-bar { display: flex; gap: 2px; height: 14px; min-width: 4px; border-radius: 0 4px 4px 0; overflow: hidden; }
+.viewer-panel .viz-seg { min-width: 2px; height: 100%; }
+.viewer-panel .viz-seg:last-child { border-radius: 0 4px 4px 0; }
+.viewer-panel .viz-total { font-size: 12.5px; font-weight: 700; color: var(--viz-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.viewer-panel .viz-tip {
+  position: absolute; z-index: 5; right: 4px; top: calc(100% + 4px);
+  background: #0b1120; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px;
+  padding: 10px 12px; font-size: 12.5px; color: var(--viz-text); min-width: 180px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); pointer-events: none;
+}
+.viewer-panel .viz-tip > div { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--viz-muted); }
+.viewer-panel .viz-tip b { color: var(--viz-text); }
+.viewer-panel .viz-tip-total { border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 6px; }
+.viewer-panel .viz-empty { color: #64748b; font-size: 13px; padding: 12px 0; }
+@media (max-width: 899px) { .viewer-panel .viz-grid { grid-template-columns: 1fr; } }

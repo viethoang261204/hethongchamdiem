@@ -2,6 +2,25 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
 import { BOARD_AGE_LABEL, contentGroup } from '../../lib/lookup';
+import { HBarChart, SERIES_COLORS } from './ViewerCharts';
+
+const AWARD_SERIES = [
+  { key: 'major', label: 'Giải chính (Nhất / Nhì / Ba, Vô địch...)', color: SERIES_COLORS[0] },
+  { key: 'rising', label: 'Rising Star', color: SERIES_COLORS[1] },
+  { key: 'phu', label: 'Giải phụ (Top 5 / Top 10...)', color: SERIES_COLORS[2] },
+];
+const ONE_SERIES = [{ key: 'v', label: '', color: SERIES_COLORS[0] }];
+
+// Đếm giải thưởng chính thức của 1 tập đội theo 3 loại (đội nhiều giải đếm đủ)
+function countAwards(teams) {
+  const c = { major: 0, rising: 0, phu: 0 };
+  for (const t of teams) for (const a of t.awards || []) {
+    if (a.label === 'Rising Star') c.rising++;
+    else if (a.tier === 'major') c.major++;
+    else c.phu++;
+  }
+  return c;
+}
 
 const hasResult = (t) => (t.isCombat ? t.combat?.played > 0 : !!t.total);
 
@@ -55,7 +74,19 @@ export default function ViewerOverview() {
       const teams = lookup.teams.filter((t) => t.boardName === name);
       return { name, ...summarize(teams) };
     }).filter((b) => b.teams > 0);
-    return { total: summarize(lookup.teams), perCompetition, perContent, perBoard };
+    // Biểu đồ: theo giải (host) khi xem tổng thể, theo nội dung khi xem 1 giải
+    const chartUnits = lookup.all
+      ? lookup.competitions.map((comp) => ({ key: comp.id, label: comp.name, teams: lookup.teams.filter((t) => t.competition_id === comp.id) }))
+      : perContent.map((r) => ({ key: r.key, label: r.name, teams: lookup.teams.filter((t) => contentGroup(t.content).key === r.key) }));
+    const awardRows = chartUnits.map((u) => ({ key: u.key, label: u.label, values: countAwards(u.teams) }));
+    const studentRows = chartUnits
+      .map((u) => ({ key: u.key, label: u.label, values: { v: new Set(u.teams.flatMap((t) => t.student_ids || [])).size } }))
+      .filter((r) => r.values.v > 0).sort((a, b) => b.values.v - a.values.v);
+    const contentStudentRows = perContent.map((r) => ({ key: r.key, label: r.name, values: { v: r.students } }))
+      .sort((a, b) => b.values.v - a.values.v);
+    const awardTotal = countAwards(lookup.teams);
+    return { total: summarize(lookup.teams), perCompetition, perContent, perBoard, awardRows, studentRows, contentStudentRows,
+      awardTotal: awardTotal.major + awardTotal.rising + awardTotal.phu, awardSplit: awardTotal };
   }, [lookup]);
 
   if (!lookup) return <p style={{ color: '#94a3b8', padding: 24 }}>Chọn giải đấu để xem thống kê.</p>;
@@ -79,6 +110,24 @@ export default function ViewerOverview() {
         <div className="rt-stat"><div className="rt-stat-value">{lookup.coaches.length}</div><div className="rt-stat-label">Huấn luyện viên</div></div>
         <div className="rt-stat"><div className="rt-stat-value">{lookup.all ? stats.perCompetition.length : stats.perContent.length}</div><div className="rt-stat-label">{lookup.all ? 'Giải đấu' : 'Nội dung thi'}</div></div>
         <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{stats.total.withResult}</div><div className="rt-stat-label">Đội đã có kết quả</div></div>
+        <div className="rt-stat"><div className="rt-stat-value">{stats.awardTotal.toLocaleString('vi-VN')}</div><div className="rt-stat-label">Tổng giải thưởng ({stats.awardSplit.major} chính · {stats.awardSplit.rising} Rising Star · {stats.awardSplit.phu} phụ)</div></div>
+      </div>
+
+      <div className="viz-grid">
+        <div className="card viz-wide">
+          <div className="card-header"><h3 className="card-title">{lookup.all ? 'Tổng số giải thưởng theo từng giải (host)' : 'Giải thưởng theo nội dung'}</h3></div>
+          <HBarChart rows={stats.awardRows} series={AWARD_SERIES} emptyText="Chưa có giải thưởng chính thức." />
+        </div>
+        <div className="card">
+          <div className="card-header"><h3 className="card-title">{lookup.all ? 'Học sinh tham dự theo giải' : 'Học sinh tham dự theo nội dung'}</h3></div>
+          <HBarChart rows={stats.studentRows} series={ONE_SERIES} unit=" HS" />
+        </div>
+        {lookup.all && (
+          <div className="card">
+            <div className="card-header"><h3 className="card-title">Học sinh theo nội dung thi (gộp các giải)</h3></div>
+            <HBarChart rows={stats.contentStudentRows} series={ONE_SERIES} unit=" HS" />
+          </div>
+        )}
       </div>
 
       {lookup.all && (
