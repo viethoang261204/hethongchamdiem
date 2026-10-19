@@ -6,11 +6,9 @@ import { useApiLoader, LoaderFull, ErrorBox } from '../../hooks/useApiLoader.jsx
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
-import { writeStyledBlock, downloadWorkbook } from '../../lib/excelReport';
-import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
+import { downloadWorkbook } from '../../lib/excelReport';
+import { buildScoreboardWorkbook } from '../../lib/scoreExports';
 import './AdminLayout.css';
-
-const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
 
 function MeasurementTable({ teams }) {
   return (
@@ -253,167 +251,13 @@ export default function AdminScoreboard() {
     if (!selectedComp) { showAlert('Chọn cuộc thi trước.', 'error'); return; }
     setExportingFull(true);
     try {
-      const allContents = await api.getContents(selectedComp);
-      const allStudents = await api.getStudents().catch(() => []);
-      const studentNameById = new Map(allStudents.map((s) => [s.id, s.full_name]));
-      const { default: ExcelJS } = await import('exceljs');
-      const workbook = new ExcelJS.Workbook();
-      // Gộp TẤT CẢ bảng vào 1 sheet duy nhất (không tách sheet riêng từng nội
-      // dung×bảng đấu như trước) — mỗi bảng cách nhau vài dòng trống để dễ
-      // cắt/kéo sắp xếp lại tay. Dựng TOÀN BỘ dữ liệu (mảng `blocks`) trước,
-      // CHƯA ghi vào sheet — để đo được độ dài nội dung dài nhất của từng cột
-      // trên khắp mọi khối rồi mới set độ rộng cột (ws.columns dùng CHUNG cho
-      // cả sheet), tránh chữ bị xuống dòng hoặc bảng quá hẹp mất chữ.
-      const ws = workbook.addWorksheet('Bảng xếp hạng', {
-        views: [{ showGridLines: false }],
-        pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
-      });
-      const blocks = [];
-
-      for (const content of allContents) {
-        const contentBoards = await api.getBoards(content.id).catch(() => []);
-        if (!contentBoards.length) continue;
-        const isCombat = COMBAT_FORMATS.includes(content.content_format);
-        const isStars = content.content_format === 'combat_stars';
-
-        let combatTeams = null, combatMatches = null;
-        if (isCombat) {
-          [combatTeams, combatMatches] = await Promise.all([api.getTeams(content.id), api.getCombatMatches(content.id)]);
-        }
-        // HLV/Trường/Sân thi đấu/Học sinh không có sẵn trong /ranking
-        // (measurement) hay trong dữ liệu tính BXH combat (chỉ có id/name
-        // đội) — lấy riêng từ /teams (đã kèm sẵn coaches.name, schools.name,
-        // fields, student_ids) rồi tra theo team_id khi dựng từng dòng.
-        const allTeamsForLookup = isCombat ? combatTeams : await api.getTeams(content.id).catch(() => []);
-        const teamInfoById = new Map((allTeamsForLookup || []).map((t) => [t.id, {
-          coach: t.coaches?.name || '',
-          school: t.schools?.name || '',
-          field: (t.fields || []).map((f) => f.name).join(', '),
-          students: (t.student_ids || []).map((sid) => studentNameById.get(sid)).filter(Boolean).join(', '),
-        }]));
-        const infoOf = (id) => teamInfoById.get(id) || { coach: '', school: '', field: '', students: '' };
-
-        const IDENTITY_HEADER = ['Hạng', 'Đội', 'HLV', 'Trường', 'Sân thi đấu', 'Học sinh'];
-        const IDENTITY_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
-        const identityRow = (rank, teamName, id) => {
-          const info = infoOf(id);
-          return [rank, teamName, info.coach, info.school, info.field, info.students];
-        };
-
-        // Ghép xếp hạng theo boardMerge.js (nếu nội dung này có cấu hình) —
-        // chỉ áp dụng cho bảng đang xếp hạng đo lường (measurement), không đụng
-        // tới nhánh đấu loại trực tiếp (combat). Bảng đã gộp thì bỏ qua ở vòng
-        // lặp per-board bên dưới, tránh xuất trùng 2 lần.
-        const mergedBoardIds = new Set();
-        if (!isCombat) {
-          for (const groupBoards of getMergeGroupsForContent(content.competition_id, content.name, contentBoards)) {
-            const rankingResults = await Promise.all(groupBoards.map((b) => api.getRanking(content.id, b.id).catch(() => null)));
-            const mergedTeams = mergeMeasurementTeams(rankingResults);
-            if (!mergedTeams.length) continue;
-
-            blocks.push({
-              title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
-              subtitle: `${groupBoards.map((b) => b.name).join(' + ')} (gộp xếp hạng)`,
-              header: [...IDENTITY_HEADER, 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'],
-              columnKinds: [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number'],
-              rows: mergedTeams.map((t, idx) => [
-                ...identityRow(idx + 1, t.team_name, t.team_id),
-                t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
-                t.total_score, t.total_time, t.total_retry,
-              ]),
-            });
-
-            groupBoards.forEach((b) => mergedBoardIds.add(b.id));
-          }
-        }
-
-        for (const board of contentBoards) {
-          if (mergedBoardIds.has(board.id)) continue;
-          let header, columnKinds, dataRows;
-
-          if (isCombat) {
-            const boardTeams = combatTeams.filter((t) => t.board_id === board.id);
-            if (!boardTeams.length) continue;
-            const standings = isStars
-              ? computeGroupStandings(boardTeams, combatMatches)
-              : computeDroneStandings(boardTeams, combatMatches);
-            header = isStars
-              ? [...IDENTITY_HEADER, 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score', 'Meteor', 'Direct Win', 'Retries']
-              : [...IDENTITY_HEADER, 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score'];
-            columnKinds = isStars
-              ? [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number']
-              : [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number', 'number'];
-            dataRows = standings.map((s) => (isStars
-              ? [...identityRow(s.rank, s.teamName, s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore, s.meteorCompleted, s.directWins, s.retries]
-              : [...identityRow(s.rank, s.teamName, s.teamId), s.played, s.wins, s.draws, s.losses, s.matchPoints, s.totalScore]));
-          } else {
-            const r = await api.getRanking(content.id, board.id).catch(() => null);
-            if (!r) continue;
-            if (r.ranking_format === 'measurement') {
-              if (!r.teams?.length) continue;
-              header = [...IDENTITY_HEADER, 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian', 'Chạy lại'];
-              columnKinds = [...IDENTITY_KINDS, 'number', 'number', 'number', 'number', 'number'];
-              dataRows = r.teams.map((t, idx) => [
-                ...identityRow(idx + 1, t.team_name, t.team_id),
-                t.round1 ? t.round1.score : '', t.round2 ? t.round2.score : '',
-                t.total_score, t.total_time, t.total_retry,
-              ]);
-            } else {
-              // Nhánh đấu loại trực tiếp (ranking_format='combat' cho nội dung
-              // đo lường) — chỉ xuất được khi đã đấu xong hết nhánh.
-              if (!r.bracket_resolved || !r.placements?.length) continue;
-              header = IDENTITY_HEADER;
-              columnKinds = IDENTITY_KINDS;
-              dataRows = r.placements.map((p) => {
-                const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
-                  || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || p.team_id;
-                return identityRow(p.rank, name, p.team_id);
-              });
-            }
-          }
-
-          blocks.push({
-            title: `BẢNG XẾP HẠNG – ${(content.name || '').toUpperCase()}`,
-            subtitle: `${board.name}${board.age_group ? ` — ${board.age_group}` : ''}`,
-            header, columnKinds, rows: dataRows,
-          });
-        }
-      }
-
-      if (blocks.length === 0) {
+      const compName = competitions.find((c) => c.id === selectedComp)?.name || '';
+      const built = await buildScoreboardWorkbook({ compId: selectedComp, compName });
+      if (!built) {
         showAlert('Chưa có dữ liệu bảng xếp hạng nào để xuất.', 'error');
         return;
       }
-
-      // Độ rộng mỗi cột = độ dài nội dung DÀI NHẤT xuất hiện ở đúng cột đó
-      // (tiêu đề lẫn dữ liệu) trên khắp mọi khối, cộng thêm chút đệm — không
-      // dùng bề rộng cố định vì tên trường/HLV/học sinh dài ngắn rất khác nhau
-      // giữa các đội, cố định sẽ khiến chữ bị xuống dòng hoặc bảng quá hẹp.
-      const colCount = Math.max(...blocks.map((b) => b.header.length));
-      const colMaxLen = new Array(colCount).fill(0);
-      const colKindAt = new Array(colCount).fill(null);
-      for (const b of blocks) {
-        b.header.forEach((h, i) => { colMaxLen[i] = Math.max(colMaxLen[i], String(h).length); });
-        b.rows.forEach((row) => {
-          row.forEach((v, i) => { colMaxLen[i] = Math.max(colMaxLen[i], String(v ?? '').length); });
-        });
-        b.columnKinds.forEach((k, i) => { if (!colKindAt[i]) colKindAt[i] = k; });
-      }
-      ws.columns = colMaxLen.map((len, i) => {
-        const minWidth = colKindAt[i] === 'index' ? 8 : colKindAt[i] === 'number' ? 10 : 10;
-        return { width: Math.max(minWidth, len + 2) };
-      });
-
-      const BLOCK_GAP_ROWS = 2;
-      let currentRow = 1;
-      for (const b of blocks) {
-        const nextRow = writeStyledBlock(ws, currentRow, b);
-        currentRow = nextRow + BLOCK_GAP_ROWS;
-      }
-
-      const compName = competitions.find((c) => c.id === selectedComp)?.name || 'bang-xep-hang';
-      const slug = compName.replace(/\s+/g, '-').toLowerCase();
-      await downloadWorkbook(workbook, `bang-xep-hang-${slug}.xlsx`);
+      await downloadWorkbook(built.workbook, built.filename);
     } catch (e) {
       showAlert(e.message || 'Lỗi khi xuất Excel.', 'error');
     } finally {

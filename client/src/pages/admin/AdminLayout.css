@@ -1230,3 +1230,13 @@
   font-size: 13px;
   padding: 0 4px;
 }
+
+/* Lưu trữ bảng điểm — đường dẫn thư mục kiểu Drive */
+.nhutin-admin .archive-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; font-size: 18px; }
+.nhutin-admin .archive-crumbs button { background: none; border: 0; padding: 4px 8px; border-radius: 8px; font: inherit; color: #475569; cursor: pointer; }
+.nhutin-admin .archive-crumbs button:hover:not(:disabled) { background: #f1f5f9; }
+.nhutin-admin .archive-crumbs button:disabled { color: #0f172a; cursor: default; }
+.nhutin-admin .archive-crumbs span { color: #94a3b8; }
+.nhutin-admin .archive-crumbs strong { padding: 4px 8px; color: #0f172a; font-weight: 500; }
+.nhutin-admin .archive-table tbody tr:hover { background: #f8fafc; }
+.nhutin-admin .archive-table .btn-sm { padding: 6px 14px; font-size: 13px; }

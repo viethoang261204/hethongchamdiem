@@ -122,7 +122,10 @@ export function buildStyledSheet(workbook, sheetName, { title, subtitle, header,
 // SheetJS cho trình duyệt nên tự tạo Blob + link tải rồi bấm hộ.
 export async function downloadWorkbook(workbook, filename) {
   const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  downloadBlob(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
+}
+
+export function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

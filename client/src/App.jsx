@@ -24,6 +24,7 @@ import AdminChinaTeams from './pages/admin/AdminChinaTeams';
 import AdminFields from './pages/admin/AdminFields';
 import AdminCombatMatches from './pages/admin/AdminCombatMatches';
 import AdminReports from './pages/admin/AdminReports';
+import AdminArchive from './pages/admin/AdminArchive';
 import AdminComplaints from './pages/admin/AdminComplaints';
 import ServerDiag from './pages/admin/ServerDiag';
 import RefereeLogin from './pages/referee/RefereeLogin';
@@ -120,6 +121,7 @@ export default function App() {
               <Route path="fields" element={<AdminFields />} />
               <Route path="combat-matches" element={<AdminCombatMatches />} />
               <Route path="reports" element={<AdminReports />} />
+              <Route path="archive" element={<AdminArchive />} />
               <Route path="complaints" element={<AdminComplaints />} />
               <Route path="scoreboard" element={<AdminScoreboard />} />
               <Route path="students" element={<AdminStudents />} />
