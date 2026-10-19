@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../App';
 import { signIn, signOut } from '../../lib/http';
 import '../admin/AdminLogin.css';
@@ -12,6 +12,7 @@ export default function ViewerLogin() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,7 +27,9 @@ export default function ViewerLogin() {
         return;
       }
       login(profile);
-      navigate('/tra-cuu', { replace: true });
+      // Ở lại đúng trang đang mở (link /tra-cuu/... được chia sẻ), trang lạ thì
+      // App tự chuyển về /tra-cuu.
+      navigate(location.pathname.startsWith('/tra-cuu') ? location.pathname + location.search : '/tra-cuu', { replace: true });
     } catch (err) {
       setError(err.message || 'Sai email hoặc mật khẩu.');
     } finally {

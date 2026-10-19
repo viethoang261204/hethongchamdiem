@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
-import { BOARD_AGE_LABEL, contentLabel, normalizeText, teamResultText } from '../../lib/lookup';
+import { BOARD_AGE_LABEL, contentGroup, contentLabel, normalizeText, teamResultText } from '../../lib/lookup';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
@@ -11,7 +11,7 @@ import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 // Bộ lọc lưu trên URL (?noiDung=&bang=&san=&truong=&hlv=&q=) — để trang
 // Tổng quan / Trường-HLV dẫn link thẳng sang danh sách đã lọc sẵn, và người
 // xem có thể copy link gửi cho người khác.
-const FILTER_KEYS = ['q', 'giai', 'noiDung', 'bang', 'san', 'truong', 'hlv'];
+const FILTER_KEYS = ['q', 'giai', 'nhom', 'noiDung', 'bang', 'san', 'truong', 'hlv'];
 
 export default function ViewerTeams() {
   const { lookup } = useLookupData();
@@ -30,6 +30,7 @@ export default function ViewerTeams() {
     return lookup.teams.filter((t) => {
       if (f.giai && t.competition_id !== f.giai) return false;
       if (f.noiDung && t.contest_content_id !== f.noiDung) return false;
+      if (f.nhom && contentGroup(t.content).key !== f.nhom) return false;
       if (f.bang && t.boardName !== f.bang) return false;
       if (f.san && !(t.fields || []).includes(f.san)) return false;
       if (f.truong && t.school_name !== f.truong) return false;
@@ -38,7 +39,7 @@ export default function ViewerTeams() {
       return [t.name, t.school_name, t.coach_name, ...t.students.map((s) => s.full_name)]
         .some((v) => normalizeText(v).includes(q));
     });
-  }, [lookup, f.q, f.giai, f.noiDung, f.bang, f.san, f.truong, f.hlv]);
+  }, [lookup, f.q, f.giai, f.nhom, f.noiDung, f.bang, f.san, f.truong, f.hlv]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 25);
   if (!lookup) return null;
@@ -62,6 +63,11 @@ export default function ViewerTeams() {
             <option value="">Tất cả giải</option>
             {lookup.competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+        )}
+        {f.nhom && (
+          <button type="button" className="btn btn-secondary" onClick={() => setFilter('nhom', '')} title="Bỏ lọc nội dung (gộp các giải)">
+            Nội dung: {lookup.contents.map(contentGroup).find((g) => g.key === f.nhom)?.name || '—'} ✕
+          </button>
         )}
         <select className="filter-select" value={f.noiDung} onChange={(e) => setFilter('noiDung', e.target.value)}>
           <option value="">Tất cả nội dung</option>

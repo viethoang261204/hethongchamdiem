@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
-import { BOARD_AGE_LABEL, contentLabel } from '../../lib/lookup';
+import { BOARD_AGE_LABEL, contentGroup } from '../../lib/lookup';
 
 const hasResult = (t) => (t.isCombat ? t.combat?.played > 0 : !!t.total);
 
@@ -27,17 +27,30 @@ export default function ViewerOverview() {
         return { comp, contents: lookup.contents.filter((c) => c.competition_id === comp.id).length, ...summarize(teams) };
       }).filter((r) => r.teams > 0 || r.contents > 0)
       : [];
-    const perContent = lookup.contents.map((c) => {
-      const teams = lookup.teams.filter((t) => t.contest_content_id === c.id);
-      const boards = lookup.boards.filter((b) => b.contest_content_id === c.id);
-      const done = teams.filter((t) => (t.isCombat ? t.combat?.played > 0 : t.total?.rounds_done === 2)).length;
-      const perBoard = boards.map((b) => ({
-        name: b.name,
-        teams: teams.filter((t) => t.board_id === b.id).length,
-        students: new Set(teams.filter((t) => t.board_id === b.id).flatMap((t) => t.student_ids || [])).size,
-      }));
-      return { content: c, done, perBoard, ...summarize(teams) };
-    }).filter((r) => r.teams > 0);
+    // Gộp CÙNG 1 nội dung giữa các giải (vd "Con đường phát minh" ở ĐN/HCM/HN
+    // + "Inventions Trail" ở Asian Open) thành 1 dòng; xem 1 giải thì mỗi
+    // nội dung vẫn là 1 dòng như cũ.
+    const groups = new Map();
+    for (const c of lookup.contents) {
+      const g = contentGroup(c);
+      if (!groups.has(g.key)) groups.set(g.key, { key: g.key, name: g.name, contents: [] });
+      groups.get(g.key).contents.push(c);
+    }
+    const perContent = [...groups.values()].map((g) => {
+      const ids = new Set(g.contents.map((c) => c.id));
+      const teams = lookup.teams.filter((t) => ids.has(t.contest_content_id));
+      // Bằng đã thi xong: chấm điểm = có ĐỦ số lượt của giải đó (giải nhập bảng
+      // điểm ngoài chỉ có 1 lượt), đối kháng = đã đấu ≥ 1 trận.
+      const done = teams.filter((t) => (t.isCombat ? t.combat?.played > 0
+        : t.total && (t.total.rounds_done === 2 || [t.rounds[1], t.rounds[2]].some((r) => r?.official_rank)))).length;
+      const boardNames = [...new Set(lookup.boards.filter((b) => ids.has(b.contest_content_id)).map((b) => b.name))].sort();
+      const perBoard = boardNames.map((name) => {
+        const bt = teams.filter((t) => t.boardName === name);
+        return { name, teams: bt.length, students: new Set(bt.flatMap((t) => t.student_ids || [])).size };
+      });
+      const comps = [...new Set(g.contents.map((c) => lookup.competitionsById.get(c.competition_id)?.name).filter(Boolean))];
+      return { key: g.key, name: g.name, comps, done, perBoard, ...summarize(teams) };
+    }).filter((r) => r.teams > 0).sort((a, b) => b.teams - a.teams);
     const perBoard = ['Bảng A', 'Bảng B', 'Bảng C', 'Bảng D', 'Bảng E'].map((name) => {
       const teams = lookup.teams.filter((t) => t.boardName === name);
       return { name, ...summarize(teams) };
@@ -112,8 +125,11 @@ export default function ViewerOverview() {
             </thead>
             <tbody>
               {stats.perContent.map((r) => (
-                <tr key={r.content.id}>
-                  <td><Link className="viewer-link" to={`/tra-cuu/doi-thi?noiDung=${r.content.id}`}>{contentLabel(lookup, r.content)}</Link></td>
+                <tr key={r.key}>
+                  <td>
+                    <Link className="viewer-link" to={`/tra-cuu/doi-thi?nhom=${encodeURIComponent(r.key)}`}>{r.name}</Link>
+                    {lookup.all && <div className="viewer-sub">{r.comps.length} giải: {r.comps.join(', ')}</div>}
+                  </td>
                   <td className="viewer-num">{r.teams}</td>
                   <td className="viewer-num">{r.students}</td>
                   <td className="viewer-num">{r.schools}</td>

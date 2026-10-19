@@ -153,6 +153,24 @@ export function buildLookup(data) {
   };
 }
 
+// Gộp cùng 1 nội dung thi giữa các giải — Asian Open đặt tên tiếng Anh, các
+// giải sau đặt tên tiếng Việt (name_en khác nhau đôi chút) nên khớp theo bảng
+// tên tương đương, không chỉ theo tên giống hệt. Nội dung lạ: gộp theo tên.
+const CONTENT_GROUPS = [
+  { key: 'inventions', name: 'Con đường phát minh', aliases: ['con duong phat minh', 'inventions trail', 'invention trail', 'invention road'] },
+  { key: 'skyline', name: 'Cuộc phiêu lưu trên bầu trời', aliases: ['cuoc phieu luu tren bau troi', 'skyline adventures', 'skyline adventure', 'sky adventure'] },
+  { key: 'mining', name: 'Cuộc thám hiểm khai khoáng', aliases: ['cuoc tham hiem khai khoang', 'mining expedition'] },
+  { key: 'ancient', name: 'Nền văn minh cổ đại', aliases: ['nen van minh co dai', 'ancient civilizations', 'ancient civilization'] },
+  { key: 'fly', name: 'Fly Smart Cup', aliases: ['fly smart cup'] },
+  { key: 'battle', name: 'Battle of Stars', aliases: ['battle of stars', 'tran chien giua cac vi sao', 'dai chien vi sao'] },
+];
+export function contentGroup(content) {
+  if (!content) return { key: '', name: '' };
+  const names = [content.name, content.name_en].map(normalizeText).filter(Boolean);
+  const g = CONTENT_GROUPS.find((x) => names.some((n) => x.aliases.includes(n)));
+  return g ? { key: g.key, name: g.name } : { key: `name:${normalizeText(content.name)}`, name: content.name };
+}
+
 // Tên nội dung kèm tên giải khi đang xem tổng thể nhiều giải (tránh nhầm các
 // nội dung trùng tên giữa các giải, vd "Con đường phát minh" ở ĐN/HCM/HN).
 export function contentLabel(lookup, content) {
