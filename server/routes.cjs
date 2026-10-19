@@ -1703,7 +1703,7 @@ router.post('/fields/import', requireAdmin, h(async (req, res) => {
 // ============================================================
 // Báo cáo — điểm gộp 2 lượt, nhóm theo trường/HLV do frontend tự xử lý
 // ============================================================
-router.get('/reports/scores', requireAdmin, h(async (req, res) => {
+router.get('/reports/scores', requireViewer, h(async (req, res) => {
   const { competitionId, contentId } = req.query;
   const cond = [];
   const vals = [];

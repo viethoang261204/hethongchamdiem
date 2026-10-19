@@ -171,3 +171,14 @@
 .viewer-panel .viewer-china-table td { vertical-align: top; }
 .viewer-panel .viewer-china-table tr:not(.viewer-team-first) td { border-top-color: transparent; }
 .viewer-panel .viewer-nowrap { white-space: nowrap; }
+
+/* Lưu trữ bảng điểm — đường dẫn thư mục kiểu Drive */
+.viewer-panel .archive-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.viewer-panel .archive-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; font-size: 18px; }
+.viewer-panel .archive-crumbs button { background: none; border: 0; padding: 4px 8px; border-radius: 8px; font: inherit; color: #94a3b8; cursor: pointer; }
+.viewer-panel .archive-crumbs button:hover:not(:disabled) { background: rgba(148, 163, 184, 0.12); color: #e2e8f0; }
+.viewer-panel .archive-crumbs button:disabled { color: #f1f5f9; cursor: default; }
+.viewer-panel .archive-crumbs span { color: #64748b; }
+.viewer-panel .archive-crumbs strong { padding: 4px 8px; color: #f1f5f9; font-weight: 600; }
+.viewer-panel .archive-table tbody tr:hover { background: rgba(148, 163, 184, 0.06); }
+.viewer-panel .archive-table .btn-sm { padding: 6px 14px; font-size: 13px; white-space: nowrap; }

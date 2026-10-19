@@ -5,7 +5,6 @@ import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { downloadBlob, downloadWorkbook } from '../../lib/excelReport';
 import { loadReportRows, groupReportRows, buildGroupWorkbook, buildScoreboardWorkbook } from '../../lib/scoreExports';
-import './AdminLayout.css';
 
 // "Lưu trữ bảng điểm" — sắp xếp file như thư mục Drive để tải về gửi riêng
 // cho từng trường / HLV:
@@ -21,7 +20,7 @@ const FOLDERS = {
 };
 
 const FolderIcon = () => (
-  <svg viewBox="0 0 24 24" width="22" height="22" fill="#5f6368" aria-hidden="true">
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="#94a3b8" aria-hidden="true">
     <path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z" />
   </svg>
 );
@@ -35,7 +34,7 @@ const XlsxIcon = () => (
 const rowStyle = { cursor: 'pointer' };
 const nameCell = { display: 'flex', alignItems: 'center', gap: 12, fontWeight: 500 };
 
-export default function AdminArchive() {
+export default function ViewerArchive() {
   const { showAlert } = useNotify();
   const [params, setParams] = useSearchParams();
   const compId = params.get('giai') || '';
@@ -149,14 +148,14 @@ export default function AdminArchive() {
 
   const zipLabel = (label) => (busy === 'zip' ? `Đang tạo .zip${progress ? ` (${progress})` : ''}...` : label);
 
-  if (error) return <div className="nhutin-admin"><ErrorBox error={error} onRetry={reload} /></div>;
+  if (error) return <div className="referee-content-wrap"><ErrorBox error={error} onRetry={reload} /></div>;
 
   return (
-    <div className="nhutin-admin">
-      <div className="page-header">
+    <div className="referee-content-wrap">
+      <div className="referee-page-header archive-header">
         <div>
-          <h1 className="page-title">Lưu trữ bảng điểm</h1>
-          <p className="page-subtitle">Tải bảng điểm theo từng HLV, từng trường / trung tâm và bảng xếp hạng tổng của mỗi giải để gửi riêng — file luôn lấy theo điểm mới nhất.</p>
+          <h1 className="referee-page-title">Lưu trữ bảng điểm</h1>
+          <p className="referee-page-subtitle">Tải bảng điểm theo từng HLV, từng trường / trung tâm và bảng xếp hạng tổng của mỗi giải để gửi riêng — file luôn lấy theo điểm mới nhất.</p>
         </div>
         {comp && (
           <div style={{ display: 'flex', gap: 8 }}>
@@ -180,7 +179,7 @@ export default function AdminArchive() {
       </nav>
 
       {folder && (
-        <div className="filters-bar">
+        <div className="filters-bar viewer-filters">
           <div className="search-box"><input type="text" placeholder={folder.groupBy === 'coach' ? 'Tìm tên HLV...' : 'Tìm tên trường / trung tâm...'} value={q} onChange={(e) => setQ(e.target.value)} /></div>
         </div>
       )}
@@ -196,11 +195,11 @@ export default function AdminArchive() {
                 <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : !comp ? (
                 comps.length === 0 ? (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Chưa có cuộc thi nào.</td></tr>
+                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Chưa có cuộc thi nào.</td></tr>
                 ) : comps.map((c) => (
                   <tr key={c.id} style={rowStyle} onClick={() => go(c.id)}>
                     <td><div style={nameCell}><FolderIcon />Bảng điểm {c.name}</div></td>
-                    <td style={{ color: '#64748b' }}>{contents.filter((x) => x.competition_id === c.id).length} nội dung thi</td>
+                    <td className="viewer-sub">{contents.filter((x) => x.competition_id === c.id).length} nội dung thi</td>
                     <td />
                   </tr>
                 ))
@@ -209,13 +208,13 @@ export default function AdminArchive() {
                   {Object.entries(FOLDERS).map(([k, f]) => (
                     <tr key={k} style={rowStyle} onClick={() => go(comp.id, k)}>
                       <td><div style={nameCell}><FolderIcon />{f.name}</div></td>
-                      <td style={{ color: '#64748b' }}>{f.hint}</td>
+                      <td className="viewer-sub">{f.hint}</td>
                       <td />
                     </tr>
                   ))}
                   <tr>
                     <td><div style={nameCell}><XlsxIcon />Bảng xếp hạng tổng {comp.name}</div></td>
-                    <td style={{ color: '#64748b' }}>Mọi nội dung × bảng đấu, 1 sheet</td>
+                    <td className="viewer-sub">Mọi nội dung × bảng đấu, 1 sheet</td>
                     <td style={{ textAlign: 'right' }}>
                       <button type="button" className="btn btn-secondary btn-sm" disabled={!!busy} onClick={downloadScoreboard}>
                         {busy === 'scoreboard' ? 'Đang xuất...' : 'Tải xuống'}
@@ -228,13 +227,13 @@ export default function AdminArchive() {
               ) : !report.rows ? (
                 <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24 }}>Đang tổng hợp điểm của giải...</td></tr>
               ) : shown.length === 0 ? (
-                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#888' }}>{groups.length ? 'Không tìm thấy.' : 'Giải này chưa có dữ liệu điểm.'}</td></tr>
+                <tr><td colSpan={3} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>{groups.length ? 'Không tìm thấy.' : 'Giải này chưa có dữ liệu điểm.'}</td></tr>
               ) : shown.map((g) => (
                 <tr key={g.name}>
                   <td>
                     <div style={nameCell}><XlsxIcon />{fileOf(g)}</div>
                   </td>
-                  <td style={{ color: '#64748b' }}>
+                  <td className="viewer-sub">
                     {g.teams.length} đội · {new Set(g.teams.map((t) => t.content_name)).size} nội dung
                   </td>
                   <td style={{ textAlign: 'right' }}>
