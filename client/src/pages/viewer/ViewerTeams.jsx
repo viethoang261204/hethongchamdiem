@@ -143,7 +143,7 @@ function TeamModal({ team: t, onClose }) {
             <div><span>Trường / Trung tâm</span><strong>{t.school_name || '—'}</strong></div>
             <div><span>Huấn luyện viên</span><strong>{t.coach_name || '—'}</strong></div>
             <div><span>Thành viên</span><strong>{t.students.map((s) => s.full_name).join(', ') || '—'}</strong></div>
-            <div><span>Hạng</span><strong>{t.rank ? `${t.rank}${t.rankScope ? ` (${t.rankScope})` : ''}` : 'Chưa xếp hạng'}</strong></div>
+            <div><span>Hạng</span><strong>{t.rank ? `${t.rank}${t.rankScope ? ` (${t.rankScope})` : ''}` : 'Chưa xếp hạng'}{t.award ? ` · ${t.award}` : ''}</strong></div>
           </div>
 
           {!t.isCombat ? (

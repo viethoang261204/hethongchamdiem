@@ -120,6 +120,17 @@ export function buildLookup(data) {
     }
   }
 
+  // Giải có bảng điểm chính thức nhập từ hệ thống thi bên ngoài (vd ENJOY AI
+  // ONLINE): dùng ĐÚNG hạng + giải ghi trong bảng điểm đó thay cho hạng tự
+  // tính (bảng điểm gốc còn tính cả thí sinh vắng/tài khoản dự phòng).
+  for (const t of teams) {
+    const official = [t.rounds[1], t.rounds[2]].find((r) => r && r.official_rank);
+    if (!official) continue;
+    t.rank = official.official_rank;
+    t.award = official.award || '';
+    t.rankScope = t.boardName;
+  }
+
   // ---- Học sinh ↔ đội ----
   const students = data.students.map((s) => ({ ...s, teams: [] }));
   const studentObjById = new Map(students.map((s) => [s.id, s]));
@@ -159,5 +170,5 @@ export function teamResultText(t) {
     return `${c.wins} thắng · ${c.draws} hòa · ${c.losses} thua (${c.matchPoints} điểm trận)`;
   }
   if (!t.total) return 'Chưa có phiếu';
-  return `${t.total.total_score} điểm · ${t.total.total_time}s`;
+  return `${t.total.total_score} điểm · ${t.total.total_time}s${t.award ? ` · ${t.award}` : ''}`;
 }

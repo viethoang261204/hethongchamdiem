@@ -1764,7 +1764,8 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
            where st.id in (select unnest(t.student_ids) from teams t
                            join contest_contents cc on cc.id = t.contest_content_id where ${inComp})`, [compId]),
     query(`select s.id, s.team_id, s.contest_content_id, s.round, s.score, s.time, s.retry_count, s.submitted_at,
-             u.full_name as referee_name
+             u.full_name as referee_name,
+             (s.criteria_scores->>'officialRank')::int as official_rank, s.criteria_scores->>'award' as award
            from scores s join contest_contents cc on cc.id = s.contest_content_id
            left join users u on u.id = s.referee_id
            where ${inComp}`, [compId]),
