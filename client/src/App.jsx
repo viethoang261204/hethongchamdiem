@@ -150,7 +150,12 @@ export default function App() {
         <Route path="/tra-cuu" element={user?.role === 'viewer' ? <ViewerLayout /> : <ViewerLogin />}>
           {/* Chưa đăng nhập: MỌI đường dẫn /tra-cuu/... đều hiện màn đăng nhập
               (không văng về trang chủ), đăng nhập xong vào đúng trang đã mở. */}
-          {user?.role !== 'viewer' && <Route path="*" element={null} />}
+          {user?.role !== 'viewer' && (
+            <>
+              <Route index element={null} />
+              <Route path="*" element={null} />
+            </>
+          )}
           {user?.role === 'viewer' && (
             <>
               <Route index element={<ViewerOverview />} />
