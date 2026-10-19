@@ -30,7 +30,10 @@ export function normalizeText(s) {
 
 export function buildLookup(data) {
   if (!data) return null;
-  const competitionId = data.competition.id;
+  // Báo cáo tổng thể (all) gồm nhiều giải — mọi phép xếp hạng/gộp bảng vẫn
+  // tính riêng trong ĐÚNG giải của từng nội dung (content.competition_id).
+  const competitions = data.competitions || [data.competition];
+  const competitionsById = new Map(competitions.map((c) => [c.id, c]));
   const contentsById = new Map(data.contents.map((c) => [c.id, c]));
   const boardNameById = new Map(data.boards.map((b) => [b.id, b.name]));
   const studentsById = new Map(data.students.map((s) => [s.id, s]));
@@ -40,6 +43,7 @@ export function buildLookup(data) {
     return {
       ...t,
       content,
+      competition: competitionsById.get(content?.competition_id) || null,
       isCombat: isCombatFormat(content?.content_format),
       boardName: boardNameById.get(t.board_id) || '',
       students: (t.student_ids || []).map((id) => studentsById.get(id)).filter(Boolean),
@@ -106,7 +110,7 @@ export function buildLookup(data) {
       continue;
     }
     // Chấm điểm — gộp bảng (nếu cuộc thi có cấu hình) rồi các bảng còn lại
-    const merged = getMergeGroupsForContent(competitionId, content.name, contentBoards);
+    const merged = getMergeGroupsForContent(content.competition_id, content.name, contentBoards);
     const mergedIds = new Set(merged.flat().map((b) => b.id));
     const units = [...merged, ...contentBoards.filter((b) => !mergedIds.has(b.id)).map((b) => [b])];
     for (const unit of units) {
@@ -123,7 +127,10 @@ export function buildLookup(data) {
   students.sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi'));
 
   return {
+    all: !!data.all,
     competition: data.competition,
+    competitions,
+    competitionsById,
     contents: data.contents,
     boards: data.boards,
     teams,
@@ -133,6 +140,15 @@ export function buildLookup(data) {
     coaches: [...new Set(teams.map((t) => t.coach_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')),
     fields: [...new Set(teams.flatMap((t) => t.fields || []))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
   };
+}
+
+// Tên nội dung kèm tên giải khi đang xem tổng thể nhiều giải (tránh nhầm các
+// nội dung trùng tên giữa các giải, vd "Con đường phát minh" ở ĐN/HCM/HN).
+export function contentLabel(lookup, content) {
+  if (!content) return '';
+  if (!lookup?.all) return content.name;
+  const comp = lookup.competitionsById.get(content.competition_id);
+  return comp ? `${content.name} — ${comp.name}` : content.name;
 }
 
 // Kết quả ngắn gọn của 1 đội để hiện trong bảng

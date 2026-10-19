@@ -1694,18 +1694,23 @@ router.get('/reports/scores', requireAdmin, h(async (req, res) => {
 // nặng) KHÔNG trả ở đây — xem phiếu chi tiết thì gọi /scores/:id riêng.
 // ============================================================
 router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
-  const compId = req.params.competitionId;
-  const { rows: comp } = await query('select id, name, location, start_date, end_date, is_active from competitions where id = $1', [compId]);
-  if (!comp[0]) return res.status(404).json({ error: 'Không tìm thấy cuộc thi.' });
+  // 'all' = báo cáo tổng thể TẤT CẢ các giải; còn lại = đúng 1 giải.
+  const all = req.params.competitionId === 'all';
+  const compId = all ? null : req.params.competitionId;
+  const { rows: comps } = await query(
+    `select id, name, location, start_date, end_date, is_active, created_at from competitions
+     where $1::uuid is null or id = $1 order by created_at`, [compId]);
+  if (!all && !comps[0]) return res.status(404).json({ error: 'Không tìm thấy cuộc thi.' });
+  const inComp = '($1::uuid is null or cc.competition_id = $1)';
 
   const [contents, boards, teams, students, scores, matches] = await Promise.all([
-    query(`select id, name, name_en, content_format, order_index from contest_contents
-           where competition_id = $1 order by order_index, name`, [compId]),
+    query(`select cc.id, cc.name, cc.name_en, cc.content_format, cc.order_index, cc.competition_id from contest_contents cc
+           where ${inComp} order by cc.order_index, cc.name`, [compId]),
     query(`select cb.contest_content_id, b.id, b.name, cb.ranking_format, b.order_index
            from content_boards cb join boards b on b.id = cb.board_id
            join contest_contents cc on cc.id = cb.contest_content_id
-           where cc.competition_id = $1 order by b.order_index`, [compId]),
-    query(`select t.id, t.name, t.contest_content_id, t.board_id, t.student_ids, t.combat_group, t.order_index,
+           where ${inComp} order by b.order_index`, [compId]),
+    query(`select t.id, t.name, t.contest_content_id, cc.competition_id, t.board_id, t.student_ids, t.combat_group, t.order_index,
              t.school_id, sch.name as school_name, t.coach_id, co.name as coach_name,
              coalesce((select array_agg(f.name order by f.name) from team_fields tf join fields f on f.id = tf.field_id
                        where tf.team_id = t.id), '{}') as fields
@@ -1713,27 +1718,29 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
            join contest_contents cc on cc.id = t.contest_content_id
            left join schools sch on sch.id = t.school_id
            left join coaches co on co.id = t.coach_id
-           where cc.competition_id = $1
+           where ${inComp}
            order by cc.order_index, t.order_index`, [compId]),
     query(`select st.id, st.full_name, st.grade, sch.name as school_name
            from students st left join schools sch on sch.id = st.school_id
            where st.id in (select unnest(t.student_ids) from teams t
-                           join contest_contents cc on cc.id = t.contest_content_id where cc.competition_id = $1)`, [compId]),
+                           join contest_contents cc on cc.id = t.contest_content_id where ${inComp})`, [compId]),
     query(`select s.id, s.team_id, s.contest_content_id, s.round, s.score, s.time, s.retry_count, s.submitted_at,
              u.full_name as referee_name
            from scores s join contest_contents cc on cc.id = s.contest_content_id
            left join users u on u.id = s.referee_id
-           where cc.competition_id = $1`, [compId]),
+           where ${inComp}`, [compId]),
     query(`select cm.id, cm.contest_content_id, cm.team_a_id, cm.team_b_id, cm.winner_id, cm.is_draw, cm.match_no,
              cm.group_label, cm.stage, cm.played_at, f.name as field_name,
              cm.details - 'studentSignatureImageA' - 'studentSignatureImageB' - 'refereeSignatureImage' as details
            from combat_matches cm join contest_contents cc on cc.id = cm.contest_content_id
            left join fields f on f.id = cm.field_id
-           where cc.competition_id = $1`, [compId]),
+           where ${inComp}`, [compId]),
   ]);
 
   res.json({
-    competition: comp[0],
+    all,
+    competition: all ? { id: 'all', name: 'Tất cả các giải' } : comps[0],
+    competitions: comps,
     contents: contents.rows,
     boards: boards.rows,
     teams: teams.rows,

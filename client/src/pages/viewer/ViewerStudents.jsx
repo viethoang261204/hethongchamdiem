@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
-import { normalizeText } from '../../lib/lookup';
+import { contentLabel, normalizeText } from '../../lib/lookup';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 
@@ -42,7 +42,7 @@ export default function ViewerStudents() {
         </div>
         <select className="filter-select" value={contentId} onChange={(e) => setContentId(e.target.value)}>
           <option value="">Tất cả nội dung</option>
-          {lookup.contents.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {lookup.contents.map((c) => <option key={c.id} value={c.id}>{contentLabel(lookup, c)}</option>)}
         </select>
         <select className="filter-select" value={school} onChange={(e) => setSchool(e.target.value)}>
           <option value="">Tất cả trường / TT</option>
@@ -74,7 +74,7 @@ export default function ViewerStudents() {
                     {s.teams.map((t) => (
                       <div key={t.id}>
                         <Link className="viewer-link" to={`/tra-cuu/doi-thi?q=${encodeURIComponent(t.name)}&noiDung=${t.contest_content_id}`}>{t.name}</Link>
-                        <span className="viewer-sub"> — {t.content?.name} · {t.boardName}</span>
+                        <span className="viewer-sub"> — {contentLabel(lookup, t.content)} · {t.boardName}</span>
                       </div>
                     ))}
                   </td>

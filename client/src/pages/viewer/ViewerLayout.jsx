@@ -38,7 +38,7 @@ export default function ViewerLayout() {
   const { showConfirm } = useNotify();
   const [competitions, setCompetitions] = useState([]);
   const [compId, setCompIdState] = useState(() => {
-    try { return localStorage.getItem(COMP_KEY) || ''; } catch { return ''; }
+    try { return localStorage.getItem(COMP_KEY) || 'all'; } catch { return 'all'; }
   });
   const [raw, setRaw] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -54,7 +54,7 @@ export default function ViewerLayout() {
       const sorted = list.slice().sort((a, b) => (b.is_active === false ? 0 : 1) - (a.is_active === false ? 0 : 1)
         || String(b.created_at || '').localeCompare(String(a.created_at || '')));
       setCompetitions(sorted);
-      if (!sorted.some((c) => c.id === compId) && sorted.length) setCompId(sorted[0].id);
+      if (compId !== 'all' && !sorted.some((c) => c.id === compId)) setCompId('all');
     }).catch(() => setCompetitions([]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -78,6 +78,7 @@ export default function ViewerLayout() {
   const initials = (user?.fullName || user?.full_name || user?.username || 'T').charAt(0).toUpperCase();
   const compSelect = (
     <select className="form-input form-select viewer-comp-select" value={compId} onChange={(e) => setCompId(e.target.value)}>
+      <option value="all">Tất cả các giải (tổng thể)</option>
       {competitions.map((c) => <option key={c.id} value={c.id}>{c.name}{c.is_active === false ? ' (đã kết thúc)' : ''}</option>)}
     </select>
   );

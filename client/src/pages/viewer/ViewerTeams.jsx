@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
-import { BOARD_AGE_LABEL, normalizeText, teamResultText } from '../../lib/lookup';
+import { BOARD_AGE_LABEL, contentLabel, normalizeText, teamResultText } from '../../lib/lookup';
 import { formatSecondsAsMinutes } from '../../lib/time';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
@@ -11,7 +11,7 @@ import CombatDroneSheetTable from '../shared/CombatDroneSheetTable';
 // Bộ lọc lưu trên URL (?noiDung=&bang=&san=&truong=&hlv=&q=) — để trang
 // Tổng quan / Trường-HLV dẫn link thẳng sang danh sách đã lọc sẵn, và người
 // xem có thể copy link gửi cho người khác.
-const FILTER_KEYS = ['q', 'noiDung', 'bang', 'san', 'truong', 'hlv'];
+const FILTER_KEYS = ['q', 'giai', 'noiDung', 'bang', 'san', 'truong', 'hlv'];
 
 export default function ViewerTeams() {
   const { lookup } = useLookupData();
@@ -28,6 +28,7 @@ export default function ViewerTeams() {
     if (!lookup) return [];
     const q = normalizeText(f.q);
     return lookup.teams.filter((t) => {
+      if (f.giai && t.competition_id !== f.giai) return false;
       if (f.noiDung && t.contest_content_id !== f.noiDung) return false;
       if (f.bang && t.boardName !== f.bang) return false;
       if (f.san && !(t.fields || []).includes(f.san)) return false;
@@ -37,7 +38,7 @@ export default function ViewerTeams() {
       return [t.name, t.school_name, t.coach_name, ...t.students.map((s) => s.full_name)]
         .some((v) => normalizeText(v).includes(q));
     });
-  }, [lookup, f.q, f.noiDung, f.bang, f.san, f.truong, f.hlv]);
+  }, [lookup, f.q, f.giai, f.noiDung, f.bang, f.san, f.truong, f.hlv]);
 
   const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 25);
   if (!lookup) return null;
@@ -56,9 +57,15 @@ export default function ViewerTeams() {
         <div className="search-box">
           <input type="text" placeholder="Tên đội, học sinh, trường, HLV..." value={f.q} onChange={(e) => setFilter('q', e.target.value)} />
         </div>
+        {lookup.all && (
+          <select className="filter-select" value={f.giai} onChange={(e) => setFilter('giai', e.target.value)}>
+            <option value="">Tất cả giải</option>
+            {lookup.competitions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        )}
         <select className="filter-select" value={f.noiDung} onChange={(e) => setFilter('noiDung', e.target.value)}>
           <option value="">Tất cả nội dung</option>
-          {lookup.contents.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {lookup.contents.filter((c) => !f.giai || c.competition_id === f.giai).map((c) => <option key={c.id} value={c.id}>{contentLabel(lookup, c)}</option>)}
         </select>
         <select className="filter-select" value={f.bang} onChange={(e) => setFilter('bang', e.target.value)}>
           <option value="">Tất cả bảng</option>
@@ -86,15 +93,16 @@ export default function ViewerTeams() {
           <table>
             <thead>
               <tr>
-                <th>Đội</th><th>Nội dung</th><th>Bảng</th><th>Sân</th><th>Trường / Trung tâm</th><th>HLV</th><th>Kết quả</th><th className="viewer-num">Hạng</th>
+                <th>Đội</th>{lookup.all && <th>Giải</th>}<th>Nội dung</th><th>Bảng</th><th>Sân</th><th>Trường / Trung tâm</th><th>HLV</th><th>Kết quả</th><th className="viewer-num">Hạng</th>
               </tr>
             </thead>
             <tbody>
               {pageItems.length === 0 ? (
-                <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không tìm thấy đội nào.</td></tr>
+                <tr><td colSpan={lookup.all ? 9 : 8} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không tìm thấy đội nào.</td></tr>
               ) : pageItems.map((t) => (
                 <tr key={t.id} className="viewer-row" onClick={() => setOpenTeamId(t.id)}>
                   <td><strong>{t.name}</strong><div className="viewer-sub">{t.students.map((s) => s.full_name).join(', ')}</div></td>
+                  {lookup.all && <td>{t.competition?.name || '—'}</td>}
                   <td>{t.content?.name}</td>
                   <td>{t.boardName}</td>
                   <td>{(t.fields || []).join(', ')}</td>
@@ -125,7 +133,7 @@ function TeamModal({ team: t, onClose }) {
         <div className="viewer-modal-header">
           <div>
             <h2 className="viewer-modal-title">{t.name}</h2>
-            <div className="viewer-sub">{t.content?.name} · {t.boardName}{BOARD_AGE_LABEL[t.boardName] ? ` (${BOARD_AGE_LABEL[t.boardName]})` : ''} · Sân {(t.fields || []).join(', ') || '—'}</div>
+            <div className="viewer-sub">{t.competition ? `${t.competition.name} · ` : ''}{t.content?.name} · {t.boardName}{BOARD_AGE_LABEL[t.boardName] ? ` (${BOARD_AGE_LABEL[t.boardName]})` : ''} · Sân {(t.fields || []).join(', ') || '—'}</div>
           </div>
           <button type="button" className="viewer-modal-close" onClick={onClose} aria-label="Đóng">×</button>
         </div>

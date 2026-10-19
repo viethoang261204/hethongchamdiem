@@ -125,7 +125,6 @@ export default function HomePage() {
             <Link to="/" className="nav-link active">Home</Link>
             <Link to="/admin" className="nav-link nav-link-admin">Admin</Link>
             <Link to="/referee" className="nav-link nav-link-outline">Referee</Link>
-            <Link to="/tra-cuu" className="nav-link nav-link-outline">Tra cứu</Link>
           </nav>
         </div>
       </header>
@@ -292,7 +291,6 @@ export default function HomePage() {
             <Link to="/" className="footer-link">Home</Link>
             <Link to="/admin" className="footer-link">Admin</Link>
             <Link to="/referee" className="footer-link">Referee</Link>
-            <Link to="/tra-cuu" className="footer-link">Tra cứu</Link>
           </div>
           <div className="footer-contact">
             <a href="mailto:info@enjoyai.vn" className="footer-email">
