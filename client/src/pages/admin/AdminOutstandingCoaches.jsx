@@ -4,7 +4,7 @@ import { useNotify } from '../../context/NotifyContext';
 import { useApiLoader, ErrorBox } from '../../hooks/useApiLoader.jsx';
 import { computeGroupStandings } from '../../lib/battleScoring';
 import { computeGroupStandings as computeDroneStandings } from '../../lib/flySmartCupScoring';
-import { classifyRank, isOutstandingCoach, isRisingStarTeam, formatRankLabel } from '../../lib/outstandingCoach';
+import { awardOrder, classifyRank, isOutstandingCoach, isRisingStarTeam, formatRankLabel } from '../../lib/outstandingCoach';
 import { getMergeGroupsForContent, mergeMeasurementTeams } from '../../lib/boardMerge';
 import './AdminLayout.css';
 
@@ -17,13 +17,26 @@ const TIER_LABEL = { major: 'Giải chính (Top 1-3)', phu: 'Giải phụ' };
 // để biết luật xét giải chính/giải phụ theo từng nội dung), rồi gộp theo HLV
 // (team.coach_id). Trả về Map coachId -> mảng các đội đạt giải của HLV đó.
 async function computeQualifyingEntries(competitionId) {
-  const contents = await api.getContents(competitionId);
   const entriesByCoach = new Map();
   const addEntry = (coachId, entry) => {
     if (!coachId) return;
     if (!entriesByCoach.has(coachId)) entriesByCoach.set(coachId, []);
     entriesByCoach.get(coachId).push(entry);
   };
+
+  // Cuộc thi đã có danh sách giải thưởng CHÍNH THỨC (team_awards, theo công
+  // bố của BTC) → xét đúng theo danh sách đó, không tự suy ra từ hạng.
+  const awards = await api.getCompetitionAwards(competitionId).catch(() => []);
+  if (awards.length) {
+    awards.forEach((a) => addEntry(a.coach_id, {
+      team_name: a.team_name, content_name: a.content_name, board_name: a.board_name || '',
+      rank: awardOrder(a.label), tier: a.tier, label: a.label, competition_id: competitionId,
+      award: a.label === 'Rising Star' ? 'rising_star' : undefined,
+    }));
+    return entriesByCoach;
+  }
+
+  const contents = await api.getContents(competitionId);
 
   for (const content of contents) {
     const [boards, teams] = await Promise.all([
@@ -281,7 +294,7 @@ export default function AdminOutstandingCoaches() {
                     <td style={{ fontSize: 12.5 }}>
                       {row.entries.map((e, idx) => (
                         <div key={idx}>
-                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>{formatRankLabel(e.competition_id, e.content_name, e.board_name, e.rank)}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
+                          {e.award === 'rising_star' ? <strong>🌟 Rising Star</strong> : <strong>{e.label || formatRankLabel(e.competition_id, e.content_name, e.board_name, e.rank)}</strong>} — {e.team_name} ({e.content_name}{e.award !== 'rising_star' && ` · ${e.board_name}`})
                           {e.tier === 'phu' && <span style={{ color: '#94a3b8' }}> — giải phụ</span>}
                         </div>
                       ))}

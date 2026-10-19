@@ -1742,7 +1742,7 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
   if (!all && !comps[0]) return res.status(404).json({ error: 'Không tìm thấy cuộc thi.' });
   const inComp = '($1::uuid is null or cc.competition_id = $1)';
 
-  const [contents, boards, teams, students, scores, matches] = await Promise.all([
+  const [contents, boards, teams, students, scores, matches, awards] = await Promise.all([
     query(`select cc.id, cc.name, cc.name_en, cc.content_format, cc.order_index, cc.competition_id from contest_contents cc
            where ${inComp} order by cc.order_index, cc.name`, [compId]),
     query(`select cb.contest_content_id, b.id, b.name, cb.ranking_format, b.order_index
@@ -1775,6 +1775,8 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
            from combat_matches cm join contest_contents cc on cc.id = cm.contest_content_id
            left join fields f on f.id = cm.field_id
            where ${inComp}`, [compId]),
+    query(`select a.team_id, a.label, a.tier, a.competition_id from team_awards a
+           where $1::uuid is null or a.competition_id = $1`, [compId]),
   ]);
 
   res.json({
@@ -1787,7 +1789,24 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
     students: students.rows,
     scores: scores.rows,
     matches: matches.rows,
+    awards: awards.rows,
   });
+}));
+
+// Giải thưởng chính thức (team_awards) của 1 cuộc thi — dùng xét HLV xuất sắc
+router.get('/competitions/:competitionId/awards', requireViewer, h(async (req, res) => {
+  const { rows } = await query(
+    `select a.id, a.team_id, a.label, a.tier, a.note, t.name as team_name, t.coach_id,
+       cc.name as content_name, b.name as board_name
+     from team_awards a
+     join teams t on t.id = a.team_id
+     join contest_contents cc on cc.id = t.contest_content_id
+     left join boards b on b.id = t.board_id
+     where a.competition_id = $1
+     order by cc.order_index, b.name, a.label`,
+    [req.params.competitionId]
+  );
+  res.json(rows);
 }));
 
 // ============================================================

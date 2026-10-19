@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLookupData } from './ViewerLayout';
 import { normalizeText } from '../../lib/lookup';
-import { classifyRank, formatRankLabel, isOutstandingCoach, isRisingStarTeam } from '../../lib/outstandingCoach';
+import { awardOrder, classifyRank, formatRankLabel, isOutstandingCoach, isRisingStarTeam } from '../../lib/outstandingCoach';
 
 // Tổng hợp "HLV xuất sắc" — ĐÚNG tiêu chí ở lib/outstandingCoach.js (dùng
 // chung với trang admin): HLV có ≥ 1 đội Top 1-3 (hoặc Rising Star), hoặc
@@ -26,6 +26,11 @@ export default function ViewerCoaches() {
       r.teams++;
       if (t.school_name) r.schools.add(t.school_name);
       const contentName = t.content?.name;
+      // Giải đã có danh sách giải thưởng chính thức → dùng đúng danh sách đó
+      if (lookup.compsWithAwards.has(t.competition_id)) {
+        t.awards.forEach((a) => r.entries.push({ team: t, label: a.label, tier: a.tier }));
+        continue;
+      }
       if (isRisingStarTeam(t.competition_id, t.name)) {
         r.entries.push({ team: t, label: 'Rising Star', tier: 'major' });
       }
@@ -36,6 +41,7 @@ export default function ViewerCoaches() {
     return [...byCoach.values()]
       .map((r) => ({
         ...r,
+        entries: r.entries.slice().sort((x, y) => awardOrder(x.label) - awardOrder(y.label)),
         outstanding: isOutstandingCoach(r.entries),
         major: r.entries.filter((e) => e.tier === 'major').length,
       }))
@@ -53,7 +59,7 @@ export default function ViewerCoaches() {
       <div className="referee-page-header">
         <h1 className="referee-page-title">Huấn luyện viên xuất sắc</h1>
         <p className="referee-page-subtitle">
-          HLV đạt danh hiệu khi có <strong>ít nhất 1 đội đạt giải chính (Top 1–3 hoặc Rising Star)</strong>, hoặc <strong>ít nhất 3 đội đạt giải</strong> (gộp giải chính + giải phụ Top 5 / Top 10 theo cấu hình từng giải). Hạng xét theo bảng xếp hạng chính thức.
+          HLV đạt danh hiệu khi có <strong>ít nhất 1 đội đạt giải chính (Giải Nhất / Nhì / Ba hoặc Rising Star)</strong>, hoặc <strong>ít nhất 3 đội đạt giải</strong> (gộp giải chính + giải phụ Top 5 / Top 10). Xét theo danh sách giải thưởng chính thức BTC công bố.
         </p>
       </div>
 
@@ -96,7 +102,7 @@ export default function ViewerCoaches() {
                     {r.entries.map((e, i) => (
                       <div key={i} className="viewer-award">
                         <span className={`viewer-chip ${e.tier === 'major' ? 'viewer-chip-gold' : ''}`}>{e.label}</span>
-                        {' '}{e.team.name}<span className="viewer-sub"> — {e.team.content?.name}{e.team.rankScope && e.label !== 'Rising Star' ? ` · ${e.team.rankScope}` : ''}</span>
+                        {' '}{e.team.name}<span className="viewer-sub"> — {e.team.content?.name}{e.team.boardName && e.label !== 'Rising Star' ? ` · ${e.team.boardName}` : ''}</span>
                       </div>
                     ))}
                   </td>

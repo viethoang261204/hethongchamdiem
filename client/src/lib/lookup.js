@@ -8,6 +8,7 @@
 import { compareRankedTeams, getMergeGroupsForContent } from './boardMerge';
 import { computeGroupStandings as computeStarsStandings } from './battleScoring';
 import { computeGroupStandings as computeDroneStandings } from './flySmartCupScoring';
+import { awardOrder } from './outstandingCoach';
 
 // Nhãn bảng đấu theo tuổi — dùng chung trên mọi trang tra cứu
 export const BOARD_AGE_LABEL = {
@@ -131,6 +132,20 @@ export function buildLookup(data) {
     t.rankScope = t.boardName;
   }
 
+  // Giải thưởng chính thức (team_awards) — ưu tiên hơn mọi nhãn suy ra từ hạng
+  const compsWithAwards = new Set();
+  for (const a of data.awards || []) {
+    const t = teamsById.get(a.team_id);
+    if (!t) continue;
+    compsWithAwards.add(a.competition_id);
+    (t.awards ||= []).push({ label: a.label, tier: a.tier });
+  }
+  for (const t of teams) {
+    if (!t.awards) { t.awards = []; continue; }
+    t.awards.sort((x, y) => awardOrder(x.label) - awardOrder(y.label));
+    t.award = t.awards.map((a) => a.label).join(' + ');
+  }
+
   // ---- Học sinh ↔ đội ----
   const students = data.students.map((s) => ({ ...s, teams: [] }));
   const studentObjById = new Map(students.map((s) => [s.id, s]));
@@ -142,6 +157,7 @@ export function buildLookup(data) {
     competition: data.competition,
     competitions,
     competitionsById,
+    compsWithAwards,
     contents: data.contents,
     boards: data.boards,
     teams,
@@ -184,8 +200,8 @@ export function contentLabel(lookup, content) {
 export function teamResultText(t) {
   if (t.isCombat) {
     const c = t.combat;
-    if (!c || !c.played) return 'Chưa thi đấu';
-    return `${c.wins} thắng · ${c.draws} hòa · ${c.losses} thua (${c.matchPoints} điểm trận)`;
+    if (!c || !c.played) return t.award || 'Chưa thi đấu';
+    return `${c.wins} thắng · ${c.draws} hòa · ${c.losses} thua (${c.matchPoints} điểm trận)${t.award ? ` · ${t.award}` : ''}`;
   }
   if (!t.total) return 'Chưa có phiếu';
   return `${t.total.total_score} điểm · ${t.total.total_time}s${t.award ? ` · ${t.award}` : ''}`;

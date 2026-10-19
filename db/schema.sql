@@ -739,3 +739,22 @@ left join boards b on b.id = t.board_id;
 -- (xem router.use đầu server/routes.cjs). Tách riêng khỏi admin/referee.
 alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check check (role in ('admin', 'referee', 'viewer'));
+
+-- Giải thưởng CHÍNH THỨC của từng đội (theo công bố của BTC: Giải Nhất/Nhì/
+-- Ba, Top 5/Top 10, Rising Star; giải Online: Vô địch/Á quân/Quý quân...).
+-- Khi 1 cuộc thi đã có dữ liệu ở đây, cổng Tra cứu + xét HLV xuất sắc dùng
+-- đúng giải công bố thay vì tự suy ra từ hạng.
+--   tier: 'major' = giải chính (Nhất/Nhì/Ba, Rising Star — tính như giải chính)
+--         'phu'   = giải phụ (Top 5/Top 10...)
+create table if not exists team_awards (
+  id              uuid primary key default gen_random_uuid(),
+  team_id         uuid not null references teams(id) on delete cascade,
+  competition_id  uuid not null references competitions(id) on delete cascade,
+  label           text not null,
+  tier            text not null check (tier in ('major', 'phu')),
+  source          text,
+  note            text,
+  created_at      timestamptz default now(),
+  unique (team_id, label)
+);
+create index if not exists idx_team_awards_competition on team_awards(competition_id);

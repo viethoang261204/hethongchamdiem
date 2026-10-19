@@ -582,6 +582,9 @@ export const api = {
     }
   },
 
+  // Giải thưởng chính thức (team_awards) của 1 cuộc thi
+  getCompetitionAwards: (competitionId) => withRetry(() => request(`/competitions/${competitionId}/awards`), 'getCompetitionAwards'),
+
   // Cổng Tra cứu (/tra-cuu) — toàn bộ dữ liệu 1 cuộc thi trong 1 lần gọi
   getLookup: (competitionId) => withRetry(() => request(`/lookup/${competitionId}`), 'getLookup'),
 

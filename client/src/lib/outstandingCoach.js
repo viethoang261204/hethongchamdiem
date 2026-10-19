@@ -75,6 +75,15 @@ export function formatRankLabel(competitionId, contentName, boardName, rank) {
   return '';
 }
 
+// Thứ tự hiển thị giải thưởng CHÍNH THỨC (bảng team_awards — theo công bố của
+// BTC). Khi 1 cuộc thi đã có giải chính thức thì xét HLV xuất sắc theo đúng
+// các giải đó (tier major/phu lưu sẵn) thay vì tự suy ra từ hạng.
+export const AWARD_ORDER = {
+  'Vô địch': 1, 'Á quân': 2, 'Quý quân': 3,
+  'Giải Nhất': 4, 'Giải Nhì': 5, 'Giải Ba': 6, 'Rising Star': 7, 'Top 5': 8, 'Top 10': 9,
+};
+export const awardOrder = (label) => AWARD_ORDER[label] ?? 50;
+
 // Có đạt chuẩn "HLV xuất sắc" không, dựa trên danh sách các đội đã qua
 // classifyRank() (mỗi phần tử có `tier`: 'major' | 'phu').
 export function isOutstandingCoach(entries) {
