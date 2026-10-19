@@ -182,3 +182,5 @@
 .viewer-panel .archive-crumbs strong { padding: 4px 8px; color: #f1f5f9; font-weight: 600; }
 .viewer-panel .archive-table tbody tr:hover { background: rgba(148, 163, 184, 0.06); }
 .viewer-panel .archive-table .btn-sm { padding: 6px 14px; font-size: 13px; white-space: nowrap; }
+.viewer-panel .viewer-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 0; }
+.viewer-panel .viewer-entry .viewer-chips { flex-wrap: nowrap; }

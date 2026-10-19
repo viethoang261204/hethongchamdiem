@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import {
-  chinaStats, exportChinaExcel, filterChinaRows, prepareChinaRows, CHINA_IMPORT_COLUMNS, parseDateInput,
+  buildPeople, chinaStats, exportChinaExcel, expandImportRows, filterChinaRows, filterPeople, prepareChinaRows,
+  validDob, CHINA_IMPORT_COLUMNS,
 } from '../../lib/china';
 import { readRegistrationFile } from '../../lib/registration';
 import { usePagination } from '../../hooks/usePagination';
@@ -18,11 +19,14 @@ const sub = { fontSize: 12, color: '#64748b', fontWeight: 400 };
 //     học sinh theo họ tên + tên đội (xem POST /students/registration-import)
 //   - sửa ngay trên bảng (lưu khi rời ô)
 //   - xuất Excel → điền ô trống → "Nhập từ Excel đã xuất" (khớp theo Mã HS)
+// Mặc định xem THEO HỌC SINH (đã lọc trùng em thi nhiều giải — buildPeople);
+// sửa 1 em là ghi cho mọi bản ghi của em đó ở các giải.
 export default function AdminChinaTeams() {
   const { showAlert } = useNotify();
   const [raw, setRaw] = useState(null);
   const [error, setError] = useState('');
   const [f, setF] = useState({ q: '', giai: '', nhom: '', loai: '', thongTin: '' });
+  const [view, setView] = useState('hs');
   const [importOpen, setImportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [reg, setReg] = useState(null); // { fileName, rows, sheets, busy, result }
@@ -35,20 +39,25 @@ export default function AdminChinaTeams() {
   useEffect(load, [load]);
 
   const rows = raw || [];
-  const filtered = useMemo(() => filterChinaRows(rows, f), [rows, f]);
-  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(filtered, 20);
+  const teamFilter = useMemo(() => (view === 'hs' ? { ...f, q: '', thongTin: '' } : f), [view, f]);
+  const filtered = useMemo(() => filterChinaRows(rows, teamFilter), [rows, teamFilter]);
+  const people = useMemo(() => (view === 'hs' ? filterPeople(buildPeople(filtered), f) : []), [view, filtered, f]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(view === 'hs' ? people : filtered, view === 'hs' ? 30 : 20);
   const comps = useMemo(() => [...new Map(rows.map((r) => [r.competition_id, r.competition_name])).entries()], [rows]);
   const groups = useMemo(() => [...new Map(rows.map((r) => [r.contentGroup.key, r.contentGroup.name])).entries()], [rows]);
   const stats = useMemo(() => chinaStats(rows), [rows]);
 
-  const saveStudent = async (student, field, value) => {
+  // target: 1 bản ghi học sinh ({ id, ... }) hoặc 1 người đã gộp ({ ids, ... })
+  const saveStudent = async (target, field, value) => {
     const v = String(value ?? '').trim();
-    if ((student[field] || '') === v) return;
+    if ((target[field] || '') === v) return;
+    const ids = target.ids || [target.id];
     try {
-      const saved = await api.putStudentInfo(student.id, { [field]: v });
-      // 1 học sinh có thể nằm ở nhiều đội đạt giải → cập nhật mọi chỗ
+      const saved = new Map();
+      for (const id of ids) saved.set(id, await api.putStudentInfo(id, { [field]: v }));
+      // 1 bản ghi có thể nằm ở nhiều đội đạt giải → cập nhật mọi chỗ
       setRaw((list) => prepareChinaRows(list.map((r) => ({
-        ...r, students: r.students.map((s) => (s.id === student.id ? { ...s, ...saved } : s)),
+        ...r, students: r.students.map((s) => (saved.has(s.id) ? { ...s, ...saved.get(s.id) } : s)),
       }))));
     } catch (e) {
       showAlert(e.message || 'Không lưu được thông tin học sinh.', 'error');
@@ -86,7 +95,7 @@ export default function AdminChinaTeams() {
         <div>
           <h1 className="page-title">Đội đi Trung Quốc</h1>
           <p className="page-subtitle">
-            {stats.teams} đội đạt giải · {stats.students} học sinh — đủ thông tin: {stats.complete}, còn thiếu: {stats.students - stats.complete}
+            {stats.teams} đội đạt giải · {stats.students} học sinh (đã gộp {stats.records - stats.students} bản ghi trùng của em thi nhiều giải) — đủ thông tin: {stats.complete}, còn thiếu: {stats.students - stats.complete}
             {' '}(chưa có SĐT: {stats.noPhone})
           </p>
         </div>
@@ -95,7 +104,7 @@ export default function AdminChinaTeams() {
           <input ref={regInput} type="file" accept=".xlsx,.xls" hidden onChange={pickRegistration} />
           <button type="button" className="btn btn-secondary" disabled={!filtered.length || exporting}
             onClick={async () => { setExporting(true); try { await exportChinaExcel(filtered); } finally { setExporting(false); } }}>
-            {exporting ? 'Đang xuất...' : `Xuất Excel (${filtered.length} đội)`}
+            {exporting ? 'Đang xuất...' : 'Xuất Excel (đã lọc trùng)'}
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => setImportOpen(true)}>Nhập từ Excel đã xuất</button>
         </div>
@@ -103,6 +112,10 @@ export default function AdminChinaTeams() {
       {error && <div className="card" style={{ padding: 16, color: '#dc2626' }}>{error}</div>}
 
       <div className="filters-bar" style={{ flexWrap: 'wrap' }}>
+        <select className="filter-select" value={view} onChange={(e) => setView(e.target.value)}>
+          <option value="hs">Theo học sinh</option>
+          <option value="doi">Theo đội</option>
+        </select>
         <div className="search-box"><input type="text" placeholder="Tên đội, học sinh, trường, HLV, email, SĐT..." value={f.q} onChange={(e) => set('q', e.target.value)} /></div>
         <select className="filter-select" value={f.giai} onChange={(e) => set('giai', e.target.value)}>
           <option value="">Tất cả giải</option>
@@ -120,13 +133,57 @@ export default function AdminChinaTeams() {
         </select>
         <select className="filter-select" value={f.thongTin} onChange={(e) => set('thongTin', e.target.value)}>
           <option value="">Thông tin HS: tất cả</option>
-          <option value="du">Đội đã đủ thông tin</option>
-          <option value="thieu">Đội còn HS thiếu thông tin</option>
+          <option value="du">{view === 'hs' ? 'HS đã đủ thông tin' : 'Đội đã đủ thông tin'}</option>
+          <option value="thieu">{view === 'hs' ? 'HS còn thiếu thông tin' : 'Đội còn HS thiếu thông tin'}</option>
         </select>
       </div>
 
       <div className="card">
         <div className="table-container">
+          {view === 'hs' ? (
+            <table>
+              <thead>
+                <tr><th>Học sinh</th><th>Ngày sinh</th><th>SĐT</th><th>Email</th><th>Đội · giải thưởng</th></tr>
+              </thead>
+              <tbody>
+                {!raw ? (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                ) : pageItems.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có học sinh nào.</td></tr>
+                ) : pageItems.map((p) => (
+                  <tr key={p.key} style={{ verticalAlign: 'top' }}>
+                    <td style={{ fontWeight: 600, minWidth: 180 }}>
+                      {p.full_name}
+                      <div style={sub}>{[p.schools.join(', '), p.coaches.length && `HLV ${p.coaches.join(', ')}`].filter(Boolean).join(' · ')}</div>
+                      {p.ids.length > 1 && <div style={sub}>Gộp {p.ids.length} bản ghi — sửa là lưu cho cả {p.ids.length}</div>}
+                    </td>
+                    <td>
+                      <input key={`d-${p.key}-${p.birth_date}`} className="form-input" type="date" style={{ minWidth: 140 }}
+                        defaultValue={p.birth_date} onBlur={(e) => saveStudent(p, 'birth_date', e.target.value)} />
+                    </td>
+                    <td>
+                      <input key={`p-${p.key}-${p.phone}`} className="form-input" type="tel" style={{ minWidth: 130 }}
+                        defaultValue={p.phone} placeholder="09..." onBlur={(e) => saveStudent(p, 'phone', e.target.value)} />
+                      {p.phone_source && <div style={sub}>{p.phone_source}</div>}
+                    </td>
+                    <td>
+                      <input key={`e-${p.key}-${p.email}`} className="form-input" type="email" style={{ minWidth: 200 }}
+                        defaultValue={p.email} placeholder="email@..." onBlur={(e) => saveStudent(p, 'email', e.target.value)} />
+                      {p.email_source && <div style={sub}>{p.email_source}</div>}
+                    </td>
+                    <td style={{ fontSize: 13 }}>
+                      {p.entries.map((t) => (
+                        <div key={t.id} style={{ marginBottom: 4 }}>
+                          <strong>{t.awardText}</strong> — {t.name}
+                          <div style={sub}>{t.competition_name} · {t.content_name}{t.board_name ? ` · ${t.board_name}` : ''}</div>
+                        </div>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
           <table>
             <thead>
               <tr><th>Đội</th><th>Giải thưởng</th><th>Học sinh</th><th>Ngày sinh</th><th>SĐT</th><th>Email</th></tr>
@@ -156,7 +213,7 @@ export default function AdminChinaTeams() {
                         <td style={{ minWidth: 160 }}>{s.full_name}</td>
                         <td>
                           <input key={`d-${s.id}-${s.birth_date || ''}`} className="form-input" type="date" style={{ minWidth: 140 }}
-                            defaultValue={s.birth_date || ''} onBlur={(e) => saveStudent(s, 'birth_date', e.target.value)} />
+                            defaultValue={validDob(s.birth_date) ? s.birth_date : ''} onBlur={(e) => saveStudent(s, 'birth_date', e.target.value)} />
                         </td>
                         <td>
                           <input key={`p-${s.id}-${s.phone || ''}`} className="form-input" type="tel" style={{ minWidth: 130 }}
@@ -175,6 +232,7 @@ export default function AdminChinaTeams() {
               })}
             </tbody>
           </table>
+          )}
         </div>
         <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
       </div>
@@ -248,9 +306,7 @@ export default function AdminChinaTeams() {
           columns={CHINA_IMPORT_COLUMNS}
           templateFilename="mau-thong-tin-hoc-sinh-di-trung-quoc.xlsx"
           notePrereq='Dùng chính file "Xuất Excel" ở trang này: điền các ô Ngày sinh (dd/mm/yyyy) / SĐT / Email còn trống, giữ nguyên cột Mã HS. Ô để trống sẽ giữ nguyên giá trị cũ.'
-          onImport={(list) => api.importStudentInfo(list.map((r) => ({
-            ...r, birth_date: parseDateInput(r.birth_date),
-          })))}
+          onImport={(list) => api.importStudentInfo(expandImportRows(list))}
           onDone={load}
           onClose={() => setImportOpen(false)}
         />
