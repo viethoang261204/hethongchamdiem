@@ -65,7 +65,6 @@ export default function AdminTeams() {
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-  const SECURITY_CODE = '26122004';
   const [studentModal, setStudentModal] = useState(false);
   const [studentForm, setStudentForm] = useState({ fullName: '', class: '', grade: '', dateOfBirth: '', school: '' });
   const [studentErrors, setStudentErrors] = useState({});
@@ -393,7 +392,7 @@ export default function AdminTeams() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

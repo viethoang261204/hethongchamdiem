@@ -28,7 +28,6 @@ export default function AdminCompetitions() {
   const [form, setForm] = useState({ name: '', description: '', location: '', startDate: '', endDate: '', isActive: true });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, securityCode: '' }
-  const SECURITY_CODE = '26122004';
 
   // Trang khác (Đội thi, Phiếu điểm...) đọc danh sách cuộc thi qua cache
   // (capi.getCompetitions) — phải clear để không thấy dữ liệu cũ sau khi sửa ở đây.
@@ -93,7 +92,7 @@ export default function AdminCompetitions() {
   };
 
   const confirmDelete = async () => {
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

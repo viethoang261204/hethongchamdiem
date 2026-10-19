@@ -74,7 +74,6 @@ export default function AdminStudents() {
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [importOpen, setImportOpen] = useState(false);
-  const SECURITY_CODE = '26122004';
 
   const load = async () => reload();
 
@@ -150,7 +149,7 @@ export default function AdminStudents() {
   };
 
   const confirmDelete = async () => {
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

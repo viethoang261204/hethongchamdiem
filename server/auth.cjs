@@ -2,19 +2,26 @@
 // verify bằng pgcrypto: password = crypt($input, password)), cấp JWT.
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { query } = require('./db.cjs');
+const { loginAccountLimiter, loginIpLimiter } = require('./security.cjs');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('[auth] Thiếu JWT_SECRET trong .env');
   process.exit(1);
 }
-const TOKEN_TTL = '30d';
+const TOKEN_TTL = '7d';
 
 const PROFILE_FIELDS = 'id, email, username, full_name, role, area_id, can_view_scoreboard, language';
 
-function signToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+// "Phiên bản mật khẩu" gắn vào token — đổi mật khẩu (hash đổi) thì mọi token
+// cũ tự hết hiệu lực, không phải chờ hết hạn. Chỉ là dấu vân tay của hash,
+// không lộ được mật khẩu.
+const passwordVersion = (hash) => crypto.createHash('sha256').update(String(hash || '')).digest('hex').slice(0, 16);
+
+function signToken(user, passwordHash) {
+  return jwt.sign({ sub: user.id, role: user.role, pv: passwordVersion(passwordHash) }, JWT_SECRET, { expiresIn: TOKEN_TTL });
 }
 
 // ---- Middleware ----
@@ -25,9 +32,13 @@ async function attachUser(req, _res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return next();
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    const { rows } = await query(`select ${PROFILE_FIELDS} from users where id = $1`, [payload.sub]);
-    if (rows[0]) req.user = rows[0];
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    const { rows } = await query(`select ${PROFILE_FIELDS}, password as __pw from users where id = $1`, [payload.sub]);
+    const row = rows[0];
+    if (row && payload.pv === passwordVersion(row.__pw)) {
+      delete row.__pw;
+      req.user = row;
+    }
   } catch (_) {
     // token hỏng/hết hạn → coi như chưa đăng nhập
   }
@@ -49,20 +60,26 @@ function requireAdmin(req, res, next) {
 const router = express.Router();
 
 // POST /api/auth/login { email, password }
-router.post('/login', async (req, res) => {
+router.post('/login', loginIpLimiter, loginAccountLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu.' });
+    if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+      return res.status(400).json({ error: 'Thiếu email hoặc mật khẩu.' });
+    }
+    if (email.length > 200 || password.length > 200) return res.status(400).json({ error: 'Thông tin đăng nhập không hợp lệ.' });
     const { rows } = await query(
-      `select ${PROFILE_FIELDS} from users
+      `select ${PROFILE_FIELDS}, password as __pw from users
        where (lower(email) = lower($1) or lower(username) = lower($1))
          and password is not null
          and password = crypt($2, password)`,
-      [String(email).trim(), String(password)]
+      [email.trim(), password]
     );
     const user = rows[0];
     if (!user) return res.status(401).json({ error: 'Sai email hoặc mật khẩu.' });
-    res.json({ token: signToken(user), user });
+    const pw = user.__pw;
+    delete user.__pw;
+    loginAccountLimiter.reset(req);
+    res.json({ token: signToken(user, pw), user });
   } catch (err) {
     console.error('[auth/login]', err.message);
     res.status(500).json({ error: 'Lỗi máy chủ khi đăng nhập.' });

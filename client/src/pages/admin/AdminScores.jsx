@@ -37,7 +37,6 @@ export default function AdminScores() {
   const [deletingAll, setDeletingAll] = useState(false);
   const [imageModal, setImageModal] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const SECURITY_CODE = '26122004';
 
   function emptyForm() {
     return {
@@ -203,7 +202,7 @@ export default function AdminScores() {
   };
 
   const confirmDelete = async () => {
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }
@@ -233,7 +232,7 @@ export default function AdminScores() {
 
   const confirmDeleteAll = async () => {
     if (!deleteAllConfirm) return;
-    if (deleteAllConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    if (!(await api.verifyDangerCode(deleteAllConfirm.securityCode))) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
     setDeletingAll(true);
     try {
       await api.bulkDeleteScores(filtered.map((s) => s.id));

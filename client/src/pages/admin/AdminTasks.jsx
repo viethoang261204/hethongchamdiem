@@ -67,7 +67,6 @@ export default function AdminTasks() {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [removeImage, setRemoveImage] = useState(false);
-  const SECURITY_CODE = '26122004';
 
   const load = async () => reload();
 
@@ -225,7 +224,7 @@ export default function AdminTasks() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

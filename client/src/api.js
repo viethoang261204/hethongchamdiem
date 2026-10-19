@@ -571,6 +571,17 @@ export const api = {
     return withRetry(() => request(`/reports/scores${q ? `?${q}` : ''}`), 'getReportScores');
   },
 
+  // Mã bảo mật xoá dữ liệu — kiểm tra ở server (không lưu mã trong giao diện)
+  verifyDangerCode: async (code) => {
+    if (!code) return false;
+    try {
+      const r = await request('/admin/verify-danger-code', { method: 'POST', body: { code } });
+      return !!r?.ok;
+    } catch {
+      return false;
+    }
+  },
+
   // Cổng Tra cứu (/tra-cuu) — toàn bộ dữ liệu 1 cuộc thi trong 1 lần gọi
   getLookup: (competitionId) => withRetry(() => request(`/lookup/${competitionId}`), 'getLookup'),
 

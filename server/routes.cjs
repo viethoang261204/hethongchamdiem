@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const { query, withTransaction } = require('./db.cjs');
 const { requireAuth, requireAdmin } = require('./auth.cjs');
+const { sensitiveLimiter } = require('./security.cjs');
 const battleScoring = require('./battleScoring.cjs');
 const flySmartCup = require('./flySmartCup.cjs');
 
@@ -20,6 +21,28 @@ router.use((req, res, next) => {
     return res.status(403).json({ error: 'Tài khoản Tra cứu chỉ được xem, không có quyền thay đổi dữ liệu.' });
   }
   next();
+});
+
+// Chưa đăng nhập chỉ được đọc ĐÚNG những gì trang chủ / bảng xếp hạng công
+// khai cần (danh sách cuộc thi, nội dung, bảng, xếp hạng, bảng điểm rút gọn)
+// và ảnh qua thẻ <img> (không gửi được header đăng nhập). Mọi dữ liệu khác
+// (đội, học sinh, HLV, phiếu điểm, chữ ký, trận đấu...) phải đăng nhập.
+const PUBLIC_GET = [
+  /^\/health$/,
+  /^\/competitions$/,
+  /^\/competitions\/[^/]+\/contents$/,
+  /^\/contents$/,
+  /^\/boards$/,
+  /^\/contents\/[^/]+\/boards$/,
+  /^\/contents\/[^/]+\/boards\/[^/]+\/(ranking|bracket)$/,
+  /^\/scoreboard\/[^/]+$/,
+  /^\/tasks\/[^/]+\/image\/raw$/,
+  /^\/score-images\/[^/]+\/raw$/,
+];
+router.use((req, res, next) => {
+  if (req.user || (req.method !== 'GET' && req.method !== 'HEAD')) return next();
+  if (PUBLIC_GET.some((re) => re.test(req.path))) return next();
+  return res.status(401).json({ error: 'Vui lòng đăng nhập để xem dữ liệu này.' });
 });
 
 function requireViewer(req, res, next) {
@@ -59,9 +82,10 @@ function buildUpdate(table, id, data) {
 const h = (fn) => (req, res) => {
   Promise.resolve(fn(req, res)).catch((err) => {
     console.error(`[api] ${req.method} ${req.originalUrl}:`, err.message);
-    // Lỗi constraint Postgres → 400 với message gốc (client có logic nhận diện)
+    // Lỗi constraint Postgres → 400 với message gốc (client có logic nhận diện
+    // trùng/khóa ngoại); lỗi khác → 500 KHÔNG kèm chi tiết nội bộ (chỉ log).
     const isPgError = /duplicate key|violates|constraint|invalid input/.test(err.message);
-    res.status(isPgError ? 400 : 500).json({ error: err.message });
+    res.status(isPgError ? 400 : 500).json({ error: isPgError ? err.message : 'Lỗi máy chủ, vui lòng thử lại.' });
   });
 };
 
@@ -92,9 +116,11 @@ const SCHOOLS_JSON = `case when sch.id is null then null
 // ============================================================
 // Health / diag
 // ============================================================
-router.get('/health', h(async (_req, res) => {
+router.get('/health', h(async (req, res) => {
   const t0 = Date.now();
   const { rows } = await query('select count(*)::int as competitions from competitions');
+  // Ẩn chi tiết hạ tầng với người chưa đăng nhập
+  if (!req.user) return res.json({ ok: true });
   res.json({ ok: true, db: 'neon', latencyMs: Date.now() - t0, competitions: rows[0].competitions });
 }));
 
@@ -547,7 +573,7 @@ const BOARDS_JSON = `case when bd.id is null then null
   else json_build_object('id', bd.id, 'name', bd.name, 'age_group', bd.age_group) end`;
 // SQL fragment: nested coaches {id, name, phone}
 const COACHES_JSON = `case when co.id is null then null
-  else json_build_object('id', co.id, 'name', co.name, 'phone', co.phone) end`;
+  else json_build_object('id', co.id, 'name', co.name) end`;
 // SQL fragment: mảng field của 1 đội (bảng team_fields, không giới hạn số
 // lượng) — subquery scalar, không cần thêm left join vào FROM.
 const TEAM_FIELDS_JSON = `coalesce((
@@ -751,6 +777,17 @@ const SCORE_NESTED = `
 `;
 
 router.get('/scoreboard/:contentId', h(async (req, res) => {
+  // Chưa đăng nhập (trang chủ): chỉ trả số liệu tối thiểu — không kèm chi tiết
+  // phiếu (criteria_scores có ảnh chữ ký), học sinh, HLV, trọng tài.
+  if (!req.user) {
+    const { rows } = await query(
+      `select s.id, s.team_id, s.contest_content_id, s.round, s.score, s.time, t.name as team_name
+       from scores s left join teams t on t.id = s.team_id
+       where s.contest_content_id = $1 order by s.score desc`,
+      [req.params.contentId]
+    );
+    return res.json(rows.map((r) => ({ ...r, teams: { name: r.team_name } })));
+  }
   const { rows } = await query(
     `${SCORE_NESTED} where s.contest_content_id = $1 order by s.score desc`,
     [req.params.contentId]
@@ -1518,7 +1555,9 @@ router.get('/coaches', h(async (req, res) => {
   const vals = [];
   if (req.query.competitionId) { vals.push(req.query.competitionId); cond.push(`competition_id = $${vals.length}`); }
   const where = cond.length ? `where ${cond.join(' and ')}` : '';
-  const { rows } = await query(`select * from coaches ${where} order by name`, vals);
+  // SĐT/email/ghi chú HLV là thông tin cá nhân — chỉ admin mới xem được
+  const cols = req.user?.role === 'admin' ? '*' : 'id, name, competition_id';
+  const { rows } = await query(`select ${cols} from coaches ${where} order by name`, vals);
   res.json(rows);
 }));
 
@@ -1748,6 +1787,29 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
     scores: scores.rows,
     matches: matches.rows,
   });
+}));
+
+// ============================================================
+// Mã bảo mật xoá dữ liệu — trước đây so sánh ngay trong code giao diện (ai
+// mở mã nguồn trình duyệt cũng đọc được mã). Giờ kiểm tra ở server: mã lấy
+// từ biến môi trường DELETE_SECURITY_CODE, nếu không có thì so với mã băm
+// scrypt bên dưới (không lưu mã gốc trong repo).
+// ============================================================
+const DANGER_CODE_HASH = '5d34f9660706bf97dface1b28c20abe5:4a823389e15aa2127b1b2f4f3891f8056658863d9477bcd2b435af9a4fb4a1f9';
+function checkDangerCode(code) {
+  const input = String(code || '');
+  if (!input || input.length > 100) return false;
+  if (process.env.DELETE_SECURITY_CODE) {
+    const a = Buffer.from(input), b = Buffer.from(process.env.DELETE_SECURITY_CODE);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+  const [salt, hash] = DANGER_CODE_HASH.split(':');
+  const got = crypto.scryptSync(input, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+  return crypto.timingSafeEqual(got, Buffer.from(hash, 'hex'));
+}
+
+router.post('/admin/verify-danger-code', requireAdmin, sensitiveLimiter, h(async (req, res) => {
+  res.json({ ok: checkDangerCode(req.body?.code) });
 }));
 
 // ============================================================
@@ -2006,7 +2068,7 @@ router.post('/tasks/import', requireAdmin, h(async (req, res) => {
 }));
 
 // Ảnh minh hoạ nhiệm vụ — admin upload (multipart field "file"), public xem
-router.post('/tasks/:id/image', requireAdmin, (req, res, next) => uploadImage(req, res, next), h(async (req, res) => {
+router.post('/tasks/:id/image', requireAdmin, (req, res, next) => uploadImage(req, res, next), verifyImageFile, h(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Chưa chọn file ảnh.' });
   const { rows } = await query(
     `update tasks set image_data = $1, image_mime = $2 where id = $3 returning ${TASK_COLS}`,
@@ -2041,6 +2103,25 @@ const upload = multer({
   },
 });
 // Dùng chung cho upload ảnh nhiệm vụ (khai báo phía trên, chạy lúc request nên không TDZ)
+// Kiểm tra CHỮ KÝ NHỊ PHÂN của file (không tin mimetype trình duyệt tự khai —
+// giả mạo được) và dùng đúng loại đã nhận diện khi lưu/trả ảnh về.
+function detectImageMime(buf) {
+  if (!buf || buf.length < 12) return null;
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
+  if (buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buf.slice(0, 6).toString('ascii') === 'GIF87a' || buf.slice(0, 6).toString('ascii') === 'GIF89a') return 'image/gif';
+  if (buf.slice(0, 4).toString('ascii') === 'RIFF' && buf.slice(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return null;
+}
+function verifyImageFile(req, res, next) {
+  if (!req.file) return next();
+  const mime = detectImageMime(req.file.buffer);
+  if (!mime) return res.status(400).json({ error: 'File không phải ảnh hợp lệ (chỉ nhận JPG/PNG/WEBP/GIF).' });
+  req.file.mimetype = mime;
+  req.file.originalname = String(req.file.originalname || 'image').replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 120);
+  next();
+}
+
 const uploadImage = upload.single('file');
 
 // Danh sách ảnh của 1 phiếu (không trả bytea — chỉ metadata + url)
@@ -2054,7 +2135,7 @@ router.get('/scores/:scoreId/images', h(async (req, res) => {
 }));
 
 // Upload ảnh (multipart field "file") — chủ phiếu hoặc admin
-router.post('/scores/:scoreId/images', requireAuth, upload.single('file'), h(async (req, res) => {
+router.post('/scores/:scoreId/images', requireAuth, upload.single('file'), verifyImageFile, h(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Chưa chọn file ảnh.' });
   const { rows: sc } = await query('select referee_id from scores where id = $1', [req.params.scoreId]);
   if (!sc[0]) return res.status(404).json({ error: 'Không tìm thấy phiếu chấm.' });

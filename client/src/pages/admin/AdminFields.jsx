@@ -32,7 +32,6 @@ export default function AdminFields() {
   const [form, setForm] = useState({ name: '', notes: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const SECURITY_CODE = '26122004';
 
   const filtered = useMemo(() => {
     if (!search.trim()) return list;
@@ -91,7 +90,7 @@ export default function AdminFields() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

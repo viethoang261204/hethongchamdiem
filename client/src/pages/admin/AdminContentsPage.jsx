@@ -39,7 +39,6 @@ export default function AdminContentsPage() {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const SECURITY_CODE = '26122004';
 
   const contents = useMemo(() => {
     if (!selectedComp) return [];
@@ -147,7 +146,7 @@ export default function AdminContentsPage() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

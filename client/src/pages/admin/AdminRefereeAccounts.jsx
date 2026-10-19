@@ -42,7 +42,6 @@ export default function AdminRefereeAccounts() {
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(null);
   const [deletingAll, setDeletingAll] = useState(false);
   const [permModal, setPermModal] = useState(null); // { user, selected: Set<"contentId:fieldId">, loading, saving }
-  const SECURITY_CODE = '26122004';
 
   const permKey = (contentId, fieldId) => `${contentId}:${fieldId}`;
   // Snapshot đã lưu (chuỗi đã sort, so sánh nhanh) — dùng để phát hiện có
@@ -215,7 +214,7 @@ export default function AdminRefereeAccounts() {
   };
 
   const confirmDelete = async () => {
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }
@@ -242,7 +241,7 @@ export default function AdminRefereeAccounts() {
 
   const confirmDeleteAll = async () => {
     if (!deleteAllConfirm) return;
-    if (deleteAllConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    if (!(await api.verifyDangerCode(deleteAllConfirm.securityCode))) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
     setDeletingAll(true);
     try {
       await api.bulkDeleteRefereeUsers(filtered.map((u) => u.id));

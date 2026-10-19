@@ -34,7 +34,6 @@ export default function AdminSchools() {
   const [form, setForm] = useState({ name: '', province: '', district: '' });
   const [errors, setErrors] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const SECURITY_CODE = '26122004';
 
   const filtered = useMemo(() => {
     let l = list;
@@ -123,7 +122,7 @@ export default function AdminSchools() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.securityCode !== SECURITY_CODE) {
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) {
       showAlert('Mã bảo mật không đúng!', 'error');
       return;
     }

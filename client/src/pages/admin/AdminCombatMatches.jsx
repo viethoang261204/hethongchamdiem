@@ -40,7 +40,6 @@ const newShootoutRound = (n) => ({ roundNo: n, aSuccess: false, aTimeSeconds: ''
 export default function AdminCombatMatches() {
   const { showConfirm, showAlert } = useNotify();
   const sheetRef = useRef(null);
-  const SECURITY_CODE = '26122004';
 
   const { data, loading, error, reload } = useApiLoader(async () => {
     const [comps, allContents, allBoards, allFields] = await Promise.all([api.getCompetitions(), api.getAllContents(), api.getAllBoards(), api.getFields()]);
@@ -213,7 +212,7 @@ export default function AdminCombatMatches() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return;
-    if (deleteConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    if (!(await api.verifyDangerCode(deleteConfirm.securityCode))) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
     try {
       await api.deleteCombatMatch(selectedContentId, deleteConfirm.id);
       setDeleteConfirm(null);
@@ -288,7 +287,7 @@ export default function AdminCombatMatches() {
 
   const confirmDeleteAll = async () => {
     if (!deleteAllConfirm) return;
-    if (deleteAllConfirm.securityCode !== SECURITY_CODE) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
+    if (!(await api.verifyDangerCode(deleteAllConfirm.securityCode))) { showAlert('Mã bảo mật không đúng!', 'error'); return; }
     setDeletingAll(true);
     try {
       for (const m of matches) {
