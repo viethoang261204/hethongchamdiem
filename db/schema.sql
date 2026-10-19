@@ -733,3 +733,9 @@ join areas a on a.id = t.area_id
 join users u on u.area_id = a.id and u.role = 'referee'
 left join schools sch on sch.id = t.school_id
 left join boards b on b.id = t.board_id;
+
+-- Vai trò "viewer" — tài khoản cổng Tra cứu (/tra-cuu): chỉ được XEM thống kê,
+-- đội thi, học sinh, phiếu điểm, bảng xếp hạng; server chặn mọi thao tác ghi
+-- (xem router.use đầu server/routes.cjs). Tách riêng khỏi admin/referee.
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check check (role in ('admin', 'referee', 'viewer'));

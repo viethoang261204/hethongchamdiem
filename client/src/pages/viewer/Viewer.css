@@ -1,0 +1,123 @@
+/* Cổng Tra cứu (/tra-cuu) — dùng lại toàn bộ theme tối của RefereeLayout.css
+   (.referee-panel), file này chỉ thêm các phần riêng: chọn giải, chip, modal. */
+
+.viewer-panel .viewer-comp-box {
+  padding: 0 14px 12px;
+}
+.viewer-panel .viewer-comp-select {
+  width: 100%;
+  font-size: 13px;
+}
+
+.viewer-panel .viewer-section { margin-bottom: 24px; }
+.viewer-panel .viewer-num { text-align: center; white-space: nowrap; }
+.viewer-panel .viewer-sub { color: #94a3b8; font-size: 12px; font-weight: 400; }
+.viewer-panel .viewer-hint { color: #64748b; font-size: 12.5px; margin: 12px 4px 0; }
+.viewer-panel .viewer-count { color: #94a3b8; font-size: 13px; margin: 0 0 10px 2px; }
+.viewer-panel .viewer-link { color: #a5b4fc; text-decoration: none; }
+.viewer-panel .viewer-link:hover { text-decoration: underline; }
+.viewer-panel .viewer-result { font-size: 13px; white-space: nowrap; }
+.viewer-panel .viewer-row { cursor: pointer; }
+.viewer-panel .viewer-row:hover td { background: rgba(99, 102, 241, 0.08); }
+.viewer-panel .viewer-btn-sm { padding: 6px 12px !important; font-size: 12.5px !important; white-space: nowrap; }
+
+.viewer-panel .viewer-filters { flex-wrap: wrap; gap: 10px; }
+.viewer-panel .viewer-filters .filter-select { min-width: 150px; max-width: 220px; }
+
+.viewer-panel .viewer-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.viewer-panel .viewer-chip {
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  white-space: nowrap;
+}
+
+.viewer-panel .viewer-res-win { color: #34d399; font-weight: 700; }
+.viewer-panel .viewer-res-lose { color: #f87171; font-weight: 700; }
+.viewer-panel .viewer-res-draw { color: #fbbf24; font-weight: 700; }
+.viewer-panel .viewer-total-row td { font-weight: 700; border-top: 2px solid rgba(255, 255, 255, 0.12); }
+
+/* ─── Modal chi tiết đội ─── */
+.viewer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+}
+.viewer-modal {
+  width: 100%;
+  max-width: 1000px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  color: #e2e8f0;
+}
+.viewer-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.viewer-modal-title { margin: 0 0 4px; font-size: 20px; font-weight: 800; color: #f8fafc; }
+.viewer-modal-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.viewer-modal-body { padding: 20px 24px 24px; }
+.viewer-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.viewer-info-grid > div {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.viewer-info-grid span { display: block; font-size: 11.5px; color: #94a3b8; margin-bottom: 3px; }
+.viewer-info-grid strong { font-size: 14px; color: #f1f5f9; }
+.viewer-h3 { font-size: 15px; font-weight: 700; color: #c7d2fe; margin: 4px 0 10px; }
+.viewer-sheet { margin-top: 20px; }
+.viewer-sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+
+/* ─── Màn hình nhỏ: chọn giải + tab ngang thay cho sidebar ─── */
+.viewer-panel .viewer-mobile-nav { display: none; }
+@media (max-width: 899px) {
+  .viewer-panel .viewer-mobile-nav { display: block; margin-bottom: 20px; }
+  .viewer-panel .viewer-mobile-nav .viewer-comp-select { margin-bottom: 10px; }
+  .viewer-mobile-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .viewer-mobile-tab {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    color: #cbd5e1;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .viewer-mobile-tab.active { background: rgba(99, 102, 241, 0.25); border-color: rgba(129, 140, 248, 0.5); color: #fff; }
+  .viewer-modal-overlay { padding: 12px 8px; }
+  .viewer-modal-header, .viewer-modal-body { padding: 16px; }
+}

@@ -12,6 +12,24 @@ const flySmartCup = require('./flySmartCup.cjs');
 
 const router = express.Router();
 
+// Tài khoản "Tra cứu" (role = 'viewer') — cổng /tra-cuu chỉ để XEM: chặn cứng
+// mọi thao tác ghi ở tầng server (kể cả các route chỉ requireAuth như nộp
+// phiếu điểm/kết quả trận), không phụ thuộc vào việc giao diện có ẩn nút.
+router.use((req, res, next) => {
+  if (req.user?.role === 'viewer' && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Tài khoản Tra cứu chỉ được xem, không có quyền thay đổi dữ liệu.' });
+  }
+  next();
+});
+
+function requireViewer(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.' });
+  if (req.user.role !== 'viewer' && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Chỉ tài khoản Tra cứu hoặc admin mới xem được trang này.' });
+  }
+  next();
+}
+
 // Người duy nhất được phép ký duyệt khi sửa 1 phiếu điểm đã chấm (Trưởng ban
 // trọng tài) — cố định ở server, KHÔNG lấy tên từ client, để không ai giả
 // mạo tên người duyệt dù có sửa request thế nào.
@@ -1668,6 +1686,61 @@ router.get('/reports/scores', requireAdmin, h(async (req, res) => {
     vals
   );
   res.json(rows);
+}));
+
+// ============================================================
+// Tra cứu (cổng /tra-cuu, role viewer) — toàn bộ dữ liệu 1 cuộc thi trong
+// 1 lần gọi; lọc/tìm kiếm/xếp hạng do frontend tự làm. Chữ ký (ảnh base64
+// nặng) KHÔNG trả ở đây — xem phiếu chi tiết thì gọi /scores/:id riêng.
+// ============================================================
+router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
+  const compId = req.params.competitionId;
+  const { rows: comp } = await query('select id, name, location, start_date, end_date, is_active from competitions where id = $1', [compId]);
+  if (!comp[0]) return res.status(404).json({ error: 'Không tìm thấy cuộc thi.' });
+
+  const [contents, boards, teams, students, scores, matches] = await Promise.all([
+    query(`select id, name, name_en, content_format, order_index from contest_contents
+           where competition_id = $1 order by order_index, name`, [compId]),
+    query(`select cb.contest_content_id, b.id, b.name, cb.ranking_format, b.order_index
+           from content_boards cb join boards b on b.id = cb.board_id
+           join contest_contents cc on cc.id = cb.contest_content_id
+           where cc.competition_id = $1 order by b.order_index`, [compId]),
+    query(`select t.id, t.name, t.contest_content_id, t.board_id, t.student_ids, t.combat_group, t.order_index,
+             t.school_id, sch.name as school_name, t.coach_id, co.name as coach_name,
+             coalesce((select array_agg(f.name order by f.name) from team_fields tf join fields f on f.id = tf.field_id
+                       where tf.team_id = t.id), '{}') as fields
+           from teams t
+           join contest_contents cc on cc.id = t.contest_content_id
+           left join schools sch on sch.id = t.school_id
+           left join coaches co on co.id = t.coach_id
+           where cc.competition_id = $1
+           order by cc.order_index, t.order_index`, [compId]),
+    query(`select st.id, st.full_name, st.grade, sch.name as school_name
+           from students st left join schools sch on sch.id = st.school_id
+           where st.id in (select unnest(t.student_ids) from teams t
+                           join contest_contents cc on cc.id = t.contest_content_id where cc.competition_id = $1)`, [compId]),
+    query(`select s.id, s.team_id, s.contest_content_id, s.round, s.score, s.time, s.retry_count, s.submitted_at,
+             u.full_name as referee_name
+           from scores s join contest_contents cc on cc.id = s.contest_content_id
+           left join users u on u.id = s.referee_id
+           where cc.competition_id = $1`, [compId]),
+    query(`select cm.id, cm.contest_content_id, cm.team_a_id, cm.team_b_id, cm.winner_id, cm.is_draw, cm.match_no,
+             cm.group_label, cm.stage, cm.played_at, f.name as field_name,
+             cm.details - 'studentSignatureImageA' - 'studentSignatureImageB' - 'refereeSignatureImage' as details
+           from combat_matches cm join contest_contents cc on cc.id = cm.contest_content_id
+           left join fields f on f.id = cm.field_id
+           where cc.competition_id = $1`, [compId]),
+  ]);
+
+  res.json({
+    competition: comp[0],
+    contents: contents.rows,
+    boards: boards.rows,
+    teams: teams.rows,
+    students: students.rows,
+    scores: scores.rows,
+    matches: matches.rows,
+  });
 }));
 
 // ============================================================

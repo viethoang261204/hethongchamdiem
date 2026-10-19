@@ -571,6 +571,9 @@ export const api = {
     return withRetry(() => request(`/reports/scores${q ? `?${q}` : ''}`), 'getReportScores');
   },
 
+  // Cổng Tra cứu (/tra-cuu) — toàn bộ dữ liệu 1 cuộc thi trong 1 lần gọi
+  getLookup: (competitionId) => withRetry(() => request(`/lookup/${competitionId}`), 'getLookup'),
+
   // ============================================================
   // Diagnostic
   // ============================================================

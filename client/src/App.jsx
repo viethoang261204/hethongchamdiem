@@ -38,6 +38,14 @@ import RefereeMatches from './pages/referee/RefereeMatches';
 import RefereeCombatDrone from './pages/referee/RefereeCombatDrone';
 import RefereeCombatStars from './pages/referee/RefereeCombatStars';
 import RefereeCombatMatchScore from './pages/referee/RefereeCombatMatchScore';
+import ViewerLogin from './pages/viewer/ViewerLogin';
+import ViewerLayout from './pages/viewer/ViewerLayout';
+import ViewerOverview from './pages/viewer/ViewerOverview';
+import ViewerTeams from './pages/viewer/ViewerTeams';
+import ViewerStudents from './pages/viewer/ViewerStudents';
+import ViewerGroups from './pages/viewer/ViewerGroups';
+import ViewerScoreDetail from './pages/viewer/ViewerScoreDetail';
+import ViewerScoreboard from './pages/viewer/ViewerScoreboard';
 
 const AuthContext = createContext(null);
 
@@ -134,6 +142,19 @@ export default function App() {
               <Route path="complaints" element={<RefereeComplaints />} />
               <Route path="scoreboard" element={<RefereeScoreboard />} />
               <Route path="history/:scoreId" element={<RefereeScoreDetail />} />
+            </>
+          )}
+        </Route>
+        {/* Cổng Tra cứu — tài khoản role 'viewer' (chỉ xem), tách riêng admin/trọng tài */}
+        <Route path="/tra-cuu" element={user?.role === 'viewer' ? <ViewerLayout /> : <ViewerLogin />}>
+          {user?.role === 'viewer' && (
+            <>
+              <Route index element={<ViewerOverview />} />
+              <Route path="doi-thi" element={<ViewerTeams />} />
+              <Route path="hoc-sinh" element={<ViewerStudents />} />
+              <Route path="truong-hlv" element={<ViewerGroups />} />
+              <Route path="bang-xep-hang" element={<ViewerScoreboard />} />
+              <Route path="phieu/:scoreId" element={<ViewerScoreDetail />} />
             </>
           )}
         </Route>

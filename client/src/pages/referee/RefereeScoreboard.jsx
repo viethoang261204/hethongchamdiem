@@ -225,17 +225,22 @@ function ContentSection({ content }) {
   );
 }
 
-export default function RefereeScoreboard() {
+// competitionId (tuỳ chọn) — cổng Tra cứu (/tra-cuu) truyền vào giải đang
+// chọn ở sidebar: khi đó hiện đúng giải đó (kể cả giải đã kết thúc), ẩn ô
+// chọn cuộc thi, và tài khoản viewer luôn được xem.
+export default function RefereeScoreboard({ competitionId: fixedCompId } = {}) {
   const { user } = useAuth();
   const [competitions, setCompetitions] = useState([]);
   const [contents, setContents] = useState([]);
-  const [selectedComp, setSelectedComp] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [selectedComp, setSelectedComp] = useState(fixedCompId || '');
+  const [loading, setLoading] = useState(!fixedCompId);
 
-  const allowed = !!user?.can_view_scoreboard;
+  const allowed = !!user?.can_view_scoreboard || user?.role === 'viewer';
+
+  useEffect(() => { if (fixedCompId) setSelectedComp(fixedCompId); }, [fixedCompId]);
 
   useEffect(() => {
-    if (!allowed) { setLoading(false); return; }
+    if (!allowed || fixedCompId) { setLoading(false); return; }
     api.getCompetitions()
       .then((list) => {
         const active = list.filter((c) => c.is_active !== false);
@@ -244,7 +249,7 @@ export default function RefereeScoreboard() {
       })
       .catch(() => setCompetitions([]))
       .finally(() => setLoading(false));
-  }, [allowed]);
+  }, [allowed, fixedCompId]);
 
   useEffect(() => {
     if (!selectedComp) { setContents([]); return; }
@@ -277,11 +282,11 @@ export default function RefereeScoreboard() {
         <p className="referee-page-subtitle">Xem điểm số và xếp hạng của toàn bộ các nội dung và bảng đấu trong cuộc thi.</p>
       </div>
 
-      {competitions.length === 0 ? (
+      {!fixedCompId && competitions.length === 0 ? (
         <div className="card" style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>Chưa có cuộc thi nào đang diễn ra.</div>
       ) : (
         <>
-          {competitions.length > 1 && (
+          {!fixedCompId && competitions.length > 1 && (
             <div className="form-group" style={{ maxWidth: 360, marginBottom: 20 }}>
               <label className="form-label">Cuộc thi</label>
               <select className="form-input form-select" value={selectedComp} onChange={(e) => setSelectedComp(e.target.value)}>
