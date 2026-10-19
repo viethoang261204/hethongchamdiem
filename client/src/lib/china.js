@@ -1,11 +1,9 @@
 // Danh sách đội đủ điều kiện đi Trung Quốc (đội có giải thưởng chính thức)
 // — dùng chung cho cổng Tra cứu (chỉ xem) và trang admin (sửa/nhập thông tin
-// học sinh). Mỗi học sinh cần: họ tên, ngày sinh, giới tính, SĐT, email.
+// học sinh). Mỗi học sinh cần: họ tên, ngày sinh, SĐT, email.
 import { awardOrder } from './outstandingCoach';
 import { contentGroup, normalizeText } from './lookup';
 import { buildStyledSheet, downloadWorkbook } from './excelReport';
-
-export const GENDERS = ['Nam', 'Nữ'];
 
 // 'YYYY-MM-DD' → 'dd/mm/yyyy'
 export function fmtDate(iso) {
@@ -25,16 +23,8 @@ export function parseDateInput(s) {
   return '';
 }
 
-export function normalizeGender(s) {
-  const v = normalizeText(s);
-  if (/^(nam|male|m)$/.test(v)) return 'Nam';
-  if (/^(nu|female|f)$/.test(v)) return 'Nữ';
-  return '';
-}
-
 export const studentMissing = (s) => [
   !s.birth_date && 'ngày sinh',
-  !s.gender && 'giới tính',
   !s.phone && 'SĐT',
   !s.email && 'email',
 ].filter(Boolean);
@@ -63,7 +53,6 @@ export function chinaStats(rows) {
     teams: rows.length,
     students: all.length,
     complete: all.filter((s) => !s.missing.length).length,
-    noGender: all.filter((s) => !s.gender).length,
     noPhone: all.filter((s) => !s.phone).length,
   };
 }
@@ -90,7 +79,6 @@ export function filterChinaRows(rows, f) {
 export const CHINA_IMPORT_COLUMNS = [
   { key: 'student_id', label: 'Mã HS', required: true, example: '(giữ nguyên từ file xuất)' },
   { key: 'birth_date', label: 'Ngày sinh', required: false, example: '25/12/2014' },
-  { key: 'gender', label: 'Giới tính', required: false, example: 'Nam' },
   { key: 'phone', label: 'SĐT', required: false, example: '0900000000' },
   { key: 'email', label: 'Email', required: false, example: 'phuhuynh@example.com' },
 ];
@@ -102,13 +90,13 @@ export async function exportChinaExcel(rows, filename = 'hoc-sinh-doi-di-trung-q
   buildStyledSheet(workbook, 'Đi Trung Quốc', {
     title: 'DANH SÁCH HỌC SINH CÁC ĐỘI ĐẠT GIẢI ĐI TRUNG QUỐC',
     subtitle: `${rows.length} đội · ${lines.length} học sinh — "Nguồn" cho biết SĐT/email là của thí sinh, phụ huynh, HLV hay đơn vị. Điền ô trống rồi nhập lại hệ thống (giữ nguyên cột Mã HS).`,
-    header: ['STT', 'Họ và tên', 'Ngày sinh', 'Giới tính', 'SĐT', 'Nguồn SĐT', 'Email', 'Nguồn email',
+    header: ['STT', 'Họ và tên', 'Ngày sinh', 'SĐT', 'Nguồn SĐT', 'Email', 'Nguồn email',
       'Đội', 'Giải thưởng', 'Giải đấu', 'Nội dung', 'Bảng', 'Trường / Trung tâm', 'HLV', 'Mã HS'],
-    columnKinds: ['index', 'text', 'label', 'label', 'text-nowrap', 'label', 'text', 'label',
+    columnKinds: ['index', 'text', 'label', 'text-nowrap', 'label', 'text', 'label',
       'text', 'text', 'text', 'text', 'label', 'text', 'text', 'text-nowrap'],
-    columnWidths: [6, 26, 12, 9, 14, 11, 30, 11, 24, 20, 24, 24, 10, 28, 22, 38],
+    columnWidths: [6, 26, 12, 14, 11, 30, 11, 24, 20, 24, 24, 10, 28, 22, 38],
     rows: lines.map(([r, s], i) => [
-      i + 1, s.full_name, fmtDate(s.birth_date), s.gender || '', s.phone || '', s.phone_source || '',
+      i + 1, s.full_name, fmtDate(s.birth_date), s.phone || '', s.phone_source || '',
       s.email || '', s.email_source || '', r.name, r.awardText, r.competition_name, r.content_name,
       r.board_name || '', r.school_name || '', r.coach_name || '', s.id,
     ]),

@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api';
 import { useNotify } from '../../context/NotifyContext';
 import {
-  chinaStats, exportChinaExcel, filterChinaRows, prepareChinaRows, CHINA_IMPORT_COLUMNS, GENDERS,
-  normalizeGender, parseDateInput,
+  chinaStats, exportChinaExcel, filterChinaRows, prepareChinaRows, CHINA_IMPORT_COLUMNS, parseDateInput,
 } from '../../lib/china';
 import { readRegistrationFile } from '../../lib/registration';
 import { usePagination } from '../../hooks/usePagination';
@@ -14,7 +13,7 @@ import './AdminLayout.css';
 const sub = { fontSize: 12, color: '#64748b', fontWeight: 400 };
 
 // Đội đủ điều kiện đi Trung Quốc (có giải thưởng chính thức) — admin bổ sung
-// thông tin từng học sinh (ngày sinh, giới tính, SĐT, email):
+// thông tin từng học sinh (ngày sinh, SĐT, email):
 //   - "Nhập từ file đăng ký EAVN": đọc mọi sheet của file đăng ký, tự khớp
 //     học sinh theo họ tên + tên đội (xem POST /students/registration-import)
 //   - sửa ngay trên bảng (lưu khi rời ô)
@@ -88,7 +87,7 @@ export default function AdminChinaTeams() {
           <h1 className="page-title">Đội đi Trung Quốc</h1>
           <p className="page-subtitle">
             {stats.teams} đội đạt giải · {stats.students} học sinh — đủ thông tin: {stats.complete}, còn thiếu: {stats.students - stats.complete}
-            {' '}(chưa có giới tính: {stats.noGender}, chưa có SĐT: {stats.noPhone})
+            {' '}(chưa có SĐT: {stats.noPhone})
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -130,13 +129,13 @@ export default function AdminChinaTeams() {
         <div className="table-container">
           <table>
             <thead>
-              <tr><th>Đội</th><th>Giải thưởng</th><th>Học sinh</th><th>Ngày sinh</th><th>Giới tính</th><th>SĐT</th><th>Email</th></tr>
+              <tr><th>Đội</th><th>Giải thưởng</th><th>Học sinh</th><th>Ngày sinh</th><th>SĐT</th><th>Email</th></tr>
             </thead>
             <tbody>
               {!raw ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24 }}>Đang tải...</td></tr>
               ) : pageItems.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có đội nào.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có đội nào.</td></tr>
               ) : pageItems.map((r) => {
                 const list = r.students.length ? r.students : [null];
                 return list.map((s, i) => (
@@ -160,13 +159,6 @@ export default function AdminChinaTeams() {
                             defaultValue={s.birth_date || ''} onBlur={(e) => saveStudent(s, 'birth_date', e.target.value)} />
                         </td>
                         <td>
-                          <select className="form-input" style={{ minWidth: 80 }} value={s.gender || ''}
-                            onChange={(e) => saveStudent(s, 'gender', e.target.value)}>
-                            <option value="">—</option>
-                            {GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}
-                          </select>
-                        </td>
-                        <td>
                           <input key={`p-${s.id}-${s.phone || ''}`} className="form-input" type="tel" style={{ minWidth: 130 }}
                             defaultValue={s.phone || ''} placeholder="09..." onBlur={(e) => saveStudent(s, 'phone', e.target.value)} />
                           {s.phone_source && <div style={sub}>{s.phone_source}</div>}
@@ -177,7 +169,7 @@ export default function AdminChinaTeams() {
                           {s.email_source && <div style={sub}>{s.email_source}</div>}
                         </td>
                       </>
-                    ) : <td colSpan={5} style={sub}>Đội chưa có học sinh trong hệ thống</td>}
+                    ) : <td colSpan={4} style={sub}>Đội chưa có học sinh trong hệ thống</td>}
                   </tr>
                 ));
               })}
@@ -202,7 +194,7 @@ export default function AdminChinaTeams() {
                     {reg.sheets.map((s) => <li key={s.name}>{s.name}: {s.count}</li>)}
                   </ul>
                   <p style={{ fontSize: 13, color: '#64748b' }}>
-                    Khớp học sinh theo họ tên + tên đội (không phân biệt dấu). Ngày sinh / giới tính chỉ điền vào ô còn trống.
+                    Khớp học sinh theo họ tên + tên đội (không phân biệt dấu). Ngày sinh chỉ điền vào ô còn trống.
                     File đăng ký không có SĐT riêng của học sinh nên SĐT/email lấy theo thứ tự: thí sinh → phụ huynh → HLV → đơn vị
                     (ghi rõ nguồn); không ghi đè thông tin admin đã nhập tay.
                   </p>
@@ -255,9 +247,9 @@ export default function AdminChinaTeams() {
           title="Nhập thông tin học sinh từ Excel đã xuất"
           columns={CHINA_IMPORT_COLUMNS}
           templateFilename="mau-thong-tin-hoc-sinh-di-trung-quoc.xlsx"
-          notePrereq='Dùng chính file "Xuất Excel" ở trang này: điền các ô Ngày sinh (dd/mm/yyyy) / Giới tính (Nam/Nữ) / SĐT / Email còn trống, giữ nguyên cột Mã HS. Ô để trống sẽ giữ nguyên giá trị cũ.'
+          notePrereq='Dùng chính file "Xuất Excel" ở trang này: điền các ô Ngày sinh (dd/mm/yyyy) / SĐT / Email còn trống, giữ nguyên cột Mã HS. Ô để trống sẽ giữ nguyên giá trị cũ.'
           onImport={(list) => api.importStudentInfo(list.map((r) => ({
-            ...r, birth_date: parseDateInput(r.birth_date), gender: normalizeGender(r.gender),
+            ...r, birth_date: parseDateInput(r.birth_date),
           })))}
           onDone={load}
           onClose={() => setImportOpen(false)}

@@ -34,13 +34,13 @@ export default function ViewerChina() {
     <div className="referee-content-wrap">
       <div className="referee-page-header">
         <h1 className="referee-page-title">Đội đủ điều kiện đi Trung Quốc</h1>
-        <p className="referee-page-subtitle">Tất cả các đội có giải thưởng chính thức ở mọi giải (Giải Nhất / Nhì / Ba, Top 5 / Top 10, Rising Star...), kèm họ tên, ngày sinh, giới tính, SĐT và email của từng học sinh.</p>
+        <p className="referee-page-subtitle">Tất cả các đội có giải thưởng chính thức ở mọi giải (Giải Nhất / Nhì / Ba, Top 5 / Top 10, Rising Star...), kèm họ tên, ngày sinh, SĐT và email của từng học sinh.</p>
       </div>
 
       <div className="rt-stats">
         <div className="rt-stat"><div className="rt-stat-value">{stats.teams}</div><div className="rt-stat-label">Đội đủ điều kiện</div></div>
         <div className="rt-stat"><div className="rt-stat-value">{stats.students}</div><div className="rt-stat-label">Học sinh</div></div>
-        <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{stats.complete}</div><div className="rt-stat-label">HS đủ 4 thông tin</div></div>
+        <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{stats.complete}</div><div className="rt-stat-label">HS đủ thông tin</div></div>
         <div className="rt-stat rt-stat-pending"><div className="rt-stat-value">{stats.students - stats.complete}</div><div className="rt-stat-label">HS còn thiếu thông tin</div></div>
       </div>
 
@@ -75,11 +75,11 @@ export default function ViewerChina() {
         <div className="table-container">
           <table className="viewer-china-table">
             <thead>
-              <tr><th>Đội</th><th>Giải thưởng</th><th>Học sinh</th><th>Ngày sinh</th><th>Giới tính</th><th>SĐT</th><th>Email</th></tr>
+              <tr><th>Đội</th><th>Giải thưởng</th><th>Học sinh</th><th>Ngày sinh</th><th>SĐT</th><th>Email</th></tr>
             </thead>
             <tbody>
               {pageItems.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có đội nào.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có đội nào.</td></tr>
               ) : pageItems.map((r) => {
                 const list = r.students.length ? r.students : [null];
                 const span = list.length;
@@ -100,11 +100,10 @@ export default function ViewerChina() {
                       <>
                         <td>{s.full_name}</td>
                         <td className="viewer-nowrap">{fmtDate(s.birth_date) || <Missing />}</td>
-                        <td>{s.gender || <Missing />}</td>
                         <td className="viewer-nowrap">{s.phone || <Missing />}{s.phone && s.phone_source && <div className="viewer-sub">{s.phone_source}</div>}</td>
                         <td>{s.email || <Missing />}{s.email && s.email_source && <div className="viewer-sub">{s.email_source}</div>}</td>
                       </>
-                    ) : <td colSpan={5} className="viewer-sub">Đội chưa có học sinh trong hệ thống</td>}
+                    ) : <td colSpan={4} className="viewer-sub">Đội chưa có học sinh trong hệ thống</td>}
                   </tr>
                 ));
               })}
