@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../../api';
-import { useLookupData } from './ViewerLayout';
-import { buildLookup, normalizeText } from '../../lib/lookup';
+import { useMemo, useState } from 'react';
+import { useAllLookup } from './useAllLookup';
+import { normalizeText } from '../../lib/lookup';
 import { buildSecondRound, exportSecondRoundExcel } from '../../lib/secondRound';
 import { fmtDate, validDob } from '../../lib/china';
 import { usePagination } from '../../hooks/usePagination';
@@ -15,16 +14,7 @@ const roundCell = (t, n) => (t.rounds[n] ? `${t.rounds[n].score} đ · ${t.round
 // Luôn cần dữ liệu TẤT CẢ các giải: dùng lại dữ liệu của layout nếu đang ở
 // chế độ tổng thể, không thì tự tải riêng.
 export default function ViewerSecondRound() {
-  const { lookup: layoutLookup } = useLookupData();
-  const [ownRaw, setOwnRaw] = useState(null);
-  const [error, setError] = useState('');
-  const needOwn = layoutLookup && !layoutLookup.all;
-  useEffect(() => {
-    if (!needOwn || ownRaw) return;
-    api.getLookup('all').then(setOwnRaw).catch((e) => setError(e.message || 'Không tải được dữ liệu.'));
-  }, [needOwn, ownRaw]);
-  const ownLookup = useMemo(() => buildLookup(ownRaw), [ownRaw]);
-  const lookup = layoutLookup?.all ? layoutLookup : ownLookup;
+  const { lookup, error } = useAllLookup();
 
   const data = useMemo(() => buildSecondRound(lookup), [lookup]);
   const [view, setView] = useState('xet');
