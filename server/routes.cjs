@@ -1784,7 +1784,8 @@ router.get('/lookup/:competitionId', requireViewer, h(async (req, res) => {
            left join coaches co on co.id = t.coach_id
            where ${inComp}
            order by cc.order_index, t.order_index`, [compId]),
-    query(`select st.id, st.full_name, st.grade, sch.name as school_name
+    query(`select st.id, st.full_name, st.grade, st.birth_date, st.phone, st.phone_source, st.email, st.email_source,
+             sch.name as school_name
            from students st left join schools sch on sch.id = st.school_id
            where st.id in (select unnest(t.student_ids) from teams t
                            join contest_contents cc on cc.id = t.contest_content_id where ${inComp})`, [compId]),
