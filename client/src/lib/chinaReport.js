@@ -20,7 +20,7 @@ const resultText = (t) => {
 };
 
 export function buildChinaReport(lookup) {
-  if (!lookup) return { rows: [], byComp: [], byContent: [], totals: null };
+  if (!lookup) return { rows: [], byComp: [], byContent: [], bySchool: [], totals: null };
   const second = buildSecondRound(lookup);
   const secondById = new Map();
   const elsewhereById = new Map();
@@ -82,11 +82,67 @@ export function buildChinaReport(lookup) {
     byComp: groupBy((r) => r.competition?.id || '', (r) => r.competition?.name || '—')
       .sort((a, b) => (compOrder.get(a.key) ?? 99) - (compOrder.get(b.key) ?? 99)),
     byContent: groupBy((r) => r.contentKey, (r) => r.contentName).sort((a, b) => b.registered - a.registered),
+    // Trường / trung tâm gộp theo tên (cùng tên ở nhiều giải = 1 đơn vị)
+    bySchool: groupBy((r) => r.team.school_name || NO_SCHOOL, (r) => r.team.school_name || NO_SCHOOL)
+      .sort((a, b) => b.registered - a.registered || a.name.localeCompare(b.name, 'vi')),
     totals: tally(rows),
   };
 }
 
 export const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(1)}%` : '—');
+export const NO_SCHOOL = 'Chưa có trường / trung tâm';
+
+const TEAM_HEADER = ['STT', 'Trạng thái', 'Giải thưởng', 'Ghi chú', 'Đội', 'Giải đấu', 'Nội dung', 'Bảng', 'Kết quả', 'Hạng tại host', 'HLV', 'Học sinh'];
+const TEAM_KINDS = ['index', 'label', 'text', 'text', 'text', 'text', 'text', 'label', 'label', 'label', 'text', 'text'];
+const teamRow = (r, i) => [i + 1, STATUS[r.status].label, r.award, r.note, r.team.name, r.competition?.name || '', r.contentName, r.board,
+  r.result, r.hostRank ? `Hạng ${r.hostRank}` : '', r.team.coach_name || '', r.team.students.map((s) => s.full_name).join(', ')];
+
+// Excel theo trường / trung tâm: sheet "Tổng hợp theo trường" (mọi trường, tỷ
+// lệ % được đi / số đội đăng ký) rồi MỖI trường 1 sheet: số liệu + tỷ lệ ở
+// khối trên, danh sách đội (đi lần 1 → đi lần 2 → không giải) ở khối dưới.
+export async function exportChinaReportBySchool(schools, filename = 'bao-cao-di-trung-quoc-theo-truong.xlsx') {
+  const { default: ExcelJS } = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  const used = new Set();
+  const sum = (key) => schools.reduce((a, x) => a + x[key], 0);
+  const reg = sum('registered');
+  const going = sum('going');
+  buildStyledSheet(workbook, safeSheetName('Tổng hợp theo trường', used), {
+    title: 'BÁO CÁO ĐI TRUNG QUỐC THEO TRƯỜNG / TRUNG TÂM',
+    subtitle: `${schools.length} trường / trung tâm · ${going}/${reg} đội đăng ký được đi (${pct(going, reg)})`,
+    header: ['STT', 'Trường / Trung tâm', 'Đội đăng ký', 'Đã thi', 'Đi lần 1', '— giải chính', '— giải phụ', 'Đi lần 2', 'Tổng được đi',
+      'Tỷ lệ được đi', 'Không giải', 'Tỷ lệ không giải', 'HS được đi'],
+    columnKinds: ['index', 'text', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'label', 'number', 'label', 'number'],
+    columnWidths: [6, 40, 11, 9, 9, 11, 11, 9, 12, 12, 10, 14, 11],
+    rows: [
+      ...schools.map((x, i) => [i + 1, x.name, x.registered, x.played, x.lan1, x.major, x.minor, x.lan2, x.going,
+        pct(x.going, x.registered), x.none, pct(x.none, x.registered), x.students]),
+      ['', 'TỔNG CỘNG', reg, sum('played'), sum('lan1'), sum('major'), sum('minor'), sum('lan2'), going,
+        pct(going, reg), sum('none'), pct(sum('none'), reg), ''],
+    ],
+  });
+
+  for (const x of schools) {
+    const ws = workbook.addWorksheet(safeSheetName(x.name, used), {
+      views: [{ showGridLines: false }],
+      pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+    });
+    ws.columns = [6, 12, 22, 34, 24, 24, 26, 9, 16, 12, 22, 40].map((w) => ({ width: w }));
+    let row = writeStyledBlock(ws, 1, {
+      title: x.name.toUpperCase(),
+      subtitle: `Tỷ lệ được đi: ${pct(x.going, x.registered)} (${x.going}/${x.registered} đội đăng ký)`,
+      header: ['Đội đăng ký', 'Đã thi', 'Đi lần 1', 'Giải chính', 'Giải phụ', 'Đi lần 2', 'Tổng được đi', 'Tỷ lệ được đi', 'Không giải', 'Tỷ lệ không giải', 'HS được đi'],
+      columnKinds: ['number', 'number', 'number', 'number', 'number', 'number', 'number', 'label', 'number', 'label', 'number'],
+      rows: [[x.registered, x.played, x.lan1, x.major, x.minor, x.lan2, x.going, pct(x.going, x.registered), x.none, pct(x.none, x.registered), x.students]],
+    }) + 2;
+    writeStyledBlock(ws, row, {
+      title: 'DANH SÁCH ĐỘI',
+      subtitle: 'Đi lần 1 (có giải chính thức) → Đi lần 2 (xét điểm lần 2) → Không giải',
+      header: TEAM_HEADER, columnKinds: TEAM_KINDS, rows: x.rows.map(teamRow),
+    });
+  }
+  await downloadWorkbook(workbook, filename);
+}
 
 // Excel: sheet "Tổng hợp" (theo giải + theo nội dung) rồi mỗi giải 1 sheet
 // danh sách đội (đi lần 1 → đi lần 2 → không giải)

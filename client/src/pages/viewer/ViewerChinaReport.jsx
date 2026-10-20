@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useAllLookup } from './useAllLookup';
 import { normalizeText } from '../../lib/lookup';
-import { STATUS, buildChinaReport, exportChinaReportExcel, pct } from '../../lib/chinaReport';
+import { NO_SCHOOL, STATUS, buildChinaReport, exportChinaReportBySchool, exportChinaReportExcel, pct } from '../../lib/chinaReport';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 
@@ -60,13 +60,58 @@ function SummaryTable({ title, list, totals }) {
   );
 }
 
+// Tổng hợp theo trường / trung tâm — có tìm kiếm + phân trang (≈150 đơn vị);
+// bấm tên trường để lọc danh sách chi tiết bên dưới.
+function SchoolTable({ schools, onPick }) {
+  const [q, setQ] = useState('');
+  const list = useMemo(() => {
+    const n = normalizeText(q);
+    return n ? schools.filter((x) => normalizeText(x.name).includes(n)) : schools;
+  }, [schools, q]);
+  const { pageItems, page, setPage, pageCount, totalItems, pageSize } = usePagination(list, 15);
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <h3 style={{ margin: 0 }}>Theo trường / trung tâm ({schools.length})</h3>
+        <div className="search-box" style={{ minWidth: 280 }}><input type="text" placeholder="Tìm trường / trung tâm..." value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      </div>
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Trường / Trung tâm</th><th className="viewer-num">Đăng ký</th><th className="viewer-num">Đi lần 1</th>
+              <th className="viewer-num">Đi lần 2</th><th className="viewer-num">Tổng được đi</th><th className="viewer-num">Tỷ lệ được đi</th>
+              <th className="viewer-num">Không giải</th><th className="viewer-num">HS được đi</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageItems.map((x) => (
+              <tr key={x.key}>
+                <td><button type="button" className="viewer-link" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }} onClick={() => onPick(x.key)}><strong>{x.name}</strong></button></td>
+                <td className="viewer-num">{x.registered}</td>
+                <td className="viewer-num"><strong style={{ color: '#fbbf24' }}>{x.lan1}</strong><div className="viewer-sub">chính {x.major} · phụ {x.minor}</div></td>
+                <td className="viewer-num"><strong style={{ color: '#34d399' }}>{x.lan2}</strong></td>
+                <td className="viewer-num"><strong>{x.going}</strong></td>
+                <td className="viewer-num"><strong>{pct(x.going, x.registered)}</strong></td>
+                <td className="viewer-num">{x.none}</td>
+                <td className="viewer-num">{x.students}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} pageCount={pageCount} onChange={setPage} totalItems={totalItems} pageSize={pageSize} />
+    </div>
+  );
+}
+
 // Báo cáo số đội được đi Trung Quốc so với số đội đăng ký — chi tiết từng
 // đội: đi lần 1 (có giải), đi lần 2 (xét điểm lần 2) hay không giải.
 export default function ViewerChinaReport() {
   const { lookup, error } = useAllLookup();
   const report = useMemo(() => buildChinaReport(lookup), [lookup]);
-  const [f, setF] = useState({ q: '', giai: '', nhom: '', trangThai: '' });
-  const [exporting, setExporting] = useState(false);
+  const [f, setF] = useState({ q: '', giai: '', nhom: '', truong: '', trangThai: '' });
+  const [exporting, setExporting] = useState('');
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
 
   const filtered = useMemo(() => {
@@ -74,6 +119,7 @@ export default function ViewerChinaReport() {
     return report.rows.filter((r) => {
       if (f.giai && r.competition?.id !== f.giai) return false;
       if (f.nhom && r.contentKey !== f.nhom) return false;
+      if (f.truong && (r.team.school_name || NO_SCHOOL) !== f.truong) return false;
       if (f.trangThai === 'chinh' && r.tier !== 'chinh') return false;
       if (f.trangThai === 'phu' && r.tier !== 'phu') return false;
       if (['lan1', 'lan2', 'none'].includes(f.trangThai) && r.status !== f.trangThai) return false;
@@ -110,8 +156,9 @@ export default function ViewerChinaReport() {
 
       <SummaryTable title="Theo giải đấu" list={report.byComp} totals={t} />
       <SummaryTable title="Theo nội dung thi (gộp các giải)" list={report.byContent} />
+      <SchoolTable schools={report.bySchool} onPick={(name) => { set('truong', name); setTimeout(() => document.getElementById('china-report-detail')?.scrollIntoView({ behavior: 'smooth' }), 0); }} />
 
-      <div className="filters-bar viewer-filters">
+      <div className="filters-bar viewer-filters" id="china-report-detail">
         <div className="search-box"><input type="text" placeholder="Tên đội, học sinh, trường, HLV..." value={f.q} onChange={(e) => set('q', e.target.value)} /></div>
         <select className="filter-select" value={f.giai} onChange={(e) => set('giai', e.target.value)}>
           <option value="">Tất cả giải</option>
@@ -120,6 +167,10 @@ export default function ViewerChinaReport() {
         <select className="filter-select" value={f.nhom} onChange={(e) => set('nhom', e.target.value)}>
           <option value="">Tất cả nội dung</option>
           {report.byContent.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+        </select>
+        <select className="filter-select" value={f.truong} onChange={(e) => set('truong', e.target.value)}>
+          <option value="">Tất cả trường / trung tâm</option>
+          {report.bySchool.map((x) => <option key={x.key} value={x.key}>{x.name}</option>)}
         </select>
         <select className="filter-select" value={f.trangThai} onChange={(e) => set('trangThai', e.target.value)}>
           <option value="">Mọi trạng thái</option>
@@ -130,9 +181,16 @@ export default function ViewerChinaReport() {
           <option value="lan2">Đi lần 2</option>
           <option value="none">Không giải</option>
         </select>
-        <button type="button" className="btn btn-secondary" disabled={exporting}
-          onClick={async () => { setExporting(true); try { await exportChinaReportExcel(report); } finally { setExporting(false); } }}>
-          {exporting ? 'Đang xuất...' : 'Xuất Excel'}
+        <button type="button" className="btn btn-secondary" disabled={!!exporting}
+          onClick={async () => { setExporting('giai'); try { await exportChinaReportExcel(report); } finally { setExporting(''); } }}>
+          {exporting === 'giai' ? 'Đang xuất...' : 'Xuất Excel theo giải'}
+        </button>
+        <button type="button" className="btn btn-secondary" disabled={!!exporting}
+          onClick={async () => {
+            setExporting('truong');
+            try { await exportChinaReportBySchool(f.truong ? report.bySchool.filter((x) => x.key === f.truong) : report.bySchool); } finally { setExporting(''); }
+          }}>
+          {exporting === 'truong' ? 'Đang xuất...' : f.truong ? 'Xuất Excel trường này' : 'Xuất Excel theo trường'}
         </button>
       </div>
 
