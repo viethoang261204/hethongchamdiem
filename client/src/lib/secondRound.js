@@ -16,7 +16,7 @@
 //  - Đội bằng điểm tuyệt đối với đội cuối cùng được chọn → được xét cùng.
 import { compareRankedTeams, getMergeGroupsForContent } from './boardMerge';
 import { contentGroup, normalizeText } from './lookup';
-import { buildStyledSheet, downloadWorkbook } from './excelReport';
+import { downloadWorkbook, safeSheetName, writeStyledBlock } from './excelReport';
 import { fmtDate, validDob } from './china';
 
 export const SECOND_ROUND_RATE = 0.1;
@@ -118,50 +118,102 @@ const roundText = (t, n) => {
   return r ? `${r.score} đ · ${r.time}s` : '';
 };
 
-// Excel: sheet 1 = đội được xét lần 2 (mỗi học sinh 1 dòng, kèm ngày sinh /
-// SĐT / email); sheet 2 = BXH tổng đầy đủ của mọi (nội dung × bảng).
+// Excel: sheet "Tổng hợp" (suất + đội được xét của mọi BXH) rồi MỖI (nội
+// dung × bảng) 1 sheet riêng: khối trên = đội được xét lần 2 (mỗi học sinh 1
+// dòng, kèm ngày sinh / SĐT / email), khối dưới = BXH tổng đầy đủ của bảng đó.
+const SHORT_CONTENT = { inventions: 'Phát minh', mining: 'Khai khoáng', ancient: 'Văn minh cổ đại', skyline: 'Bầu trời' };
+
+const SELECTED_HEADER = ['STT', 'Thứ tự xét', 'Hạng tổng', 'Đội', 'Host', 'Tổng điểm', 'Thời gian (s)', 'Hạng tại host',
+  'Học sinh', 'Ngày sinh', 'SĐT', 'Nguồn SĐT', 'Email', 'Nguồn email', 'Trường / Trung tâm', 'HLV'];
+const SELECTED_KINDS = ['index', 'number', 'number', 'text-nowrap', 'text-nowrap', 'number', 'number', 'label',
+  'text-nowrap', 'label', 'text-nowrap', 'label', 'text-nowrap', 'label', 'text-nowrap', 'text-nowrap'];
+const RANK_HEADER = ['Hạng tổng', 'Đội', 'Host', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Thời gian (s)', 'Giải thưởng', 'Xét lần 2',
+  'Trường / Trung tâm', 'HLV', 'Học sinh'];
+const RANK_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'label', 'label', 'number', 'number', 'text-nowrap', 'label',
+  'text-nowrap', 'text-nowrap', 'text-nowrap'];
+
+function selectedRows(s) {
+  const out = [];
+  for (const r of s.selected) {
+    const t = r.team;
+    const list = t.students.length ? t.students : [null];
+    list.forEach((st, i) => out.push([
+      out.length + 1, i === 0 ? r.selectedOrder : '', i === 0 ? r.overallRank : '', i === 0 ? t.name : '',
+      i === 0 ? t.competition?.name || '' : '', i === 0 ? t.total.total_score : '', i === 0 ? t.total.total_time : '',
+      i === 0 && t.rank ? `Hạng ${t.rank}` : '',
+      st?.full_name || '', st && validDob(st.birth_date) ? fmtDate(st.birth_date) : '', st?.phone || '', st?.phone_source || '',
+      st?.email || '', st?.email_source || '', i === 0 ? t.school_name || '' : '', i === 0 ? t.coach_name || '' : '',
+    ]));
+  }
+  return out;
+}
+
+const rankRows = (s) => s.rows.map((r) => [
+  r.overallRank, r.team.name, r.team.competition?.name || '', roundText(r.team, 1), roundText(r.team, 2),
+  r.team.total.total_score, r.team.total.total_time,
+  r.team.award || (r.awardElsewhere ? `Đã có giải ở host khác: ${r.awardElsewhere.award} (${r.awardElsewhere.competition?.name || ''})` : ''),
+  r.selected ? `Được xét (${r.selectedOrder})` : '', r.team.school_name || '', r.team.coach_name || '',
+  r.team.students.map((st) => st.full_name).join(', '),
+]);
+
+// Ghi nhiều khối vào 1 sheet; độ rộng cột = nội dung dài nhất của cột đó
+// trên mọi khối (giới hạn 48) — giống "Xuất Excel toàn bộ BXH" ở admin.
+function writeBlocks(workbook, name, used, blocks) {
+  const ws = workbook.addWorksheet(safeSheetName(name, used), {
+    views: [{ showGridLines: false }],
+    pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 },
+  });
+  const cols = Math.max(...blocks.map((b) => b.header.length));
+  const width = new Array(cols).fill(8);
+  for (const b of blocks) {
+    b.header.forEach((h, i) => { width[i] = Math.max(width[i], String(h).length + 2); });
+    b.rows.forEach((row) => row.forEach((v, i) => { width[i] = Math.max(width[i], Math.min(48, String(v ?? '').length + 2)); }));
+  }
+  ws.columns = width.map((w) => ({ width: w }));
+  let row = 1;
+  for (const b of blocks) row = writeStyledBlock(ws, row, b) + 2;
+}
+
 export async function exportSecondRoundExcel(sections, filename = 'xet-diem-lan-2.xlsx') {
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
-  const picked = sections.flatMap((s) => s.selected.map((r) => [s, r]));
-  const studentRows = [];
-  for (const [s, r] of picked) {
-    const t = r.team;
-    const list = t.students.length ? t.students : [null];
-    list.forEach((st) => studentRows.push([
-      studentRows.length + 1, s.contentName, s.board, r.selectedOrder, r.overallRank, t.name, t.competition?.name || '',
-      t.total.total_score, t.total.total_time, t.rank ? `Hạng ${t.rank}` : '',
-      st?.full_name || '', st && validDob(st.birth_date) ? fmtDate(st.birth_date) : '', st?.phone || '', st?.phone_source || '',
-      st?.email || '', st?.email_source || '', t.school_name || '', t.coach_name || '',
-    ]));
-  }
-  buildStyledSheet(workbook, 'Xét điểm lần 2', {
-    title: 'DANH SÁCH ĐỘI ĐƯỢC XÉT ĐIỂM LẦN 2',
-    subtitle: `${picked.length} đội — 10% số đội không có giải (làm tròn lên) của BXH tổng mỗi nội dung × bảng, gộp các host thi trực tiếp (không tính Online)`,
-    header: ['STT', 'Nội dung', 'Bảng', 'Thứ tự xét', 'Hạng tổng', 'Đội', 'Host', 'Tổng điểm', 'Tổng thời gian (s)', 'Hạng tại host',
-      'Học sinh', 'Ngày sinh', 'SĐT', 'Nguồn SĐT', 'Email', 'Nguồn email', 'Trường / Trung tâm', 'HLV'],
-    columnKinds: ['index', 'text', 'label', 'number', 'number', 'text', 'text', 'number', 'number', 'label',
-      'text', 'label', 'text-nowrap', 'label', 'text', 'label', 'text', 'text'],
-    columnWidths: [6, 26, 10, 10, 10, 24, 24, 10, 12, 12, 26, 12, 14, 11, 30, 11, 28, 22],
-    rows: studentRows,
-  });
+  const used = new Set();
+  const sheetName = (s) => `${SHORT_CONTENT[s.contentKey] || s.contentName} - ${s.board}`;
 
-  const all = sections.flatMap((s) => s.rows.map((r) => [s, r]));
-  buildStyledSheet(workbook, 'BXH tổng', {
-    title: 'BẢNG XẾP HẠNG TỔNG CÁC HOST THI TRỰC TIẾP (KHÔNG TÍNH ONLINE)',
-    subtitle: 'Xếp theo nội dung × bảng đấu (host gộp bảng → bảng cao nhất của nhóm): tổng điểm 2 lượt → tổng thời gian → số lần chạy lại → lượt cao nhất',
-    header: ['STT', 'Nội dung', 'Bảng', 'Hạng tổng', 'Đội', 'Host', 'Lượt 1', 'Lượt 2', 'Tổng điểm', 'Tổng thời gian (s)',
-      'Giải thưởng', 'Xét lần 2', 'Trường / Trung tâm', 'HLV', 'Học sinh'],
-    columnKinds: ['index', 'text', 'label', 'number', 'text', 'text', 'label', 'label', 'number', 'number',
-      'text', 'label', 'text', 'text', 'text'],
-    columnWidths: [6, 26, 10, 10, 24, 24, 14, 14, 10, 12, 22, 10, 28, 22, 40],
-    rows: all.map(([s, r], i) => [
-      i + 1, s.contentName, s.board, r.overallRank, r.team.name, r.team.competition?.name || '',
-      roundText(r.team, 1), roundText(r.team, 2), r.team.total.total_score, r.team.total.total_time,
-      r.team.award || (r.awardElsewhere ? `Đã có giải ở host khác: ${r.awardElsewhere.award} (${r.awardElsewhere.competition?.name || ''})` : ''),
-      r.selected ? 'Được xét' : '', r.team.school_name || '', r.team.coach_name || '',
-      r.team.students.map((st) => st.full_name).join(', '),
-    ]),
-  });
+  writeBlocks(workbook, 'Tổng hợp', used, [
+    {
+      title: 'XÉT ĐIỂM LẦN 2 — TỔNG HỢP',
+      subtitle: 'BXH tổng các host thi trực tiếp (không tính Online) · 10% số đội không có giải, làm tròn lên · mỗi nội dung × bảng xem chi tiết ở sheet riêng',
+      header: ['STT', 'Nội dung', 'Bảng', 'Sheet', 'Host', 'Đội có điểm', 'Có giải', 'Có giải ở host khác', 'Không giải', 'Suất 10%', 'Được xét'],
+      columnKinds: ['index', 'text-nowrap', 'label', 'text-nowrap', 'text-nowrap', 'number', 'number', 'number', 'number', 'number', 'number'],
+      rows: sections.map((s, i) => [i + 1, s.contentName, s.board, sheetName(s), s.hosts.join(', '), s.scoredTeams, s.awardTeams,
+        s.awardElsewhereTeams || 0, s.noAwardTeams, s.quota, s.selected.length]),
+    },
+    {
+      title: 'DANH SÁCH ĐỘI ĐƯỢC XÉT ĐIỂM LẦN 2',
+      subtitle: `${sections.reduce((a, s) => a + s.selected.length, 0)} đội`,
+      header: ['STT', 'Nội dung', 'Bảng', 'Thứ tự xét', 'Hạng tổng', 'Đội', 'Host', 'Tổng điểm', 'Thời gian (s)', 'Học sinh'],
+      columnKinds: ['index', 'text-nowrap', 'label', 'number', 'number', 'text-nowrap', 'text-nowrap', 'number', 'number', 'text-nowrap'],
+      rows: sections.flatMap((s) => s.selected.map((r) => [s, r])).map(([s, r], i) => [
+        i + 1, s.contentName, s.board, r.selectedOrder, r.overallRank, r.team.name, r.team.competition?.name || '',
+        r.team.total.total_score, r.team.total.total_time, r.team.students.map((st) => st.full_name).join(', '),
+      ]),
+    },
+  ]);
+
+  for (const s of sections) {
+    writeBlocks(workbook, sheetName(s), used, [
+      {
+        title: `${s.contentName.toUpperCase()} — ${s.board.toUpperCase()}: ĐỘI ĐƯỢC XÉT ĐIỂM LẦN 2`,
+        subtitle: `${s.selected.length} đội (suất 10% = ${s.quota} / ${s.noAwardTeams} đội không giải${s.tieExtra ? `, +${s.tieExtra} đội bằng điểm` : ''}) · host: ${s.hosts.join(', ')}`,
+        header: SELECTED_HEADER, columnKinds: SELECTED_KINDS, rows: selectedRows(s),
+      },
+      {
+        title: `BXH TỔNG — ${s.contentName.toUpperCase()} — ${s.board.toUpperCase()}`,
+        subtitle: `${s.scoredTeams} đội có điểm · tổng điểm 2 lượt → thời gian → số lần chạy lại → lượt cao nhất`,
+        header: RANK_HEADER, columnKinds: RANK_KINDS, rows: rankRows(s),
+      },
+    ]);
+  }
   await downloadWorkbook(workbook, filename);
 }
