@@ -14,6 +14,9 @@
 //  - Đội đã có giải ở host khác trong cùng nội dung × bảng (trùng tên đội,
 //    hoặc có học sinh trùng họ tên + ngày sinh) → coi như đã có giải, không
 //    chiếm suất xét lần 2.
+//  - Đội nước ngoài (đơn vị đăng ký là tên nước — Taiwan, China, Mongolia...)
+//    vẫn nằm trong BXH tổng nhưng KHÔNG được xét lần 2 và không tính vào số
+//    đội làm cơ sở 10%.
 //  - Đội bằng điểm tuyệt đối với đội cuối cùng được chọn → được xét cùng.
 import { compareRankedTeams, getMergeGroupsForContent } from './boardMerge';
 import { contentGroup, normalizeText } from './lookup';
@@ -22,6 +25,13 @@ import { fmtDate, validDob } from './china';
 
 export const SECOND_ROUND_RATE = 0.1;
 export const isOnlineCompetition = (c) => /online/i.test(c?.name || '');
+
+// Đội nước ngoài ở Asian Open được nhập với Trường / Trung tâm = tên nước
+const FOREIGN_SCHOOLS = new Set([
+  'china', 'taiwan', 'mongolia', 'romania', 'indonesia', 'macau', 'macao', 'hong kong', 'singapore', 'malaysia',
+  'thailand', 'philippines', 'cambodia', 'laos', 'myanmar', 'japan', 'korea', 'south korea', 'india', 'australia',
+]);
+export const isForeignTeam = (t) => FOREIGN_SCHOOLS.has(normalizeText(t.school_name).replace(/\s+/g, ' ').trim());
 
 const CONTENT_ORDER = ['inventions', 'mining', 'ancient', 'skyline', 'battle', 'fly'];
 const fold = (v) => normalizeText(v).replace(/[^a-z0-9]+/g, '');
@@ -72,13 +82,14 @@ export function buildSecondRound(lookup) {
       return {
         ...s, combat: true, rows, hosts: hostNames, totalTeams: s.teams.length, scoredTeams: ranked.length,
         unscored: s.teams.length - ranked.length, awardTeams: rows.filter((r) => r.hasAward).length,
-        awardElsewhereTeams: 0, movedTeams: 0, noAwardTeams: 0, quota: 0, selected: [], tieExtra: 0,
+        awardElsewhereTeams: 0, foreignTeams: 0, movedTeams: 0, noAwardTeams: 0, quota: 0, selected: [], tieExtra: 0,
       };
     }
     const ranked = s.teams.filter((t) => t.total).sort((a, b) => compareRankedTeams(a.total, b.total));
     const rows = ranked.map((t, i) => ({
       team: t, overallRank: i + 1, hasAward: t.awards.length > 0, selected: false,
       fromBoard: t.boardName !== s.board ? t.boardName : '',
+      foreign: isForeignTeam(t),
     }));
     // Đội không giải ở host này nhưng đã có giải ở host khác (cùng nội dung × bảng)
     const awardedNames = new Map();
@@ -92,7 +103,7 @@ export function buildSecondRound(lookup) {
         || [...personKeys(r.team)].map((k) => awardedPeople.get(k)).find(Boolean);
       if (twin && twin.id !== r.team.id) r.awardElsewhere = twin;
     }
-    const noAward = rows.filter((r) => !r.hasAward && !r.awardElsewhere);
+    const noAward = rows.filter((r) => !r.hasAward && !r.awardElsewhere && !r.foreign);
     const quota = noAward.length ? Math.ceil(noAward.length * SECOND_ROUND_RATE) : 0;
     let picked = noAward.slice(0, quota);
     const last = picked[picked.length - 1];
@@ -111,6 +122,7 @@ export function buildSecondRound(lookup) {
       unscored: s.teams.length - ranked.length,
       awardTeams: rows.filter((r) => r.hasAward).length,
       awardElsewhereTeams: rows.filter((r) => r.awardElsewhere).length,
+      foreignTeams: rows.filter((r) => r.foreign && !r.hasAward).length,
       movedTeams: rows.filter((r) => r.fromBoard).length,
       noAwardTeams: noAward.length,
       quota,
@@ -180,7 +192,8 @@ const rankRows = (s) => s.rows.map((r) => [
   r.overallRank, r.team.name, r.team.competition?.name || '', roundText(r.team, 1), roundText(r.team, 2),
   r.team.total.total_score, r.team.total.total_time,
   r.team.award || (r.awardElsewhere ? `Đã có giải ở host khác: ${r.awardElsewhere.award} (${r.awardElsewhere.competition?.name || ''})` : ''),
-  r.selected ? `Được xét (${r.selectedOrder})` : '', r.team.school_name || '', r.team.coach_name || '',
+  r.selected ? `Được xét (${r.selectedOrder})` : r.foreign && !r.hasAward ? 'Nước ngoài – không xét' : '',
+  r.team.school_name || '', r.team.coach_name || '',
   r.team.students.map((st) => st.full_name).join(', '),
 ]);
 
@@ -211,7 +224,7 @@ export async function exportSecondRoundExcel(sections, filename = 'xet-diem-lan-
   writeBlocks(workbook, 'Tổng hợp', used, [
     {
       title: 'XÉT ĐIỂM LẦN 2 — TỔNG HỢP',
-      subtitle: 'BXH tổng các host thi trực tiếp (không tính Online) · 10% số đội không có giải, làm tròn lên · mỗi nội dung × bảng xem chi tiết ở sheet riêng',
+      subtitle: 'BXH tổng các host thi trực tiếp (không tính Online) · 10% số đội Việt Nam không có giải, làm tròn lên (không xét đội nước ngoài) · mỗi nội dung × bảng xem chi tiết ở sheet riêng',
       header: ['STT', 'Nội dung', 'Bảng', 'Sheet', 'Host', 'Đội có điểm', 'Có giải', 'Có giải ở host khác', 'Không giải', 'Suất 10%', 'Được xét'],
       columnKinds: ['index', 'text-nowrap', 'label', 'text-nowrap', 'text-nowrap', 'number', 'number', 'number', 'number', 'number', 'number'],
       rows: sections.map((s, i) => [i + 1, s.contentName, s.board, sheetName(s), s.hosts.join(', '), s.scoredTeams, s.awardTeams,

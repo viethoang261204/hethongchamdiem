@@ -62,7 +62,7 @@ export default function ViewerSecondRound() {
         <p className="referee-page-subtitle">
           BXH tổng gộp {data.hosts.map((h) => h.name).join(', ')} (không tính Online) theo nội dung × bảng đấu.
           Mỗi BXH lấy 10% số đội <strong>không có giải</strong> (làm tròn lên) có điểm cao nhất — đội đã có giải ở host khác
-          (trùng tên đội, hoặc có học sinh trùng họ tên + ngày sinh) coi như đã có giải. Host gộp bảng khi trao giải thì đội
+          (trùng tên đội, hoặc có học sinh trùng họ tên + ngày sinh) coi như đã có giải. <strong>Không xét đội nước ngoài</strong> (vẫn có trong BXH tổng, không tính vào cơ sở 10%). Host gộp bảng khi trao giải thì đội
           của bảng gộp xếp vào bảng cao nhất của nhóm (vd Đà Nẵng: B+C → C, D+E → E). Battle of Stars và Fly Smart Cup chỉ có BXH tổng
           (Match Points → Total Score → số trận thắng), không xét lần 2.
         </p>
@@ -180,7 +180,7 @@ export default function ViewerSecondRound() {
                     ) : (
                       <>
                         <td className="viewer-num">{s.awardElsewhereTeams || 0}</td>
-                        <td className="viewer-num">{s.noAwardTeams}</td>
+                        <td className="viewer-num">{s.noAwardTeams}{s.foreignTeams > 0 && <div className="viewer-sub">+{s.foreignTeams} nước ngoài không xét</div>}</td>
                         <td className="viewer-num">{s.quota}</td>
                         <td className="viewer-num"><strong style={{ color: '#34d399' }}>{s.selected.length}</strong>{s.tieExtra > 0 && <div className="viewer-sub">+{s.tieExtra} bằng điểm</div>}</td>
                       </>
@@ -239,7 +239,8 @@ export default function ViewerSecondRound() {
                           : r.awardElsewhere ? <span className="viewer-sub">Đã có giải ở host khác: {r.awardElsewhere.award} — {r.awardElsewhere.name} ({r.awardElsewhere.competition?.name})</span>
                             : <span className="viewer-sub">—</span>}
                       </td>
-                      <td>{r.selected ? <span className="viewer-chip" style={{ color: '#34d399', borderColor: 'rgba(52,211,153,.5)' }}>Được xét ({r.selectedOrder})</span> : ''}</td>
+                      <td>{r.selected ? <span className="viewer-chip" style={{ color: '#34d399', borderColor: 'rgba(52,211,153,.5)' }}>Được xét ({r.selectedOrder})</span>
+                        : r.foreign && !r.hasAward ? <span className="viewer-sub">Nước ngoài – không xét</span> : ''}</td>
                     </tr>
                   ))}
                 </tbody>
