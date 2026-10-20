@@ -56,7 +56,7 @@ export default function ViewerSecondRound() {
   const totals = useMemo(() => ({
     sections: sections.length,
     scored: sections.reduce((a, s) => a + s.scoredTeams, 0),
-    noAward: sections.reduce((a, s) => a + s.noAwardTeams, 0),
+    noAward: sections.filter((s) => !s.combat).reduce((a, s) => a + s.noAwardTeams, 0),
     selected: sections.reduce((a, s) => a + s.selected.length, 0),
   }), [sections]);
 
@@ -73,8 +73,8 @@ export default function ViewerSecondRound() {
           BXH tổng gộp {data.hosts.map((h) => h.name).join(', ')} (không tính Online) theo nội dung × bảng đấu.
           Mỗi BXH lấy 10% số đội <strong>không có giải</strong> (làm tròn lên) có điểm cao nhất — đội đã có giải ở host khác
           (trùng tên đội, hoặc có học sinh trùng họ tên + ngày sinh) coi như đã có giải. Host gộp bảng khi trao giải thì đội
-          của bảng gộp xếp vào bảng cao nhất của nhóm (vd Đà Nẵng: B+C → C, D+E → E). Không xét Battle of Stars và Fly Smart Cup
-          vì 2 nội dung này đấu vòng tròn trong từng host, không xếp chung được.
+          của bảng gộp xếp vào bảng cao nhất của nhóm (vd Đà Nẵng: B+C → C, D+E → E). Battle of Stars và Fly Smart Cup chỉ có BXH tổng
+          (Match Points → Total Score → số trận thắng), không xét lần 2.
         </p>
       </div>
 
@@ -185,10 +185,16 @@ export default function ViewerSecondRound() {
                     <td className="viewer-sub">{s.hosts.join(', ')}</td>
                     <td className="viewer-num">{s.scoredTeams}{s.unscored ? <div className="viewer-sub">+{s.unscored} chưa có điểm</div> : null}</td>
                     <td className="viewer-num">{s.awardTeams}</td>
-                    <td className="viewer-num">{s.awardElsewhereTeams || 0}</td>
-                    <td className="viewer-num">{s.noAwardTeams}</td>
-                    <td className="viewer-num">{s.quota}</td>
-                    <td className="viewer-num"><strong style={{ color: '#34d399' }}>{s.selected.length}</strong>{s.tieExtra > 0 && <div className="viewer-sub">+{s.tieExtra} bằng điểm</div>}</td>
+                    {s.combat ? (
+                      <td colSpan={4} className="viewer-sub" style={{ textAlign: 'center' }}>Chỉ BXH tổng</td>
+                    ) : (
+                      <>
+                        <td className="viewer-num">{s.awardElsewhereTeams || 0}</td>
+                        <td className="viewer-num">{s.noAwardTeams}</td>
+                        <td className="viewer-num">{s.quota}</td>
+                        <td className="viewer-num"><strong style={{ color: '#34d399' }}>{s.selected.length}</strong>{s.tieExtra > 0 && <div className="viewer-sub">+{s.tieExtra} bằng điểm</div>}</td>
+                      </>
+                    )}
                     <td><button type="button" className="btn btn-secondary btn-sm" onClick={() => openSection(s.key)}>Xem BXH</button></td>
                   </tr>
                 ))}
@@ -199,6 +205,28 @@ export default function ViewerSecondRound() {
           {view === 'bxh' && (
             !current ? (
               <p style={{ padding: 24, color: '#94a3b8', textAlign: 'center' }}>Chọn nội dung × bảng để xem BXH tổng.</p>
+            ) : current.combat ? (
+              <table>
+                <thead>
+                  <tr><th className="viewer-num">Hạng tổng</th><th>Đội</th><th>Host</th><th className="viewer-num">Trận</th><th className="viewer-num">T / H / B</th><th className="viewer-num">Match Points</th><th className="viewer-num">Total Score</th><th>Giải thưởng</th></tr>
+                </thead>
+                <tbody>
+                  {pageItems.length === 0 ? (
+                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không có đội nào.</td></tr>
+                  ) : pageItems.map((r) => (
+                    <tr key={r.team.id}>
+                      <td className="viewer-num"><strong>{r.overallRank}</strong></td>
+                      <td><strong>{r.team.name}</strong><div className="viewer-sub">{[r.team.school_name, r.team.coach_name && `HLV ${r.team.coach_name}`].filter(Boolean).join(' · ')}</div></td>
+                      <td className="viewer-sub">{r.team.competition?.name}{r.team.rank ? <div>hạng {r.team.rank} tại host</div> : null}</td>
+                      <td className="viewer-num">{r.team.combat.played}</td>
+                      <td className="viewer-num viewer-nowrap">{r.team.combat.wins} / {r.team.combat.draws} / {r.team.combat.losses}</td>
+                      <td className="viewer-num"><strong>{r.team.combat.matchPoints}</strong></td>
+                      <td className="viewer-num">{r.team.combat.totalScore}</td>
+                      <td>{r.team.awards.length ? <div className="viewer-chips">{r.team.awards.map((a) => <span key={a.label} className={`viewer-chip ${a.tier === 'major' ? 'viewer-chip-gold' : ''}`}>{a.label}</span>)}</div> : <span className="viewer-sub">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
               <table>
                 <thead>

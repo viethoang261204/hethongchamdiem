@@ -5,8 +5,9 @@
 //    đường phát minh...); bảng đấu khớp theo tên (Bảng A..E).
 //  - Xếp hạng đúng luật BXH chính thức: compareRankedTeams (tổng điểm 2 lượt
 //    → tổng thời gian → số lần chạy lại → lượt cao nhất).
-//  - Bỏ Battle of Stars / Fly Smart Cup: đấu vòng tròn trong từng host, đội ở
-//    host khác nhau không đấu với nhau nên không xếp chung được.
+//  - Battle of Stars / Fly Smart Cup: chỉ dựng BXH tổng để tham khảo (Match
+//    Points → Total Score → số trận thắng), KHÔNG xét lần 2 — đấu vòng tròn
+//    trong từng host, đội ở host khác nhau không gặp nhau.
 //  - Host có gộp bảng khi xếp hạng / trao giải (lib/boardMerge.js, vd Đà
 //    Nẵng: Bầu trời B+C, D+E) → đội của bảng gộp xếp vào bảng CAO NHẤT của
 //    nhóm (B+C → C), đúng cách host đó đã trao giải.
@@ -22,7 +23,7 @@ import { fmtDate, validDob } from './china';
 export const SECOND_ROUND_RATE = 0.1;
 export const isOnlineCompetition = (c) => /online/i.test(c?.name || '');
 
-const CONTENT_ORDER = ['inventions', 'mining', 'ancient', 'skyline'];
+const CONTENT_ORDER = ['inventions', 'mining', 'ancient', 'skyline', 'battle', 'fly'];
 const fold = (v) => normalizeText(v).replace(/[^a-z0-9]+/g, '');
 const personKeys = (team) => new Set(team.students
   .filter((st) => validDob(st.birth_date))
@@ -43,6 +44,9 @@ function sectionBoard(lookup, t, cache) {
   return cache.get(content.id).get(t.boardName) || t.boardName;
 }
 const contentRank = (key) => { const i = CONTENT_ORDER.indexOf(key); return i < 0 ? 99 : i; };
+const compareCombat = (a, b) => b.combat.matchPoints - a.combat.matchPoints
+  || b.combat.totalScore - a.combat.totalScore
+  || b.combat.wins - a.combat.wins;
 
 export function buildSecondRound(lookup) {
   if (!lookup) return { sections: [], hosts: [], hostsWithoutAwards: [] };
@@ -51,7 +55,7 @@ export function buildSecondRound(lookup) {
   const bySection = new Map();
   const mergeCache = new Map();
   for (const t of lookup.teams) {
-    if (!t.content || !hostIds.has(t.content.competition_id) || t.isCombat) continue;
+    if (!t.content || !hostIds.has(t.content.competition_id)) continue;
     const g = contentGroup(t.content);
     const board = sectionBoard(lookup, t, mergeCache) || 'Chưa xếp bảng';
     const key = `${g.key}|${board}`;
@@ -60,6 +64,17 @@ export function buildSecondRound(lookup) {
   }
 
   const sections = [...bySection.values()].map((s) => {
+    const hostNames = [...new Set(s.teams.map((t) => t.competition?.name).filter(Boolean))];
+    if (s.teams[0]?.isCombat) {
+      // Đối kháng: chỉ BXH tổng, không xét lần 2
+      const ranked = s.teams.filter((t) => t.combat?.played > 0).sort(compareCombat);
+      const rows = ranked.map((t, i) => ({ team: t, overallRank: i + 1, hasAward: t.awards.length > 0, selected: false, fromBoard: '' }));
+      return {
+        ...s, combat: true, rows, hosts: hostNames, totalTeams: s.teams.length, scoredTeams: ranked.length,
+        unscored: s.teams.length - ranked.length, awardTeams: rows.filter((r) => r.hasAward).length,
+        awardElsewhereTeams: 0, movedTeams: 0, noAwardTeams: 0, quota: 0, selected: [], tieExtra: 0,
+      };
+    }
     const ranked = s.teams.filter((t) => t.total).sort((a, b) => compareRankedTeams(a.total, b.total));
     const rows = ranked.map((t, i) => ({
       team: t, overallRank: i + 1, hasAward: t.awards.length > 0, selected: false,
@@ -90,7 +105,7 @@ export function buildSecondRound(lookup) {
     return {
       ...s,
       rows,
-      hosts: [...new Set(s.teams.map((t) => t.competition?.name).filter(Boolean))],
+      hosts: hostNames,
       totalTeams: s.teams.length,
       scoredTeams: ranked.length,
       unscored: s.teams.length - ranked.length,
@@ -121,7 +136,20 @@ const roundText = (t, n) => {
 // Excel: sheet "Tổng hợp" (suất + đội được xét của mọi BXH) rồi MỖI (nội
 // dung × bảng) 1 sheet riêng: khối trên = đội được xét lần 2 (mỗi học sinh 1
 // dòng, kèm ngày sinh / SĐT / email), khối dưới = BXH tổng đầy đủ của bảng đó.
-const SHORT_CONTENT = { inventions: 'Phát minh', mining: 'Khai khoáng', ancient: 'Văn minh cổ đại', skyline: 'Bầu trời' };
+const SHORT_CONTENT = {
+  inventions: 'Phát minh', mining: 'Khai khoáng', ancient: 'Văn minh cổ đại', skyline: 'Bầu trời',
+  battle: 'Battle of Stars', fly: 'Fly Smart Cup',
+};
+const COMBAT_HEADER = ['Hạng tổng', 'Đội', 'Host', 'Hạng tại host', 'Trận', 'Thắng', 'Hòa', 'Thua', 'Match Points', 'Total Score',
+  'Giải thưởng', 'Trường / Trung tâm', 'HLV', 'Học sinh'];
+const COMBAT_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'label', 'number', 'number', 'number', 'number', 'number', 'number',
+  'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
+const combatRankRows = (s) => s.rows.map((r) => [
+  r.overallRank, r.team.name, r.team.competition?.name || '', r.team.rank ? `Hạng ${r.team.rank}` : '',
+  r.team.combat.played, r.team.combat.wins, r.team.combat.draws, r.team.combat.losses,
+  r.team.combat.matchPoints, r.team.combat.totalScore, r.team.award || '',
+  r.team.school_name || '', r.team.coach_name || '', r.team.students.map((st) => st.full_name).join(', '),
+]);
 
 const SELECTED_HEADER = ['STT', 'Thứ tự xét', 'Hạng tổng', 'Đội', 'Host', 'Tổng điểm', 'Thời gian (s)', 'Hạng tại host',
   'Học sinh', 'Ngày sinh', 'SĐT', 'Nguồn SĐT', 'Email', 'Nguồn email', 'Trường / Trung tâm', 'HLV'];
@@ -187,7 +215,7 @@ export async function exportSecondRoundExcel(sections, filename = 'xet-diem-lan-
       header: ['STT', 'Nội dung', 'Bảng', 'Sheet', 'Host', 'Đội có điểm', 'Có giải', 'Có giải ở host khác', 'Không giải', 'Suất 10%', 'Được xét'],
       columnKinds: ['index', 'text-nowrap', 'label', 'text-nowrap', 'text-nowrap', 'number', 'number', 'number', 'number', 'number', 'number'],
       rows: sections.map((s, i) => [i + 1, s.contentName, s.board, sheetName(s), s.hosts.join(', '), s.scoredTeams, s.awardTeams,
-        s.awardElsewhereTeams || 0, s.noAwardTeams, s.quota, s.selected.length]),
+        ...(s.combat ? ['', '', 'Chỉ BXH', ''] : [s.awardElsewhereTeams || 0, s.noAwardTeams, s.quota, s.selected.length])]),
     },
     {
       title: 'DANH SÁCH ĐỘI ĐƯỢC XÉT ĐIỂM LẦN 2',
@@ -202,6 +230,14 @@ export async function exportSecondRoundExcel(sections, filename = 'xet-diem-lan-
   ]);
 
   for (const s of sections) {
+    if (s.combat) {
+      writeBlocks(workbook, sheetName(s), used, [{
+        title: `BXH TỔNG — ${s.contentName.toUpperCase()} — ${s.board.toUpperCase()}`,
+        subtitle: `${s.scoredTeams} đội đã thi · host: ${s.hosts.join(', ')} · Match Points → Total Score → số trận thắng (đấu vòng tròn trong từng host)`,
+        header: COMBAT_HEADER, columnKinds: COMBAT_KINDS, rows: combatRankRows(s),
+      }]);
+      continue;
+    }
     writeBlocks(workbook, sheetName(s), used, [
       {
         title: `${s.contentName.toUpperCase()} — ${s.board.toUpperCase()}: ĐỘI ĐƯỢC XÉT ĐIỂM LẦN 2`,
