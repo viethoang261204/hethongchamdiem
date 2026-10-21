@@ -2,17 +2,13 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAllLookup } from './useAllLookup';
 import { normalizeText } from '../../lib/lookup';
-import { STATUS, buildChinaReport, pct } from '../../lib/chinaReport';
-import { downloadSchoolReport, downloadSchoolReportsZip } from '../../lib/schoolReport';
+import { buildChinaReport, pct } from '../../lib/chinaReport';
+import { awardLabel, downloadSchoolReport, downloadSchoolReportsZip, goingLabel } from '../../lib/schoolReport';
 import { fmtDate, validDob } from '../../lib/china';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/Pagination';
 
-const STATUS_STYLE = {
-  lan1: { color: '#fbbf24', borderColor: 'rgba(251,191,36,.5)' },
-  lan2: { color: '#34d399', borderColor: 'rgba(52,211,153,.5)' },
-  none: { color: '#94a3b8' },
-};
+const goingStyle = (r) => (r.status !== 'none' ? { color: '#34d399', borderColor: 'rgba(52,211,153,.5)' } : { color: '#94a3b8' });
 
 // Xem trước đúng các phần của file Excel báo cáo trường (lib/schoolReport.js)
 function SchoolPreview({ school, onDownload, busy }) {
@@ -31,10 +27,9 @@ function SchoolPreview({ school, onDownload, busy }) {
       <h3 style={{ margin: '20px 0 10px' }}>Tổng quan</h3>
       <div className="rt-stats">
         <div className="rt-stat"><div className="rt-stat-value">{school.registered}</div><div className="rt-stat-label">Đội đăng ký</div></div>
-        <div className="rt-stat"><div className="rt-stat-value" style={{ color: '#fbbf24' }}>{school.lan1}</div><div className="rt-stat-label">Đi lần 1 (chính {school.major} · phụ {school.minor})</div></div>
-        <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{school.lan2}</div><div className="rt-stat-label">Đi lần 2</div></div>
-        <div className="rt-stat"><div className="rt-stat-value">{pct(school.going, school.registered)}</div><div className="rt-stat-label">Tỷ lệ được đi ({school.going}/{school.registered})</div></div>
-        <div className="rt-stat rt-stat-pending"><div className="rt-stat-value">{school.none}</div><div className="rt-stat-label">Không giải</div></div>
+        <div className="rt-stat rt-stat-done"><div className="rt-stat-value">{school.going}</div><div className="rt-stat-label">Được đi Trung Quốc</div></div>
+        <div className="rt-stat"><div className="rt-stat-value">{pct(school.going, school.registered)}</div><div className="rt-stat-label">Tỷ lệ được đi</div></div>
+        <div className="rt-stat rt-stat-pending"><div className="rt-stat-value">{school.none}</div><div className="rt-stat-label">Không được đi</div></div>
       </div>
 
       <h3 style={{ margin: '20px 0 10px' }}>Chi tiết đội thi</h3>
@@ -48,8 +43,8 @@ function SchoolPreview({ school, onDownload, busy }) {
                 <td className="viewer-sub">{r.competition?.name}</td>
                 <td>{r.contentName}<div className="viewer-sub">{r.board}</div></td>
                 <td className="viewer-nowrap">{r.result || '—'}{r.hostRank && <div className="viewer-sub">hạng {r.hostRank}</div>}</td>
-                <td>{r.status === 'lan1' ? r.award : ''}{r.note && <div className="viewer-sub">{r.note}</div>}</td>
-                <td><span className="viewer-chip" style={STATUS_STYLE[r.status]}>{STATUS[r.status].label}</span></td>
+                <td>{awardLabel(r) || <span className="viewer-sub">—</span>}</td>
+                <td><span className="viewer-chip" style={goingStyle(r)}>{goingLabel(r)}</span></td>
               </tr>
             ))}
           </tbody>
@@ -59,17 +54,16 @@ function SchoolPreview({ school, onDownload, busy }) {
       <h3 style={{ margin: '20px 0 10px' }}>Học sinh được đi Trung Quốc ({going.reduce((a, r) => a + r.team.students.length, 0)})</h3>
       <div className="table-container">
         <table>
-          <thead><tr><th>Họ và tên</th><th>Ngày sinh</th><th>Đội</th><th>Giải thưởng</th><th>Đợt đi</th></tr></thead>
+          <thead><tr><th>Họ và tên</th><th>Ngày sinh</th><th>Đội</th><th>Giải thưởng</th></tr></thead>
           <tbody>
             {going.length === 0 ? (
-              <tr><td colSpan={5} className="viewer-sub" style={{ textAlign: 'center', padding: 16 }}>Chưa có học sinh được đi.</td></tr>
+              <tr><td colSpan={4} className="viewer-sub" style={{ textAlign: 'center', padding: 16 }}>Chưa có học sinh được đi.</td></tr>
             ) : going.flatMap((r) => r.team.students.map((st) => (
               <tr key={`${r.team.id}-${st.id}`}>
                 <td>{st.full_name}</td>
                 <td className="viewer-nowrap">{validDob(st.birth_date) ? fmtDate(st.birth_date) : <span className="viewer-missing">Chưa có</span>}</td>
                 <td>{r.team.name}<div className="viewer-sub">{r.competition?.name} · {r.contentName} {r.board}</div></td>
-                <td>{r.status === 'lan1' ? r.award : 'Xét điểm lần 2'}</td>
-                <td><span className="viewer-chip" style={STATUS_STYLE[r.status]}>{STATUS[r.status].label}</span></td>
+                <td>{awardLabel(r) || <span className="viewer-sub">—</span>}</td>
               </tr>
             )))}
           </tbody>
@@ -114,7 +108,7 @@ export default function ViewerSchoolReport() {
       <div className="referee-page-header">
         <h1 className="referee-page-title">Báo cáo theo trường</h1>
         <p className="referee-page-subtitle">
-          Mỗi trường / trung tâm 1 file Excel riêng theo mẫu: tổng quan (đội đăng ký, đi lần 1 / lần 2, tỷ lệ được đi), theo giải đấu,
+          Mỗi trường / trung tâm 1 file Excel riêng theo mẫu: tổng quan (đội đăng ký, được đi Trung Quốc, tỷ lệ được đi), theo giải đấu,
           chi tiết từng đội và danh sách học sinh được đi Trung Quốc — gửi thẳng cho trường.
         </p>
       </div>
@@ -133,20 +127,19 @@ export default function ViewerSchoolReport() {
           <table>
             <thead>
               <tr>
-                <th>Trường / Trung tâm</th><th className="viewer-num">Đội đăng ký</th><th className="viewer-num">Đi lần 1</th>
-                <th className="viewer-num">Đi lần 2</th><th className="viewer-num">Tỷ lệ được đi</th><th className="viewer-num">Không giải</th><th />
+                <th>Trường / Trung tâm</th><th className="viewer-num">Đội đăng ký</th><th className="viewer-num">Được đi</th>
+                <th className="viewer-num">Tỷ lệ được đi</th><th className="viewer-num">Không được đi</th><th />
               </tr>
             </thead>
             <tbody>
               {pageItems.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không tìm thấy.</td></tr>
+                <tr><td colSpan={6} style={{ textAlign: 'center', padding: 24, color: '#94a3b8' }}>Không tìm thấy.</td></tr>
               ) : pageItems.map((x) => (
                 <tr key={x.key} style={x.key === selectedKey ? { background: 'rgba(99,102,241,.12)' } : undefined}>
                   <td><strong>{x.name}</strong></td>
                   <td className="viewer-num">{x.registered}</td>
-                  <td className="viewer-num">{x.lan1}</td>
-                  <td className="viewer-num">{x.lan2}</td>
-                  <td className="viewer-num"><strong>{pct(x.going, x.registered)}</strong><div className="viewer-sub">{x.going}/{x.registered}</div></td>
+                  <td className="viewer-num">{x.going}</td>
+                  <td className="viewer-num"><strong>{pct(x.going, x.registered)}</strong></td>
                   <td className="viewer-num">{x.none}</td>
                   <td className="viewer-nowrap" style={{ textAlign: 'right' }}>
                     <button type="button" className="btn btn-secondary viewer-btn-sm" onClick={() => { setParams({ truong: x.key }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Xem</button>{' '}

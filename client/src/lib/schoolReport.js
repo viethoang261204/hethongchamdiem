@@ -3,7 +3,8 @@
 // I. Tổng quan → II. Theo giải đấu → III. Chi tiết đội thi → IV. Học sinh được
 // đi Trung Quốc → Ghi chú. Bảng màu theo mẫu bao-cao-mau.xlsx (navy / xanh
 // ngọc) như mọi báo cáo khác. Dữ liệu: 1 phần tử bySchool của buildChinaReport.
-import { STATUS } from './chinaReport';
+// Báo cáo gửi trường CHỈ ghi "Được đi / Không" — không tách đi lần 1 / lần 2,
+// giải chính / giải phụ (đội xét điểm lần 2 tính chung là được đi).
 import { downloadBlob } from './excelReport';
 import { fmtDate, validDob } from './china';
 
@@ -11,8 +12,9 @@ const NAVY = 'FF1F3864';
 const TEAL = 'FF0F7A82';
 const WHITE = 'FFFFFFFF';
 const LIGHT = 'FFEEF2F8';
-const GOLD_BG = 'FFFFF4D6';
 const GREEN_BG = 'FFE3F5EC';
+export const goingLabel = (r) => (r.status !== 'none' ? 'Được đi' : 'Không');
+export const awardLabel = (r) => (r.status === 'lan1' ? r.award : '');
 const BORDER = { style: 'thin', color: { argb: 'FFBFBFBF' } };
 const BOX = { top: BORDER, bottom: BORDER, left: BORDER, right: BORDER };
 const FONT = 'Arial';
@@ -85,9 +87,8 @@ function table(ws, row, { header, rows, spans, align, fill, numFmt }) {
 }
 
 const tally = (rows) => {
-  const lan1 = rows.filter((r) => r.status === 'lan1').length;
-  const lan2 = rows.filter((r) => r.status === 'lan2').length;
-  return { registered: rows.length, lan1, lan2, going: lan1 + lan2, none: rows.length - lan1 - lan2 };
+  const going = rows.filter((r) => r.status !== 'none').length;
+  return { registered: rows.length, going, none: rows.length - going };
 };
 
 export function buildSchoolWorkbook(ExcelJS, school) {
@@ -130,25 +131,24 @@ export function buildSchoolWorkbook(ExcelJS, school) {
   // ---- I. Tổng quan
   let row = sectionTitle(ws, 7, 'I. TỔNG QUAN');
   row = table(ws, row, {
-    header: ['Đội đăng ký', 'Đã thi', 'Đi lần 1\n(có giải)', 'Trong đó:\ngiải chính', 'Trong đó:\ngiải phụ', 'Đi lần 2\n(xét điểm lần 2)', 'Tổng được đi', 'Tỷ lệ được đi', 'Không giải', 'Học sinh được đi'],
-    spans: [2, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    align: Array(10).fill('center'),
-    numFmt: { 7: PCT_FMT },
-    rows: [Object.assign([school.registered, school.played, school.lan1, school.major, school.minor, school.lan2, school.going,
-      ratio(school.going, school.registered), school.none, school.students], { __bold: true })],
+    header: ['Đội đăng ký', 'Đã thi', 'Được đi Trung Quốc', 'Tỷ lệ được đi', 'Không được đi', 'Học sinh được đi'],
+    spans: [2, 1, 2, 2, 2, 2],
+    align: Array(6).fill('center'),
+    numFmt: { 3: PCT_FMT },
+    rows: [Object.assign([school.registered, school.played, school.going, ratio(school.going, school.registered), school.none, school.students], { __bold: true })],
   });
 
   // ---- II. Theo giải đấu
   row = sectionTitle(ws, row + 1, 'II. THEO GIẢI ĐẤU');
   const byComp = comps.map((name) => ({ name, ...tally(school.rows.filter((r) => r.competition?.name === name)) }));
   row = table(ws, row, {
-    header: ['STT', 'Giải đấu', 'Đội đăng ký', 'Đi lần 1', 'Đi lần 2', 'Tổng được đi', 'Tỷ lệ được đi', 'Không giải'],
-    spans: [1, 2, 1, 2, 1, 2, 1, 1],
-    align: ['center', 'left', 'center', 'center', 'center', 'center', 'center', 'center'],
-    numFmt: { 6: PCT_FMT },
+    header: ['STT', 'Giải đấu', 'Đội đăng ký', 'Được đi Trung Quốc', 'Tỷ lệ được đi', 'Không được đi'],
+    spans: [1, 3, 2, 2, 2, 1],
+    align: ['center', 'left', 'center', 'center', 'center', 'center'],
+    numFmt: { 4: PCT_FMT },
     rows: [
-      ...byComp.map((c, i) => [i + 1, c.name, c.registered, c.lan1, c.lan2, c.going, ratio(c.going, c.registered), c.none]),
-      Object.assign(['', 'Tổng cộng', school.registered, school.lan1, school.lan2, school.going, ratio(school.going, school.registered), school.none], { __bold: true }),
+      ...byComp.map((c, i) => [i + 1, c.name, c.registered, c.going, ratio(c.going, c.registered), c.none]),
+      Object.assign(['', 'Tổng cộng', school.registered, school.going, ratio(school.going, school.registered), school.none], { __bold: true }),
     ],
     fill: (i) => (i === byComp.length ? LIGHT : null),
   });
@@ -156,11 +156,12 @@ export function buildSchoolWorkbook(ExcelJS, school) {
   // ---- III. Chi tiết đội thi
   row = sectionTitle(ws, row + 1, 'III. CHI TIẾT ĐỘI THI');
   row = table(ws, row, {
-    header: ['STT', 'Tên đội', 'Giải đấu', 'Nội dung thi', 'Bảng', 'Huấn luyện viên', 'Kết quả', 'Hạng tại giải', 'Giải thưởng', 'Đi Trung Quốc', 'Ghi chú'],
-    align: ['center', 'left', 'left', 'left', 'center', 'left', 'center', 'center', 'left', 'center', 'left'],
+    header: ['STT', 'Tên đội', 'Giải đấu', 'Nội dung thi', 'Bảng', 'Huấn luyện viên', 'Kết quả', 'Hạng tại giải', 'Giải thưởng', 'Đi Trung Quốc'],
+    spans: [1, 1, 1, 1, 1, 1, 1, 1, 2, 1],
+    align: ['center', 'left', 'left', 'left', 'center', 'left', 'center', 'center', 'left', 'center'],
     rows: school.rows.map((r, i) => [i + 1, r.team.name, r.competition?.name || '', r.contentName, r.board, r.team.coach_name || '',
-      r.result, r.hostRank ? `Hạng ${r.hostRank}` : '', r.status === 'lan2' ? '' : r.award, STATUS[r.status].label, r.note]),
-    fill: (i) => ({ lan1: GOLD_BG, lan2: GREEN_BG }[school.rows[i].status] || null),
+      r.result, r.hostRank ? `Hạng ${r.hostRank}` : '', awardLabel(r), goingLabel(r)]),
+    fill: (i) => (school.rows[i].status !== 'none' ? GREEN_BG : null),
   });
 
   // ---- IV. Học sinh được đi Trung Quốc
@@ -168,23 +169,21 @@ export function buildSchoolWorkbook(ExcelJS, school) {
   const going = school.rows.filter((r) => r.status !== 'none');
   const studentRows = going.flatMap((r) => (r.team.students.length ? r.team.students : [null]).map((st) => [
     st?.full_name || '(chưa có tên học sinh)', st && validDob(st.birth_date) ? fmtDate(st.birth_date) : '', r.team.name,
-    r.competition?.name || '', r.contentName, r.board, r.status === 'lan1' ? r.award : 'Xét điểm lần 2', STATUS[r.status].label,
+    r.competition?.name || '', r.contentName, r.board, awardLabel(r),
   ]));
   row = table(ws, row, {
-    header: ['STT', 'Họ và tên học sinh', 'Ngày sinh', 'Tên đội', 'Giải đấu', 'Nội dung thi', 'Bảng', 'Giải thưởng', 'Đợt đi'],
-    spans: [1, 1, 1, 1, 2, 2, 1, 1, 1],
-    align: ['center', 'left', 'center', 'left', 'left', 'left', 'center', 'left', 'center'],
-    rows: studentRows.length ? studentRows.map((x, i) => [i + 1, ...x]) : [['', 'Chưa có học sinh được đi', '', '', '', '', '', '', '']],
-    fill: (i) => (studentRows[i]?.[7] === STATUS.lan2.label ? GREEN_BG : null),
+    header: ['STT', 'Họ và tên học sinh', 'Ngày sinh', 'Tên đội', 'Giải đấu', 'Nội dung thi', 'Bảng', 'Giải thưởng'],
+    spans: [1, 1, 1, 1, 2, 2, 1, 2],
+    align: ['center', 'left', 'center', 'left', 'left', 'left', 'center', 'left'],
+    rows: studentRows.length ? studentRows.map((x, i) => [i + 1, ...x]) : [['', 'Chưa có học sinh được đi', '', '', '', '', '', '']],
   });
 
   // ---- Ghi chú
   row += 1;
   const notes = [
     'Ghi chú:',
-    '• Đi lần 1: đội có giải thưởng chính thức tại giải (giải chính: Nhất / Nhì / Ba, Rising Star; giải phụ: Top 5 / Top 10...).',
-    '• Đi lần 2: đội không có giải nhưng thuộc 10% đội có điểm cao nhất trong BXH tổng các host thi trực tiếp (theo nội dung × bảng đấu).',
-    '• Tỷ lệ được đi = (Đi lần 1 + Đi lần 2) / Số đội đăng ký.',
+    '• Được đi Trung Quốc: đội có tên trong danh sách được Ban tổ chức công bố.',
+    '• Tỷ lệ được đi = Số đội được đi / Số đội đăng ký.',
   ];
   notes.forEach((t, i) => mergedRow(ws, row + i, t, { font: { name: FONT, size: 9, italic: i > 0, bold: i === 0 }, alignment: { wrapText: true, vertical: 'middle' } }));
   return wb;
