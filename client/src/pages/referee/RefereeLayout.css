@@ -1127,3 +1127,27 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ─── Sidebar thu gọn — đủ mọi mục trong 1 màn hình, không phải cuộn ─── */
+.referee-panel .sidebar-header { padding: 14px 18px; margin-bottom: 4px; gap: 10px; }
+.referee-panel .sidebar-logo-img { width: 32px; height: 32px; }
+.referee-panel .logo-text { font-size: 15px; }
+.referee-panel .nav-menu { padding: 0 10px; }
+.referee-panel .nav-section-title { margin: 8px 0 4px; padding: 0 10px; }
+.referee-panel .nav-item {
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.25;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.referee-panel .nav-item-icon svg { width: 17px !important; height: 17px !important; min-width: 17px !important; min-height: 17px !important; }
+.referee-panel .sidebar-footer { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
+.referee-panel .user-info { padding: 6px 8px; }
+.referee-panel .user-avatar { width: 30px; height: 30px; font-size: 13px; }
+.referee-panel .logout-btn,
+.referee-panel .sidebar-footer .logout-btn { margin-top: 6px; padding: 6px 12px !important; min-height: 32px !important; }

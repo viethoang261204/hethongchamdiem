@@ -202,3 +202,8 @@
 .viewer-panel .intl-goal-scale span:first-child { transform: none; }
 .viewer-panel .intl-goal-scale span:last-child { transform: translateX(-100%); }
 .viewer-panel .intl-goal-foot { margin-top: 14px; font-size: 16px; color: #cbd5e1; }
+
+/* Sidebar thu gọn: khung chọn giải sát hơn */
+.viewer-panel .viewer-comp-box { padding: 0 12px 4px; }
+.viewer-panel .viewer-comp-box .nav-section-title { margin-top: 4px; }
+.viewer-panel .viewer-comp-select { padding-top: 7px; padding-bottom: 7px; }
