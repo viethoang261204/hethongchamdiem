@@ -184,3 +184,21 @@
 .viewer-panel .archive-table .btn-sm { padding: 6px 14px; font-size: 13px; white-space: nowrap; }
 .viewer-panel .viewer-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 3px 0; }
 .viewer-panel .viewer-entry .viewer-chips { flex-wrap: nowrap; }
+
+/* Mục tiêu ENJOY AI QUỐC TẾ 2026 — thanh tiến độ cỡ lớn */
+.viewer-panel .intl-goal-card { padding: 32px 36px 28px; margin-bottom: 20px; }
+.viewer-panel .intl-goal-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.viewer-panel .intl-goal-label { color: #94a3b8; font-size: 14px; text-transform: uppercase; letter-spacing: .08em; }
+.viewer-panel .intl-goal-number { font-size: 22px; color: #cbd5e1; font-weight: 600; }
+.viewer-panel .intl-goal-number span { font-size: 56px; font-weight: 800; color: #f8fafc; line-height: 1.05; margin-right: 6px; }
+.viewer-panel .intl-goal-percent { font-size: 64px; font-weight: 800; line-height: 1; color: #818cf8; }
+.viewer-panel .intl-goal-percent.is-done { color: #34d399; }
+.viewer-panel .intl-goal-track { position: relative; height: 56px; border-radius: 999px; background: rgba(148, 163, 184, .14); overflow: hidden; border: 1px solid rgba(148, 163, 184, .2); }
+.viewer-panel .intl-goal-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #6366f1, #3b82f6 55%, #22d3ee); box-shadow: 0 0 24px rgba(99, 102, 241, .45); transition: width .6s ease; }
+.viewer-panel .intl-goal-fill.is-done { background: linear-gradient(90deg, #10b981, #34d399); box-shadow: 0 0 24px rgba(52, 211, 153, .45); }
+.viewer-panel .intl-goal-tick { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(15, 23, 42, .55); }
+.viewer-panel .intl-goal-scale { position: relative; height: 22px; margin-top: 8px; font-size: 12.5px; color: #94a3b8; }
+.viewer-panel .intl-goal-scale span { position: absolute; transform: translateX(-50%); }
+.viewer-panel .intl-goal-scale span:first-child { transform: none; }
+.viewer-panel .intl-goal-scale span:last-child { transform: translateX(-100%); }
+.viewer-panel .intl-goal-foot { margin-top: 14px; font-size: 16px; color: #cbd5e1; }

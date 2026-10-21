@@ -596,6 +596,11 @@ export const api = {
 
   // Cổng Tra cứu (/tra-cuu) — toàn bộ dữ liệu 1 cuộc thi trong 1 lần gọi
   getLookup: (competitionId) => withRetry(() => request(`/lookup/${competitionId}`), 'getLookup'),
+  // Mục tiêu ENJOY AI QUỐC TẾ 2026 (số người đăng ký cộng dồn)
+  getIntlGoal: () => withRetry(() => request('/intl-goal'), 'getIntlGoal'),
+  addIntlEntry: (body) => request('/intl-goal/entries', { method: 'POST', body }),
+  updateIntlEntry: (id, body) => request(`/intl-goal/entries/${id}`, { method: 'PUT', body }),
+  deleteIntlEntry: (id) => request(`/intl-goal/entries/${id}`, { method: 'DELETE' }),
 
   // ============================================================
   // Diagnostic

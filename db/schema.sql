@@ -772,3 +772,14 @@ alter table students add column if not exists email text;
 alter table students add column if not exists phone text;
 alter table students add column if not exists email_source text;
 alter table students add column if not exists phone_source text;
+
+-- Mục tiêu ENJOY AI QUỐC TẾ 2026: mỗi dòng = 1 lần ghi nhận số người đăng ký
+-- (cổng Tra cứu nhập / sửa / xoá; tổng các dòng so với mục tiêu ở routes.cjs)
+create table if not exists intl_registrations (
+  id          uuid primary key default gen_random_uuid(),
+  count       integer not null check (count > 0 and count <= 10000),
+  note        text,
+  created_by  text,
+  created_at  timestamptz default now(),
+  updated_at  timestamptz default now()
+);

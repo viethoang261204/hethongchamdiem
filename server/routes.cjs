@@ -16,8 +16,11 @@ const router = express.Router();
 // Tài khoản "Tra cứu" (role = 'viewer') — cổng /tra-cuu chỉ để XEM: chặn cứng
 // mọi thao tác ghi ở tầng server (kể cả các route chỉ requireAuth như nộp
 // phiếu điểm/kết quả trận), không phụ thuộc vào việc giao diện có ẩn nút.
+// Ngoại lệ DUY NHẤT: nhập số người đăng ký cho "Mục tiêu ENJOY AI QUỐC TẾ 2026"
+// (màn này do chính cổng Tra cứu cập nhật).
+const VIEWER_WRITABLE = [/^\/intl-goal\/entries(\/[^/]+)?$/];
 router.use((req, res, next) => {
-  if (req.user?.role === 'viewer' && req.method !== 'GET') {
+  if (req.user?.role === 'viewer' && req.method !== 'GET' && !VIEWER_WRITABLE.some((re) => re.test(req.path))) {
     return res.status(403).json({ error: 'Tài khoản Tra cứu chỉ được xem, không có quyền thay đổi dữ liệu.' });
   }
   next();
@@ -1996,6 +1999,47 @@ router.post('/students/registration-import', requireAdmin, h(async (req, res) =>
     total: input.length, matchedRows, matchedStudents: best.size, updated,
     unmatchedCount: unmatched.length, unmatched: unmatched.slice(0, 500),
   });
+}));
+
+// ============================================================
+// Mục tiêu ENJOY AI QUỐC TẾ 2026 — số người đăng ký cộng dồn từ các lần nhập
+// (cổng Tra cứu + admin đều nhập / sửa / xoá được)
+// ============================================================
+const INTL_GOAL = { title: 'ENJOY AI QUỐC TẾ 2026', target: 400 };
+const cleanCount = (v) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 && n <= 10000 ? n : null;
+};
+
+router.get('/intl-goal', requireViewer, h(async (_req, res) => {
+  const { rows } = await query('select id, count, note, created_by, created_at, updated_at from intl_registrations order by created_at desc');
+  res.json({ ...INTL_GOAL, total: rows.reduce((a, r) => a + r.count, 0), entries: rows });
+}));
+
+router.post('/intl-goal/entries', requireViewer, h(async (req, res) => {
+  const count = cleanCount(req.body?.count);
+  if (!count) return res.status(400).json({ error: 'Số người phải là số nguyên từ 1 đến 10000.' });
+  const { rows } = await query(
+    'insert into intl_registrations (count, note, created_by) values ($1, $2, $3) returning *',
+    [count, cleanText(req.body?.note, 200), req.user.full_name || req.user.username || null]
+  );
+  res.json(rows[0]);
+}));
+
+router.put('/intl-goal/entries/:id', requireViewer, h(async (req, res) => {
+  const count = cleanCount(req.body?.count);
+  if (!count) return res.status(400).json({ error: 'Số người phải là số nguyên từ 1 đến 10000.' });
+  const { rows } = await query(
+    'update intl_registrations set count = $1, note = $2, updated_at = now() where id = $3 returning *',
+    [count, cleanText(req.body?.note, 200), req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy dòng này.' });
+  res.json(rows[0]);
+}));
+
+router.delete('/intl-goal/entries/:id', requireViewer, h(async (req, res) => {
+  await query('delete from intl_registrations where id = $1', [req.params.id]);
+  res.json({ ok: true });
 }));
 
 // Giải thưởng chính thức (team_awards) của 1 cuộc thi — dùng xét HLV xuất sắc

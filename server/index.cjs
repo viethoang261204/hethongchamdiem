@@ -58,7 +58,15 @@ const STARTUP_MIGRATIONS = `
   alter table students add column if not exists email text;
   alter table students add column if not exists phone text;
   alter table students add column if not exists email_source text;
-  alter table students add column if not exists phone_source text;`;
+  alter table students add column if not exists phone_source text;
+  create table if not exists intl_registrations (
+    id          uuid primary key default gen_random_uuid(),
+    count       integer not null check (count > 0 and count <= 10000),
+    note        text,
+    created_by  text,
+    created_at  timestamptz default now(),
+    updated_at  timestamptz default now()
+  );`;
 
 require('./db.cjs').query(STARTUP_MIGRATIONS)
   .catch((err) => console.error('[migrate]', err.message))
