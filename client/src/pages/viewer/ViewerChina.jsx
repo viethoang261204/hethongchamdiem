@@ -72,9 +72,9 @@ export default function ViewerChina() {
         </select>
         <select className="filter-select" value={f.loai} onChange={(e) => set('loai', e.target.value)}>
           <option value="">Mọi loại giải</option>
-          <option value="chinh">Có giải chính (Nhất/Nhì/Ba, Rising Star)</option>
+          <option value="chinh">Có giải chính (Nhất/Nhì/Ba)</option>
           <option value="rising">Rising Star</option>
-          <option value="phu">Chỉ giải phụ (Top 5 / Top 10...)</option>
+          <option value="phu">Chỉ giải phụ (Rising Star, Top 5 / Top 10...)</option>
         </select>
         <select className="filter-select" value={f.thongTin} onChange={(e) => set('thongTin', e.target.value)}>
           <option value="">Thông tin HS: tất cả</option>

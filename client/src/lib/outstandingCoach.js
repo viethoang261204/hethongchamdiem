@@ -92,8 +92,8 @@ export function isOutstandingCoach(entries) {
 }
 
 // Giải "Rising Star" — giải đặc biệt do BTC chọn thủ công (không dựa vào xếp
-// hạng thi đấu), đội đạt giải này thì HLV cũng được tính vào "HLV xuất sắc"
-// (coi như giải chính, tương đương Top 1-3). Khớp theo (competition_id × tên
+// hạng thi đấu); tính là GIẢI PHỤ (như Top 5 / Top 10) khi xét "HLV xuất sắc".
+// Khớp theo (competition_id × tên
 // đội) — cùng lý do scoping ở trên (VD "Unity" là 2 đội khác nhau ở Asian
 // Open và HCM).
 const RISING_STAR_TEAMS_BY_COMPETITION = {

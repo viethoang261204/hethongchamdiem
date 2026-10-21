@@ -1,7 +1,7 @@
 // Báo cáo đi Trung Quốc — trạng thái của MỌI đội đã đăng ký (mọi giải, kể cả
 // Online) so với tổng số đội đăng ký:
 //   - Đi lần 1: đội có giải thưởng chính thức (team_awards) — chia giải chính
-//     (Nhất / Nhì / Ba, Rising Star...) và giải phụ (Top 5 / Top 10...)
+//     (Nhất / Nhì / Ba...) và giải phụ (Rising Star, Top 5 / Top 10...)
 //   - Đi lần 2: đội được chọn ở "Xét điểm lần 2" (lib/secondRound.js)
 //   - Không giải: còn lại — ghi chú nếu đã có giải ở host khác / chưa thi
 import { buildSecondRound } from './secondRound';

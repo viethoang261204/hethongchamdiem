@@ -141,7 +141,7 @@ export default function ViewerChinaReport() {
         <h1 className="referee-page-title">Báo cáo đi Trung Quốc</h1>
         <p className="referee-page-subtitle">
           Số đội được đi Trung Quốc so với số đội đăng ký ở mọi giải. <strong>Đi lần 1</strong>: đội có giải thưởng chính thức
-          (giải chính: Nhất / Nhì / Ba, Rising Star; giải phụ: Top 5 / Top 10...). <strong>Đi lần 2</strong>: đội được chọn ở màn
+          (giải chính: Nhất / Nhì / Ba; giải phụ: Rising Star, Top 5 / Top 10...). <strong>Đi lần 2</strong>: đội được chọn ở màn
           Xét điểm lần 2. Còn lại là <strong>không giải</strong>.
         </p>
       </div>

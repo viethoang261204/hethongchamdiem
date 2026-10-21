@@ -744,8 +744,8 @@ alter table users add constraint users_role_check check (role in ('admin', 'refe
 -- Ba, Top 5/Top 10, Rising Star; giải Online: Vô địch/Á quân/Quý quân...).
 -- Khi 1 cuộc thi đã có dữ liệu ở đây, cổng Tra cứu + xét HLV xuất sắc dùng
 -- đúng giải công bố thay vì tự suy ra từ hạng.
---   tier: 'major' = giải chính (Nhất/Nhì/Ba, Rising Star — tính như giải chính)
---         'phu'   = giải phụ (Top 5/Top 10...)
+--   tier: 'major' = giải chính (Nhất/Nhì/Ba; Vô địch/Á quân/Quý quân)
+--         'phu'   = giải phụ (Rising Star, Top 5/Top 10...)
 create table if not exists team_awards (
   id              uuid primary key default gen_random_uuid(),
   team_id         uuid not null references teams(id) on delete cascade,

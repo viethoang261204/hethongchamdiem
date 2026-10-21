@@ -7,7 +7,7 @@ import Pagination from '../../components/Pagination';
 import { awardOrder, classifyRank, formatRankLabel, isOutstandingCoach, isRisingStarTeam } from '../../lib/outstandingCoach';
 
 // Tổng hợp "HLV xuất sắc" — ĐÚNG tiêu chí ở lib/outstandingCoach.js (dùng
-// chung với trang admin): HLV có ≥ 1 đội Top 1-3 (hoặc Rising Star), hoặc
+// chung với trang admin): HLV có ≥ 1 đội Top 1-3, hoặc
 // ≥ 3 đội trong "Top + giải phụ" theo cấu hình giải phụ của TỪNG giải. Hạng
 // lấy từ lib/lookup.js (đã gộp bảng nếu giải có cấu hình), khớp Bảng xếp hạng.
 export default function ViewerCoaches() {
@@ -34,7 +34,7 @@ export default function ViewerCoaches() {
         continue;
       }
       if (isRisingStarTeam(t.competition_id, t.name)) {
-        r.entries.push({ team: t, label: 'Rising Star', tier: 'major' });
+        r.entries.push({ team: t, label: 'Rising Star', tier: 'phu' });
       }
       const tier = t.rank ? classifyRank(t.competition_id, contentName, t.rankScope, t.rank) : null;
       if (tier) r.entries.push({ team: t, label: formatRankLabel(t.competition_id, contentName, t.rankScope, t.rank), tier });
@@ -62,7 +62,7 @@ export default function ViewerCoaches() {
       <div className="referee-page-header">
         <h1 className="referee-page-title">Huấn luyện viên xuất sắc</h1>
         <p className="referee-page-subtitle">
-          HLV đạt danh hiệu khi có <strong>ít nhất 1 đội đạt giải chính (Giải Nhất / Nhì / Ba hoặc Rising Star)</strong>, hoặc <strong>ít nhất 3 đội đạt giải</strong> (gộp giải chính + giải phụ Top 5 / Top 10). Xét theo danh sách giải thưởng chính thức BTC công bố.
+          HLV đạt danh hiệu khi có <strong>ít nhất 1 đội đạt giải chính (Giải Nhất / Nhì / Ba)</strong>, hoặc <strong>ít nhất 3 đội đạt giải</strong> (gộp giải chính + giải phụ Rising Star / Top 5 / Top 10). Xét theo danh sách giải thưởng chính thức BTC công bố.
         </p>
       </div>
 

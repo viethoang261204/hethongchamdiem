@@ -56,7 +56,7 @@ async function computeQualifyingEntries(competitionId) {
     teams.forEach((t) => {
       if (!isRisingStarTeam(competitionId, t.name)) return;
       addEntry(t.coach_id, {
-        team_name: t.name, content_name: content.name, board_name: 'Rising Star', rank: 0, tier: 'major', award: 'rising_star', competition_id: competitionId,
+        team_name: t.name, content_name: content.name, board_name: 'Rising Star', rank: 0, tier: 'phu', award: 'rising_star', competition_id: competitionId,
       });
     });
 
@@ -236,8 +236,8 @@ export default function AdminOutstandingCoaches() {
           <h1 className="page-title">HLV xuất sắc</h1>
           <p className="page-subtitle">
             Tự động xét theo kết quả thi đấu thật — đạt giải Nhất/Nhì/Ba ở bất kỳ bảng đấu nào,
-            hoặc có từ 3 đội trở lên nằm trong Top + giải phụ (theo đúng bảng đấu quy định giải phụ),
-            hoặc có đội đạt giải Rising Star (do BTC chọn thủ công).
+            hoặc có từ 3 đội trở lên nằm trong Top + giải phụ (Rising Star, Top 5 / Top 10 theo đúng bảng
+            đấu quy định giải phụ).
           </p>
         </div>
         <button type="button" className="btn btn-secondary" onClick={runCompute} disabled={!selectedComp || computing}>
