@@ -51,6 +51,7 @@ import ViewerCoaches from './pages/viewer/ViewerCoaches';
 import ViewerArchive from './pages/viewer/ViewerArchive';
 import ViewerSecondRound from './pages/viewer/ViewerSecondRound';
 import ViewerChinaReport from './pages/viewer/ViewerChinaReport';
+import ViewerSchoolReport from './pages/viewer/ViewerSchoolReport';
 import ViewerChina from './pages/viewer/ViewerChina';
 
 const AuthContext = createContext(null);
@@ -172,6 +173,7 @@ export default function App() {
               <Route path="di-trung-quoc" element={<ViewerChina />} />
               <Route path="xet-diem-lan-2" element={<ViewerSecondRound />} />
               <Route path="bao-cao-trung-quoc" element={<ViewerChinaReport />} />
+              <Route path="bao-cao-truong" element={<ViewerSchoolReport />} />
               <Route path="luu-tru" element={<ViewerArchive />} />
               <Route path="bang-xep-hang" element={<ViewerScoreboard />} />
               <Route path="phieu/:scoreId" element={<ViewerScoreDetail />} />

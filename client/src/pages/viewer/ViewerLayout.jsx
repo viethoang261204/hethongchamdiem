@@ -30,6 +30,7 @@ const NAV = [
   { to: '/tra-cuu/di-trung-quoc', icon: ICON.plane, label: 'Đội đi Trung Quốc' },
   { to: '/tra-cuu/xet-diem-lan-2', icon: ICON.recheck, label: 'Xét điểm lần 2' },
   { to: '/tra-cuu/bao-cao-trung-quoc', icon: ICON.report, label: 'Báo cáo đi Trung Quốc' },
+  { to: '/tra-cuu/bao-cao-truong', icon: ICON.groups, label: 'Báo cáo theo trường' },
   { to: '/tra-cuu/bang-xep-hang', icon: ICON.scoreboard, label: 'Bảng xếp hạng' },
   { to: '/tra-cuu/luu-tru', icon: ICON.folder, label: 'Lưu trữ bảng điểm' },
 ];
