@@ -4,8 +4,10 @@
 //     (Nhất / Nhì / Ba...) và giải phụ (Rising Star, Top 5 / Top 10...)
 //   - Đi lần 2: đội được chọn ở "Xét điểm lần 2" (lib/secondRound.js)
 //   - Không giải: còn lại — ghi chú nếu đã có giải ở host khác / chưa thi
+// Không tính đội nước ngoài (đơn vị đăng ký = tên nước) — xem lib/foreign.js
 import { buildSecondRound } from './secondRound';
 import { contentGroup } from './lookup';
+import { isForeignTeam } from './foreign';
 import { buildStyledSheet, downloadWorkbook, safeSheetName, writeStyledBlock } from './excelReport';
 
 export const STATUS = {
@@ -31,7 +33,7 @@ export function buildChinaReport(lookup) {
     }
   }
 
-  const rows = lookup.teams.map((t) => {
+  const rows = lookup.teams.filter((t) => !isForeignTeam(t)).map((t) => {
     const g = contentGroup(t.content);
     const played = t.isCombat ? (t.combat?.played || 0) > 0 : !!t.total || !!t.rank;
     const base = {

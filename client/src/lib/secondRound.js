@@ -20,18 +20,14 @@
 //  - Đội bằng điểm tuyệt đối với đội cuối cùng được chọn → được xét cùng.
 import { compareRankedTeams, getMergeGroupsForContent } from './boardMerge';
 import { contentGroup, normalizeText } from './lookup';
+import { isForeignTeam } from './foreign';
 import { downloadWorkbook, safeSheetName, writeStyledBlock } from './excelReport';
 import { fmtDate, validDob } from './china';
 
 export const SECOND_ROUND_RATE = 0.1;
 export const isOnlineCompetition = (c) => /online/i.test(c?.name || '');
 
-// Đội nước ngoài ở Asian Open được nhập với Trường / Trung tâm = tên nước
-const FOREIGN_SCHOOLS = new Set([
-  'china', 'taiwan', 'mongolia', 'romania', 'indonesia', 'macau', 'macao', 'hong kong', 'singapore', 'malaysia',
-  'thailand', 'philippines', 'cambodia', 'laos', 'myanmar', 'japan', 'korea', 'south korea', 'india', 'australia',
-]);
-export const isForeignTeam = (t) => FOREIGN_SCHOOLS.has(normalizeText(t.school_name).replace(/\s+/g, ' ').trim());
+export { isForeignTeam } from './foreign';
 
 const CONTENT_ORDER = ['inventions', 'mining', 'ancient', 'skyline', 'battle', 'fly'];
 const fold = (v) => normalizeText(v).replace(/[^a-z0-9]+/g, '');

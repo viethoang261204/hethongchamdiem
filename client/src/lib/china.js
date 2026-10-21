@@ -6,6 +6,7 @@
 // 1 bản ghi học sinh riêng → buildPeople() gộp về 1 người (xem quy tắc ở đó).
 import { awardOrder } from './outstandingCoach';
 import { contentGroup, normalizeText } from './lookup';
+import { isForeignTeam } from './foreign';
 import { buildStyledSheet, downloadWorkbook } from './excelReport';
 
 // 'YYYY-MM-DD' → 'dd/mm/yyyy'
@@ -36,8 +37,9 @@ export const studentMissing = (s) => [
   !s.email && 'email',
 ].filter(Boolean);
 
+// Không tính đội nước ngoài (đơn vị đăng ký = tên nước) — xem lib/foreign.js
 export function prepareChinaRows(rows) {
-  return (rows || []).map((r) => {
+  return (rows || []).filter((r) => !isForeignTeam(r)).map((r) => {
     const awards = (r.awards || []).slice().sort((a, b) => awardOrder(a) - awardOrder(b));
     const students = (r.students || []).map((s) => ({ ...s, missing: studentMissing(s) }));
     return {
