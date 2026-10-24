@@ -509,6 +509,20 @@ export async function buildScoreboardWorkbook({ compId, compName = '' }) {
     blocks.forEach((b) => {
       [b.header, b.columnKinds, ...b.rows].forEach((arr) => arr.splice(GROUP_COL, 1));
     });
+  } else {
+    // Có GROUP (VD giải Online): trong mỗi Bảng, các đội cùng GROUP đứng liền
+    // nhau — GROUP có đội hạng cao hơn lên trước, trong GROUP giữ theo hạng;
+    // đội chưa có GROUP xếp cuối. Cột "Hạng" vẫn là hạng thật trong Bảng.
+    blocks.forEach((b) => {
+      const bestRank = new Map();
+      b.rows.forEach((row) => {
+        const g = row[GROUP_COL];
+        if (g && !(bestRank.get(g) <= row[0])) bestRank.set(g, row[0]);
+      });
+      const groupOrder = (g) => (g ? bestRank.get(g) : Infinity);
+      b.rows.sort((x, y) => groupOrder(x[GROUP_COL]) - groupOrder(y[GROUP_COL])
+        || String(x[GROUP_COL]).localeCompare(String(y[GROUP_COL]), 'vi') || x[0] - y[0]);
+    });
   }
 
   // Độ rộng mỗi cột = độ dài nội dung DÀI NHẤT xuất hiện ở đúng cột đó
