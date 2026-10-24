@@ -11,7 +11,7 @@ import {
   sideFromDetails as droneSideFromDetails, computeMatchPoints as computeDroneMatchPoints,
 } from './flySmartCupScoring';
 import { safeSheetName, buildStyledSheet, writeStyledBlock } from './excelReport';
-import { formatRankLabel } from './outstandingCoach';
+import { formatRankLabel, awardOrder } from './outstandingCoach';
 import { getMergeGroupsForContent, mergeMeasurementTeams } from './boardMerge';
 
 // Cột file Excel "Báo cáo điểm" cho nội dung đo lường — 1 dòng/thí sinh theo
@@ -19,19 +19,21 @@ import { getMergeGroupsForContent, mergeMeasurementTeams } from './boardMerge';
 // sinh thí sinh nên cột đó luôn trống, không cần thiết trong báo cáo.
 // "Thứ hạng" ở cột cuối = hạng của đội trong BXH của ĐÚNG Bảng đấu (Board/
 // Division tuổi) mà đội đó thi trong nội dung này — không phải hạng gộp toàn
-// nội dung (1 nội dung có thể có nhiều Bảng đấu thi riêng), ghi dạng "Top N".
+// nội dung (1 nội dung có thể có nhiều Bảng đấu thi riêng). "Giải thưởng" =
+// giải CHÍNH THỨC của BTC (team_awards: Giải Nhất/Nhì/Ba, Top 5, Top 10,
+// Rising Star...); cuộc thi chưa nhập giải chính thức thì suy ra từ hạng.
 const REPORT_EXCEL_HEADER = [
   'Stt', 'Họ và tên thí sinh', 'Tổ chức/ Trường', 'Tên đội thi',
   'Bảng đấu', 'Huấn luyện viên', 'Địa điểm đăng ký dự thi', 'Sa bàn',
   'Điểm lần 1', 'Thời gian lần 1', 'Điểm lần 2', 'Thời gian lần 2',
-  'Tổng điểm', 'Tổng thời gian', 'Thứ hạng',
+  'Tổng điểm', 'Tổng thời gian', 'Thứ hạng', 'Giải thưởng',
 ];
 // 'index' = số thứ tự (căn giữa, định dạng số nguyên); 'text' = văn bản dài
 // (căn trái, tự xuống dòng); 'number' = số liệu (căn giữa); 'label' = văn bản
 // ngắn cần căn giữa, không xuống dòng (VD: "Top 1", "Thắng").
 const REPORT_COLUMN_KINDS = [
   'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text',
-  'number', 'number', 'number', 'number', 'number', 'number', 'label',
+  'number', 'number', 'number', 'number', 'number', 'number', 'number', 'label',
 ];
 
 // Mẫu Excel cho 2 nội dung đối kháng — MỖI TRẬN 1 DÒNG (không gộp thành 1
@@ -44,11 +46,11 @@ const REPORT_COLUMN_KINDS = [
 const COMBAT_MATCH_EXCEL_HEADER = [
   'Stt', 'Tên đội thi', 'Đối thủ', 'Trường/Trung tâm', 'Bảng đấu', 'Huấn luyện viên',
   'Sân', 'Bảng vòng tròn', 'Kết quả', 'Điểm đội', 'Điểm đối thủ', 'Match Points',
-  'Thắng', 'Hòa', 'Thua', 'Thứ hạng',
+  'Thắng', 'Hòa', 'Thua', 'Thứ hạng', 'Giải thưởng',
 ];
 const COMBAT_MATCH_COLUMN_KINDS = [
   'index', 'text', 'text', 'text', 'text', 'text', 'text', 'text', 'label',
-  'number', 'number', 'number', 'number', 'number', 'number', 'label',
+  'number', 'number', 'number', 'number', 'number', 'number', 'number', 'label',
 ];
 
 const COMBAT_FORMATS = ['combat_stars', 'combat_drone'];
@@ -84,7 +86,8 @@ export async function loadReportRows({ compId, contentId = '', contents }) {
   // lường) chỉ có hạng khi ĐÃ đấu xong (bracket_resolved) — đội chưa bị
   // loại/chưa xong nhánh sẽ không có hạng, để trống trong báo cáo.
   const scopedMeasurementContents = scopedContents.filter((c) => !COMBAT_FORMATS.includes(c.content_format));
-  const [measurement, combatPerContent, measurementRankEntries] = await Promise.all([
+  const competitionIds = compId ? [compId] : [...new Set(scopedContents.map((c) => c.competition_id))];
+  const [measurement, combatPerContent, measurementRankEntries, awardLists] = await Promise.all([
     api.getReportScores({ competitionId: compId, contentId: contentId || undefined }),
     Promise.all(scopedCombatContents.map(async (c) => {
       const [teams, matches, boards] = await Promise.all([api.getTeams(c.id), api.getCombatMatches(c.id), api.getBoards(c.id)]);
@@ -180,18 +183,35 @@ export async function loadReportRows({ compId, contentId = '', contents }) {
       });
       return entries.map((e) => ({ ...e, content_name: c.name }));
     })),
+    Promise.all(competitionIds.map((id) => api.getCompetitionAwards(id).then((list) => [id, list || []]).catch(() => [id, []]))),
   ]);
+  const awardsByTeamId = {};
+  awardLists.forEach(([, list]) => list.forEach((a) => {
+    if (!awardsByTeamId[a.team_id]) awardsByTeamId[a.team_id] = [];
+    awardsByTeamId[a.team_id].push(a.label);
+  }));
   return {
     measurement,
     rankByMeasurementKey: Object.fromEntries(
       measurementRankEntries.flat().map((e) => [`${e.team_id}|${e.contest_content_id}`, e])
     ),
+    awardsByTeamId,
+    competitionsWithAwards: awardLists.filter(([, list]) => list.length).map(([id]) => id),
     combat: combatPerContent.flatMap((c) => c.standingsRows),
     combatMatchRows: combatPerContent.flatMap((c) => c.matchRows),
     combatMatches: combatPerContent.flatMap((c) => c.matches
       .filter((m) => m.winner_id || m.is_draw || (m.details?.status && m.details.status !== 'scheduled'))
       .map((m) => ({ match: m, content: c.content }))),
   };
+}
+
+// Giải của 1 đội: giải chính thức (nhiều giải nối bằng " + "); cuộc thi
+// chưa có giải chính thức nào thì suy từ hạng (Top 1/2/3, Top 5/10).
+function teamAwardLabel(rows, content, teamId, boardName, rank) {
+  if ((rows.competitionsWithAwards || []).includes(content.competition_id)) {
+    return [...new Set(rows.awardsByTeamId?.[teamId] || [])].sort((a, b) => awardOrder(a) - awardOrder(b)).join(' + ');
+  }
+  return formatRankLabel(content.competition_id, content.name, boardName, rank);
 }
 
 // Gom (đội × nội dung) theo Trường/Trung tâm (groupBy='school') hoặc Huấn
@@ -287,7 +307,7 @@ export async function buildGroupWorkbook({ rows, groupName, groupBy, contents, c
       dataRows = matchRowsForContent.map((r, idx) => [
         idx + 1, r.team_name, r.opponent_name, r.school, r.board_name, r.coach_name,
         r.field_names, r.group_label, r.result_label, r.my_score, r.opp_score, r.match_points,
-        r.total_wins, r.total_draws, r.total_losses, formatRankLabel(content.competition_id, content.name, r.board_name, r.rank),
+        r.total_wins, r.total_draws, r.total_losses, r.rank ?? '', teamAwardLabel(rows, content, r.team_id, r.board_name, r.rank),
       ]);
     } else {
       const scoresByTeam = new Map();
@@ -325,10 +345,10 @@ export async function buildGroupWorkbook({ rows, groupName, groupBy, contents, c
             r1?.score ?? '', r1?.time ?? '',
             r2?.score ?? '', r2?.time ?? '',
             totalScore, totalTime,
-            idx === 0 ? (() => {
+            ...(idx === 0 ? (() => {
               const rankInfo = rows.rankByMeasurementKey?.[`${team.id}|${content.id}`];
-              return rankInfo ? formatRankLabel(content.competition_id, content.name, rankInfo.board_name, rankInfo.rank) : '';
-            })() : '',
+              return [rankInfo?.rank ?? '', teamAwardLabel(rows, content, team.id, rankInfo?.board_name, rankInfo?.rank)];
+            })() : ['', '']),
           ]);
         });
       }
@@ -339,8 +359,8 @@ export async function buildGroupWorkbook({ rows, groupName, groupBy, contents, c
       header: isCombat ? COMBAT_MATCH_EXCEL_HEADER : REPORT_EXCEL_HEADER,
       columnKinds: isCombat ? COMBAT_MATCH_COLUMN_KINDS : REPORT_COLUMN_KINDS,
       columnWidths: isCombat
-        ? [6, 22, 22, 20, 14, 20, 12, 16, 12, 12, 14, 14, 10, 10, 10, 12]
-        : [6, 22, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12, 12],
+        ? [6, 22, 22, 20, 14, 20, 12, 16, 12, 12, 14, 14, 10, 10, 10, 10, 18]
+        : [6, 22, 20, 20, 12, 20, 26, 14, 10, 12, 10, 12, 10, 12, 10, 18],
       rows: dataRows,
     });
   }
