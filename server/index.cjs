@@ -59,6 +59,7 @@ const STARTUP_MIGRATIONS = `
   alter table students add column if not exists phone text;
   alter table students add column if not exists email_source text;
   alter table students add column if not exists phone_source text;
+  alter table teams add column if not exists group_name text;
   create table if not exists intl_registrations (
     id          uuid primary key default gen_random_uuid(),
     count       integer not null check (count > 0 and count <= 10000),

@@ -407,16 +407,19 @@ export async function buildScoreboardWorkbook({ compId, compName = '' }) {
     const teamInfoById = new Map((allTeamsForLookup || []).map((t) => [t.id, {
       coach: t.coaches?.name || '',
       school: t.schools?.name || '',
+      group: t.group_name || '',
       field: (t.fields || []).map((f) => f.name).join(', '),
       students: (t.student_ids || []).map((sid) => studentNameById.get(sid)).filter(Boolean).join(', '),
     }]));
-    const infoOf = (id) => teamInfoById.get(id) || { coach: '', school: '', field: '', students: '' };
+    const infoOf = (id) => teamInfoById.get(id) || { coach: '', school: '', group: '', field: '', students: '' };
 
-    const IDENTITY_HEADER = ['Hạng', 'Đội', 'HLV', 'Trường', 'Sân thi đấu', 'Học sinh'];
-    const IDENTITY_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
+    // "GROUP" (nhóm/trung tâm — khác Trường của HS, VD giải Online) đứng ngay
+    // sau "Trường"; cả file không đội nào có GROUP thì bỏ cột này ở cuối hàm.
+    const IDENTITY_HEADER = ['Hạng', 'Đội', 'HLV', 'Trường', 'GROUP', 'Sân thi đấu', 'Học sinh'];
+    const IDENTITY_KINDS = ['index', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap', 'text-nowrap'];
     const identityRow = (rank, teamName, id) => {
       const info = infoOf(id);
-      return [rank, teamName, info.coach, info.school, info.field, info.students];
+      return [rank, teamName, info.coach, info.school, info.group, info.field, info.students];
     };
 
     // Ghép xếp hạng theo boardMerge.js (nếu nội dung này có cấu hình) —
@@ -481,8 +484,8 @@ export async function buildScoreboardWorkbook({ compId, compName = '' }) {
           // Nhánh đấu loại trực tiếp (ranking_format='combat' cho nội dung
           // đo lường) — chỉ xuất được khi đã đấu xong hết nhánh.
           if (!r.bracket_resolved || !r.placements?.length) continue;
-          header = IDENTITY_HEADER;
-          columnKinds = IDENTITY_KINDS;
+          header = [...IDENTITY_HEADER];
+          columnKinds = [...IDENTITY_KINDS];
           dataRows = r.placements.map((p) => {
             const name = r.matches.find((m) => m.team_a_id === p.team_id)?.team_a_name
               || r.matches.find((m) => m.team_b_id === p.team_id)?.team_b_name || p.team_id;
@@ -500,6 +503,13 @@ export async function buildScoreboardWorkbook({ compId, compName = '' }) {
   }
 
   if (blocks.length === 0) return null;
+
+  const GROUP_COL = 4;
+  if (!blocks.some((b) => b.rows.some((row) => row[GROUP_COL]))) {
+    blocks.forEach((b) => {
+      [b.header, b.columnKinds, ...b.rows].forEach((arr) => arr.splice(GROUP_COL, 1));
+    });
+  }
 
   // Độ rộng mỗi cột = độ dài nội dung DÀI NHẤT xuất hiện ở đúng cột đó
   // (tiêu đề lẫn dữ liệu) trên khắp mọi khối, cộng thêm chút đệm — không
